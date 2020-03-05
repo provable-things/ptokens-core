@@ -1,0 +1,35 @@
+[package]
+license = "MIT"
+publish = false
+edition = "2018"
+version = "0.1.0"
+name = "pbtc_core"
+readme = "README.md"
+keywords = ["provable", "defi", "crypto"]
+authors = ["Provable Things <provable.xyz>", "Greg Kapka <greg@oraclize.it>"]
+
+[features]
+debug = []
+default = []
+btc-on-eth = []
+
+[dependencies]
+hex = "=0.4.0"
+log = "=0.4.8"
+rlp = "=0.4.2"
+rand = "=0.7.2"
+base58 = "=0.1.0"
+chrono = "=0.4.9"
+sha256 = "=0.1.0"
+byteorder = "=1.3.2"
+rustc-hex = "=2.0.1"
+simplelog = "=0.7.3"
+serde_json = "=1.0.40"
+lazy_static = "=1.4.0"
+tiny-keccak = "=1.5.0"
+ethereum-types = "=0.7.0"
+bitcoin_hashes = "=0.7.0"
+serde_derive = "=1.0.101"
+serde = { version = "=1", features = ["derive"] }
+secp256k1 = { version = "=0.15.0", features = ["recovery"] }
+bitcoin = { git = "https://github.com/provable-things/rust-bitcoin.git", branch = "provable-additions" }
