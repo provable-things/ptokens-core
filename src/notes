@@ -1,0 +1,8 @@
+Need to pull out ALL shared behaviour:
+error enum
+types 
+utxo manager
+Also, grep for ETH in the btc-on-eos & remove all that eventually!
+
+Also EOS doesn't need a satoshi conversion!
+Also, need to fix the failing tests on the extractors!

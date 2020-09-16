@@ -1,9 +1,4 @@
-use crate::{
-    types::{
-        Bytes,
-        Result,
-    },
-};
+use crate::types::{Bytes, Result};
 
 pub trait DatabaseInterface {
     fn end_transaction(&self) -> Result<()>;
