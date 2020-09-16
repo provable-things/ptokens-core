@@ -233,7 +233,7 @@ __`❍ cargo build --release`__
 
  - __`llvm:`__ version 6.0.0 or later.
  - __`clang:`__ version 6.0.0-1ubuntu2 or later.
- - __`rustc & cargo:`__ version 1.42.0-nightly or later.
+ - __`rustc & cargo:`__ version 1.46.0 or later.
 
 &nbsp;
 
@@ -269,7 +269,7 @@ Further, the `sensitivity` parameter provides a way for the `core` to signal to 
 ### :black_nib: Notes
 
 - The eth ptoken smart-contract bytecode needs to be in the root of the directory of the binary when you run the ETH initialization step, as a file called: __`ptoken-erc777-bytecode`__.
--
+
 - The maximum __`confs`__ possible during initialization is 255.
 
 - There are hardcoded "safe" __ETH__ & __BTC__ addresses which are used as destinations for transactions whose actual destinations are absent or malformed when being parsed from their originating transactions.
@@ -282,6 +282,8 @@ Further, the `sensitivity` parameter provides a way for the `core` to signal to 
 2) `OP_RETURN` deposits that include in the transaction a UTXO to the `p2pkh` of the aforementioned private-key.
 
 :warning: Neither `p2pk` nor `segwit` transactions are currently supported. Deposits made via such transactions will result in lost funds! :warning:
+
+- The library follows semantic versioning specification ([SemVer](https://semver.org)).
 
 &nbsp;
 
@@ -312,7 +314,7 @@ Currently supported features include:
 
 To run the tests simply run:
 
-__`❍ cargo +nightly test --features='<chosen-feature>'`__
+__`❍ cargo test --features='<chosen-feature>'`__
 
 &nbsp;
 
