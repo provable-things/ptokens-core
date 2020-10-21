@@ -14,6 +14,7 @@
 
 pub use crate::btc_on_eth::{
     get_enclave_state::get_enclave_state,
+    get_latest_block_numbers::get_latest_block_numbers,
     debug_functions::{
         debug_mint_pbtc,
         debug_get_all_utxos,
