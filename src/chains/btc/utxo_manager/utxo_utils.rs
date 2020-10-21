@@ -20,7 +20,10 @@ use crate::{
     traits::DatabaseInterface,
     constants::MIN_DATA_SENSITIVITY_LEVEL,
     chains::btc::utxo_manager::{
-        utxo_types::BtcUtxoAndValue,
+        utxo_types::{
+            BtcUtxoAndValue,
+            BtcUtxosAndValues,
+        },
         utxo_database_utils::{
             get_utxo_from_db,
             get_all_utxo_db_keys,
@@ -109,12 +112,13 @@ pub fn utxo_exists_in_db<D: DatabaseInterface>(db: &D, utxo_to_check: &BtcUtxoAn
         })
 }
 
-pub fn utxos_exist_in_db<D: DatabaseInterface>(db: &D, utxos_to_check: &[BtcUtxoAndValue]) -> Result<Vec<bool>> {
+pub fn utxos_exist_in_db<D: DatabaseInterface>(db: &D, utxos_to_check: &BtcUtxosAndValues) -> Result<Vec<bool>> {
     debug!("✔ Checking if UTXOs exist in db...");
     get_all_utxos_from_db(db)
         .and_then(get_btc_utxos_from_utxo_and_values)
         .and_then(|btc_utxos_from_db|
              utxos_to_check
+                .0
                 .iter()
                 .map(|utxo_and_value| -> Result<BtcUtxo> { Ok(btc_deserialize(&utxo_and_value.serialized_utxo)?) })
                 .map(|utxo| -> Result<bool> { Ok(btc_utxos_from_db.contains(&utxo?))})
@@ -193,7 +197,7 @@ mod tests {
         let utxo_and_value_1 = get_sample_p2sh_utxo_and_value().unwrap();
         let utxo_and_value_2 = get_sample_op_return_utxo_and_value();
         save_new_utxo_and_value(&db, &utxo_and_value_2).unwrap();
-        let result = utxos_exist_in_db(&db, &[utxo_and_value_1, utxo_and_value_2]).unwrap();
+        let result = utxos_exist_in_db(&db, &BtcUtxosAndValues::new(vec![utxo_and_value_1, utxo_and_value_2])).unwrap();
         assert_eq!(result, expected_result);
     }
 }

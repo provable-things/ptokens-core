@@ -82,8 +82,8 @@ impl EthMetadataFromBtc {
         self.version.as_byte()
     }
 
-    fn get_originating_hash_bytes(&self) -> Bytes {
-        hex::decode(self.originating_tx_hash.to_string()).unwrap()
+    fn get_originating_hash_bytes(&self) -> Result<Bytes> {
+        Ok(hex::decode(self.originating_tx_hash.to_string())?)
     }
 
     fn get_originating_address_bytes(&self) -> Result<Bytes> {
@@ -128,7 +128,7 @@ impl EthMetadataFromBtc {
                 Ok(
                     vec![
                         vec![self.get_version_byte()],
-                        self.get_originating_hash_bytes(),
+                        self.get_originating_hash_bytes()?,
                         self.get_originating_address_bytes()?
                     ].concat()
                 )

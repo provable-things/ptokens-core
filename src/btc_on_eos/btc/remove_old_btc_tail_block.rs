@@ -20,7 +20,7 @@ fn is_anchor_block<D>(
     where D: DatabaseInterface
 {
     match get_btc_anchor_block_hash_from_db(db) {
-        Ok(hash) => Ok(&hash == btc_block_hash),
+        Ok(ref hash) => Ok(hash == btc_block_hash),
         _ => Err("✘ No anchor hash found in db!".into())
     }
 }

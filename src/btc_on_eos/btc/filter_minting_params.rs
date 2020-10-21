@@ -64,18 +64,12 @@ mod tests {
         let minting_params = get_sample_minting_params();
         let length_before = minting_params.len();
         assert_eq!(length_before, expected_length_before);
-        let result = filter_minting_params(&minting_params)
-            .unwrap();
+        let result = filter_minting_params(&minting_params).unwrap();
         let length_after = result.len();
         assert_eq!(length_after, expected_length_after);
         result
             .iter()
-            .map(|params|
-                 assert!(
-                     convert_eos_asset_to_u64(&params.amount).unwrap() >=
-                     MINIMUM_REQUIRED_SATOSHIS
-                 )
-             )
+            .map(|params| assert!(convert_eos_asset_to_u64(&params.amount).unwrap() >= MINIMUM_REQUIRED_SATOSHIS))
             .for_each(drop);
     }
 }

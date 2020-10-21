@@ -1,3 +1,4 @@
+//! # pToken-specific traits.
 use crate::types::{Bytes, Result};
 
 pub trait DatabaseInterface {

@@ -1,3 +1,5 @@
-pub mod eos;
+//! # The chain-specific functionality shared between instances.
 pub mod eth;
-pub mod btc;
+
+pub(crate) mod eos;
+pub(crate) mod btc;

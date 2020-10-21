@@ -21,6 +21,7 @@ use bitcoin::{
 };
 use crate::{
     traits::DatabaseInterface,
+    constants::SAFE_ETH_ADDRESS,
     types::{
         Byte,
         Result,
@@ -30,7 +31,6 @@ use crate::{
         btc_utils::get_pay_to_pub_key_hash_script,
     },
     btc_on_eth::{
-        constants::SAFE_ETH_ADDRESS,
         utils::convert_satoshis_to_ptoken,
         btc::{
             btc_state::BtcState,

@@ -1,24 +1,24 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::btc::{
-        deposit_address_info::DepositInfoHashMap,
-        utxo_manager::utxo_types::BtcUtxosAndValues,
+    utils::{
+        get_not_in_state_err,
+        get_no_overwrite_state_err,
     },
-    btc_on_eos::{
+    chains::{
         eos::eos_types::EosSignedTransactions,
-        utils::{
-            get_not_in_state_err,
-            get_no_overwrite_state_err,
+        btc::{
+            deposit_address_info::DepositInfoHashMap,
+            utxo_manager::utxo_types::BtcUtxosAndValues,
         },
-        btc::btc_types::{
-            BtcBlockAndId,
-            MintingParams,
-            BtcTransaction,
-            BtcTransactions,
-            BtcBlockInDbFormat,
-            SubmissionMaterial,
-        },
+    },
+    btc_on_eos::btc::btc_types::{
+        BtcBlockAndId,
+        MintingParams,
+        BtcTransaction,
+        BtcTransactions,
+        BtcBlockInDbFormat,
+        SubmissionMaterial,
     },
 };
 
@@ -52,7 +52,7 @@ impl<D> BtcState<D> where D: DatabaseInterface {
             op_return_deposit_txs: None,
             deposit_info_hash_map: None,
             btc_block_in_db_format: None,
-            utxos_and_values: Vec::new(),
+            utxos_and_values: vec![].into(),
         }
     }
 
@@ -138,12 +138,9 @@ impl<D> BtcState<D> where D: DatabaseInterface {
         Ok(self)
     }
 
-    pub fn replace_utxos_and_values(
-        mut self,
-        replacement_params: BtcUtxosAndValues,
-    ) -> Result<BtcState<D>> {
+    pub fn replace_utxos_and_values(mut self, replacement_utxos: BtcUtxosAndValues) -> Result<BtcState<D>> {
         info!("✔ Replacing UTXOs in state...");
-        self.utxos_and_values = replacement_params;
+        self.utxos_and_values = replacement_utxos;
         Ok(self)
     }
 
@@ -170,13 +167,9 @@ impl<D> BtcState<D> where D: DatabaseInterface {
         }
     }
 
-    pub fn add_utxos_and_values(
-        mut self,
-        mut utxos_and_values: BtcUtxosAndValues,
-    ) -> Result<BtcState<D>> {
+    pub fn add_utxos_and_values(mut self, utxos_and_values: BtcUtxosAndValues) -> Result<BtcState<D>> {
         info!("✔ Adding UTXOs & values to BTC state...");
-        self.utxos_and_values
-            .append(&mut utxos_and_values);
+        self.utxos_and_values.extend(utxos_and_values);
         Ok(self)
     }
 

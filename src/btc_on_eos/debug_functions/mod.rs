@@ -13,11 +13,44 @@ use crate::{
         set_key_in_db_to_value,
     },
     chains::{
-        eos::eos_constants::{
-            get_eos_constants_db_keys,
-            EOS_PRIVATE_KEY_DB_KEY as EOS_KEY,
+        eos::{
+            eos_state::EosState,
+            eos_crypto::eos_private_key::EosPrivateKey,
+            get_processed_tx_ids::get_processed_tx_ids_and_add_to_state,
+            parse_eos_schedule::parse_v2_schedule_string_to_v2_schedule,
+            parse_submission_material::parse_submission_material_and_add_to_state,
+            get_enabled_protocol_features::get_enabled_protocol_features_and_add_to_state,
+            add_global_sequences_to_processed_list::maybe_add_global_sequences_to_processed_list_and_return_state,
+            eos_database_utils::{
+                put_eos_schedule_in_db,
+                get_eos_chain_id_from_db,
+                get_eos_account_nonce_from_db,
+                get_eos_account_name_string_from_db,
+            },
+            eos_constants::{
+                get_eos_constants_db_keys,
+                EOS_PRIVATE_KEY_DB_KEY as EOS_KEY,
+            },
+            eos_database_transactions::{
+                end_eos_db_transaction_and_return_state,
+                start_eos_db_transaction_and_return_state,
+            },
+            filter_action_proofs::{
+                maybe_filter_duplicate_proofs_from_state,
+                maybe_filter_out_invalid_action_receipt_digests,
+                maybe_filter_out_proofs_with_wrong_action_mroot,
+                maybe_filter_out_proofs_with_invalid_merkle_proofs,
+                maybe_filter_out_proofs_for_non_btc_on_eos_accounts,
+                maybe_filter_out_action_proof_receipt_mismatches_and_return_state,
+            },
+            core_initialization::eos_init_utils::{
+                EosInitJson,
+                put_eos_latest_block_info_in_db,
+                generate_and_put_incremerkle_in_db,
+            },
         },
         btc::{
+            increment_btc_account_nonce::maybe_increment_btc_signature_nonce_and_return_eos_state,
             btc_constants::{
                 get_btc_constants_db_keys,
                 BTC_PRIVATE_KEY_DB_KEY as BTC_KEY,
@@ -58,40 +91,15 @@ use crate::{
             },
 	},
         eos::{
-            eos_crypto::eos_private_key::EosPrivateKey,
-            parse_eos_schedule::parse_v2_schedule_string_to_v2_schedule,
-            eos_database_utils::{
-                end_eos_db_transaction,
-                put_eos_schedule_in_db,
-                start_eos_db_transaction,
-                get_eos_chain_id_from_db,
-		get_eos_account_nonce_from_db,
-                get_eos_account_name_string_from_db,
-            },
-            initialize_eos::eos_init_utils::{
-                EosInitJson,
-                put_eos_latest_block_info_in_db,
-                generate_and_put_incremerkle_in_db,
-            },
-            eos_state::EosState,
             get_eos_output::get_eos_output,
             save_btc_utxos_to_db::maybe_save_btc_utxos_to_db,
             sign_transactions::maybe_sign_txs_and_add_to_state,
-            increment_signature_nonce::maybe_increment_signature_nonce,
-            get_processed_tx_ids::get_processed_tx_ids_and_add_to_state,
-            parse_redeem_params::maybe_parse_redeem_params_and_put_in_state,
-            filter_duplicate_proofs::maybe_filter_duplicate_proofs_from_state,
-            parse_submission_material::parse_submission_material_and_add_to_state,
             extract_utxos_from_btc_txs::maybe_extract_btc_utxo_from_btc_tx_in_state,
-            filter_redeem_params::maybe_filter_value_too_low_redeem_params_in_state,
-            filter_irrelevant_proofs::maybe_filter_out_irrelevant_proofs_from_state,
-            get_enabled_protocol_features::get_enabled_protocol_features_and_add_to_state,
-            filter_invalid_action_digests::maybe_filter_out_invalid_action_receipt_digests,
-            filter_invalid_merkle_proofs::maybe_filter_out_proofs_with_invalid_merkle_proofs,
-            filter_already_processed_txs::maybe_filter_out_already_processed_tx_ids_from_state,
-            add_global_sequences_to_processed_list::maybe_add_global_sequences_to_processed_list,
-            filter_proofs_with_wrong_action_mroot::maybe_filter_out_proofs_with_wrong_action_mroot,
-            filter_action_and_receipt_mismatches::maybe_filter_out_action_proof_receipt_mismatches,
+            redeem_info::{
+                maybe_parse_redeem_infos_and_put_in_state,
+                maybe_filter_value_too_low_redeem_infos_in_state,
+                maybe_filter_out_already_processed_tx_ids_from_state,
+            },
         },
     },
 };
@@ -124,23 +132,23 @@ pub fn debug_reprocess_eos_block<D>(db: D, block_json: &str) -> Result<String> w
     parse_submission_material_and_add_to_state(block_json, EosState::init(db))
         .and_then(check_core_is_initialized_and_return_eos_state)
         .and_then(get_enabled_protocol_features_and_add_to_state)
-        .and_then(start_eos_db_transaction)
+        .and_then(start_eos_db_transaction_and_return_state)
         .and_then(get_processed_tx_ids_and_add_to_state)
         .and_then(maybe_filter_duplicate_proofs_from_state)
-        .and_then(maybe_filter_out_irrelevant_proofs_from_state)
-        .and_then(maybe_filter_out_action_proof_receipt_mismatches)
+        .and_then(maybe_filter_out_proofs_for_non_btc_on_eos_accounts)
+        .and_then(maybe_filter_out_action_proof_receipt_mismatches_and_return_state)
         .and_then(maybe_filter_out_invalid_action_receipt_digests)
         .and_then(maybe_filter_out_proofs_with_invalid_merkle_proofs)
         .and_then(maybe_filter_out_proofs_with_wrong_action_mroot)
-        .and_then(maybe_parse_redeem_params_and_put_in_state)
-        .and_then(maybe_filter_value_too_low_redeem_params_in_state)
+        .and_then(maybe_parse_redeem_infos_and_put_in_state)
+        .and_then(maybe_filter_value_too_low_redeem_infos_in_state)
         .and_then(maybe_filter_out_already_processed_tx_ids_from_state)
-        .and_then(maybe_add_global_sequences_to_processed_list)
+        .and_then(maybe_add_global_sequences_to_processed_list_and_return_state)
         .and_then(maybe_sign_txs_and_add_to_state)
-        .and_then(maybe_increment_signature_nonce)
+        .and_then(maybe_increment_btc_signature_nonce_and_return_eos_state)
         .and_then(maybe_extract_btc_utxo_from_btc_tx_in_state)
         .and_then(maybe_save_btc_utxos_to_db)
-        .and_then(end_eos_db_transaction)
+        .and_then(end_eos_db_transaction_and_return_state)
         .and_then(get_eos_output)
         .map(prepend_debug_output_marker_to_string)
 }
@@ -150,7 +158,11 @@ pub fn debug_reprocess_eos_block<D>(db: D, block_json: &str) -> Result<String> w
 /// This function takes BTC block submission material and runs it thorugh the BTC submission
 /// pipeline signing any transactions along the way. The `stale_transaction` part alludes to the
 /// fact that EOS transactions have an intrinsic time limit, meaning a failure of upstream parts of
-/// the bridge (ie tx broadcasting) could lead to expired transactions that can't ever be mind.
+/// the bridge (ie tx broadcasting) could lead to expired transactions that can't ever be mined.
+///
+/// ### NOTE:
+/// This function will increment the core's EOS nonce, meaning the outputted reports will have a
+/// gap in their report IDs!
 pub fn debug_reprocess_btc_block_for_stale_eos_tx<D>(
     db: D,
     block_json_string: &str
@@ -244,6 +256,12 @@ pub fn debug_clear_all_utxos<D: DatabaseInterface>(db: &D) -> Result<String> {
     clear_all_utxos(db).map(prepend_debug_output_marker_to_string)
 }
 
+/// # Debug Add New Eos Schedule
+///
+/// Does exactly what it says on the tin. It's currently required due to an open ticket on the
+/// validation of EOS blocks containing new schedules. Once that ticket is cleared, new schedules
+/// can be brought in "organically" by syncing to the core up to the block containing said new
+/// schedule. Meanwhile, this function must suffice.
 pub fn debug_add_new_eos_schedule<D: DatabaseInterface>(db: D, schedule_json: &str) -> Result<String> {
     info!("✔ Debug adding new EOS schedule...");
     check_debug_mode()

@@ -6,18 +6,20 @@ pub use serde_json::{
 use crate::{
     types::Byte,
     utils::get_prefixed_db_key,
-    btc_on_eth::eth::nibble_utils::Nibbles,
+    chains::eth::nibble_utils::Nibbles,
 };
 
 pub const ZERO_BYTE: u8 = 0u8;
+pub const ZERO_ETH_VALUE: usize = 0;
 pub const ETH_TAIL_LENGTH: u64 = 100;
 pub const HIGH_NIBBLE_MASK: Byte = 15u8; // NOTE: 15u8 == [0,0,0,0,1,1,1,1]
 pub const NUM_BITS_IN_NIBBLE: usize = 4;
 pub const NUM_NIBBLES_IN_BYTE: usize = 2;
 pub const VALUE_FOR_MINTING_TX: usize = 0;
+pub static LEAF_NODE_STRING: &str = "leaf";
 pub const VALUE_FOR_PTOKEN_DEPLOY: usize = 0;
 pub const ETH_WORD_SIZE_IN_BYTES: usize = 32;
-pub static LEAF_NODE_STRING: &str = "leaf";
+pub const ETH_ADDRESS_SIZE_IN_BYTES: usize = 20;
 pub const GAS_LIMIT_FOR_MINTING_TX: usize = 120_000;
 pub static BRANCH_NODE_STRING: &str = "branch";
 pub const LOG_DATA_BTC_ADDRESS_START_INDEX: usize = 96;
@@ -25,7 +27,8 @@ pub const GAS_LIMIT_FOR_PTOKEN_DEPLOY: usize = 4_000_000;
 pub static EXTENSION_NODE_STRING: &str = "extension";
 pub const HASHED_NULL_NODE: EthHash = EthHash(HASHED_NULL_NODE_BYTES);
 pub const EMPTY_NIBBLES: Nibbles = Nibbles { data: Vec::new(), offset: 0 };
-pub static REDEEM_EVENT_TOPIC_HEX: &str = "78e6c3f67f57c26578f2487b930b70d844bcc8dd8f4d629fb4af81252ab5aa65";
+pub const ERC20_PEG_IN_EVENT_TOPIC_HEX: &str = "42877668473c4cba073df41397388516dc85c3bbae14b33603513924cec55e36";
+pub const BTC_ON_ETH_REDEEM_EVENT_TOPIC_HEX: &str = "78e6c3f67f57c26578f2487b930b70d844bcc8dd8f4d629fb4af81252ab5aa65";
 pub const ETH_MESSAGE_PREFIX: &[u8; 26] = b"\x19Ethereum Signed Message:\n";
 pub const PREFIXED_MESSAGE_HASH_LEN: &[u8; 2] = b"32";
 pub const ETH_MAINNET_CHAIN_ID: u8 = 1;
@@ -33,10 +36,20 @@ pub const ETH_ROPSTEN_CHAIN_ID: u8 = 3;
 
 #[cfg(not(test))]
 lazy_static! {
-    pub static ref PTOKEN_CONTRACT_TOPICS: [EthHash; 1] = {
+    pub static ref BTC_ON_ETH_REDEEM_EVENT_TOPIC: [EthHash; 1] = {
         [
             EthHash::from_slice(&hex::decode(
-                REDEEM_EVENT_TOPIC_HEX
+                BTC_ON_ETH_REDEEM_EVENT_TOPIC_HEX
+            ).expect("✘ Invalid hex in BTC_ON_ETH_REDEEM_EVENT_TOPIC")),
+        ]
+    };
+}
+
+lazy_static! {
+    pub static ref ERC20_ON_EOS_PEG_IN_EVENT_TOPIC: [EthHash; 1] = {
+        [
+            EthHash::from_slice(&hex::decode(
+                ERC20_PEG_IN_EVENT_TOPIC_HEX
             ).expect("✘ Invalid hex in PTOKEN_CONTRACT_TOPIC!")),
         ]
     };
@@ -44,7 +57,7 @@ lazy_static! {
 
 #[cfg(test)]
 lazy_static! {
-    pub static ref PTOKEN_CONTRACT_TOPICS: [EthHash; 1] = {
+    pub static ref BTC_ON_ETH_REDEEM_EVENT_TOPIC: [EthHash; 1] = {
         [
             EthHash::from_slice(&hex::decode(
             "fc62a6078634cc3b00bff541ac549ba6bfed8678765289f88f61e22c668198ba"
@@ -76,8 +89,10 @@ pub fn get_eth_constants_db_keys() -> JsonValue {
             hex::encode(ETH_LINKER_HASH_KEY.to_vec()),
         "ETH_ACCOUNT_NONCE_KEY":
             hex::encode(ETH_ACCOUNT_NONCE_KEY.to_vec()),
-        "ETH_SMART_CONTRACT_ADDRESS_KEY":
-            hex::encode(ETH_SMART_CONTRACT_ADDRESS_KEY.to_vec()),
+        "BTC_ON_ETH_SMART_CONTRACT_ADDRESS_KEY":
+            hex::encode(BTC_ON_ETH_SMART_CONTRACT_ADDRESS_KEY.to_vec()),
+        "ERC20_ON_EOS_SMART_CONTRACT_ADDRESS_KEY":
+            hex::encode(ERC20_ON_EOS_SMART_CONTRACT_ADDRESS_KEY.to_vec()),
         "ETH_ADDRESS_KEY":
             hex::encode(ETH_ADDRESS_KEY.to_vec()),
         "ETH_PRIVATE_KEY_DB_KEY":
@@ -138,8 +153,14 @@ lazy_static! {
 }
 
 lazy_static! {
-    pub static ref ETH_SMART_CONTRACT_ADDRESS_KEY: [u8; 32] = get_prefixed_db_key(
+    pub static ref BTC_ON_ETH_SMART_CONTRACT_ADDRESS_KEY: [u8; 32] = get_prefixed_db_key(
         "eth-smart-contract"
+    );
+}
+
+lazy_static! {
+    pub static ref ERC20_ON_EOS_SMART_CONTRACT_ADDRESS_KEY: [u8; 32] = get_prefixed_db_key(
+        "erc20-on-eos-smart-contract-address-key"
     );
 }
 

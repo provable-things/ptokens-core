@@ -6,14 +6,17 @@ use std::time::{
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::btc::btc_utils::get_hex_tx_from_signed_btc_tx,
     btc_on_eth::{
-        btc::{
-            btc_database_utils::get_btc_account_nonce_from_db,
+        btc::btc_database_utils::get_btc_account_nonce_from_db,
+        eth::redeem_info::{
+            BtcOnEthRedeemInfo,
+            BtcOnEthRedeemInfos,
         },
+    },
+    chains::{
+        btc::btc_utils::get_hex_tx_from_signed_btc_tx,
         eth::{
             eth_state::EthState,
-            eth_types::RedeemParams,
             eth_database_utils::get_eth_latest_block_from_db,
         },
     },
@@ -34,23 +37,23 @@ pub struct BtcTxInfo {
 impl BtcTxInfo {
     pub fn new(
         btc_tx: &BtcTransaction,
-        redeem_params: &RedeemParams,
+        redeem_info: &BtcOnEthRedeemInfo,
         btc_account_nonce: u64,
     ) -> Result<BtcTxInfo> {
         Ok(
             BtcTxInfo {
                 btc_account_nonce,
                 btc_tx_hash: btc_tx.txid().to_string(),
-                btc_tx_amount: redeem_params.amount.as_u64(),
+                btc_tx_amount: redeem_info.amount.as_u64(),
                 btc_tx_hex: get_hex_tx_from_signed_btc_tx(&btc_tx),
-                btc_tx_recipient: redeem_params.recipient.clone(),
+                btc_tx_recipient: redeem_info.recipient.clone(),
                 originating_address: format!(
                     "0x{}",
-                    hex::encode(redeem_params.from.as_bytes())
+                    hex::encode(redeem_info.from.as_bytes())
                 ),
                 originating_tx_hash: format!(
                     "0x{}",
-                    hex::encode(redeem_params.originating_tx_hash.as_bytes())
+                    hex::encode(redeem_info.originating_tx_hash.as_bytes())
                 ),
                 signature_timestamp: SystemTime::now()
                     .duration_since(UNIX_EPOCH)?
@@ -69,7 +72,7 @@ pub struct EthOutput {
 pub fn get_btc_signed_tx_info_from_btc_txs(
     btc_account_nonce: u64,
     btc_txs: Vec<BtcTransaction>,
-    redeem_params: &[RedeemParams],
+    redeem_info: &BtcOnEthRedeemInfos,
 ) -> Result<Vec<BtcTxInfo>> {
     info!("✔ Getting BTC tx info from BTC txs...");
     let start_nonce = btc_account_nonce - btc_txs.len() as u64;
@@ -79,7 +82,7 @@ pub fn get_btc_signed_tx_info_from_btc_txs(
         .map(|(i, btc_tx)|
             BtcTxInfo::new(
                 btc_tx,
-                &redeem_params[i],
+                &redeem_info.0[i],
                 start_nonce + i as u64,
             )
         )
@@ -101,7 +104,7 @@ pub fn get_eth_output_json<D>(state: EthState<D>) -> Result<String>
                 Some(txs) => get_btc_signed_tx_info_from_btc_txs(
                     get_btc_account_nonce_from_db(&state.db)?,
                     txs,
-                    &state.redeem_params,
+                    &state.btc_on_eth_redeem_infos,
                 )?,
                 None => vec![],
             }

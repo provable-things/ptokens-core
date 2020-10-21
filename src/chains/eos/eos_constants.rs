@@ -4,12 +4,12 @@ pub use serde_json::{
 };
 use crate::utils::get_prefixed_db_key;
 
+pub const MEMO: &str = "";
 pub const PRODUCER_REPS: u64 = 12;
 pub const PUBLIC_KEY_SIZE: usize = 33;
 pub const PBTC_MINT_FXN_NAME: &str = "issue";
 pub const REDEEM_ACTION_NAME: &str = "redeem";
 pub const PUBLIC_KEY_CHECKSUM_SIZE: usize = 4;
-pub const MEMO: &str = "BTC -> pBTC complete!";
 pub const EOS_SCHEDULE_DB_PREFIX: &str = "EOS_SCHEDULE_";
 pub const PEOS_ACCOUNT_PERMISSION_LEVEL: &str = "active";
 pub const PUBLIC_KEY_WITH_CHECKSUM_SIZE: usize = PUBLIC_KEY_SIZE + PUBLIC_KEY_CHECKSUM_SIZE;
@@ -24,6 +24,7 @@ pub fn get_eos_constants_db_keys() -> JsonValue {
         "EOS_CHAIN_ID_DB_KEY": hex::encode(EOS_CHAIN_ID_DB_KEY.to_vec()),
         "PROCESSED_TX_IDS_KEY": hex::encode(PROCESSED_TX_IDS_KEY.to_vec()),
         "EOS_ACCOUNT_NAME_KEY": hex::encode(EOS_ACCOUNT_NAME_KEY.to_vec()),
+        "EOS_ERC20_DICTIONARY": hex::encode(EOS_ERC20_DICTIONARY.to_vec()),
         "EOS_TOKEN_SYMBOL_KEY": hex::encode(EOS_TOKEN_SYMBOL_KEY.to_vec()),
         "EOS_PROTOCOL_FEATURES": hex::encode(EOS_PROTOCOL_FEATURES.to_vec()),
         "EOS_LAST_SEEN_BLOCK_ID": hex::encode(EOS_LAST_SEEN_BLOCK_ID.to_vec()),
@@ -39,6 +40,7 @@ lazy_static! { pub static ref EOS_SCHEDULE_LIST: [u8; 32] = get_prefixed_db_key(
 lazy_static! { pub static ref EOS_CHAIN_ID_DB_KEY: [u8; 32] = get_prefixed_db_key("eos-chain-id-key"); }
 lazy_static! { pub static ref EOS_TOKEN_SYMBOL_KEY: [u8; 32] = get_prefixed_db_key("eos-token-ticker"); }
 lazy_static! { pub static ref EOS_ACCOUNT_NAME_KEY: [u8; 32] = get_prefixed_db_key("eos-account-name"); }
+lazy_static! { pub static ref EOS_ERC20_DICTIONARY: [u8; 32] = get_prefixed_db_key("eos-erc20-dictionary"); }
 lazy_static! { pub static ref EOS_PROTOCOL_FEATURES: [u8; 32] = get_prefixed_db_key("eos-protocol-features"); }
 lazy_static! { pub static ref EOS_PRIVATE_KEY_DB_KEY: [u8; 32] = get_prefixed_db_key("eos-private-key-db-key"); }
 lazy_static! { pub static ref EOS_LAST_SEEN_BLOCK_ID: [u8; 32] = get_prefixed_db_key("eos-last-seen-block-id"); }

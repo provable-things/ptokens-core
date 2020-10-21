@@ -5,51 +5,34 @@ use bitcoin::{
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::btc::{
-        btc_utils::{
-            calculate_btc_tx_fee,
-            get_total_value_of_utxos_and_values,
-        },
-        utxo_manager::{
-            utxo_database_utils::get_utxo_and_value,
-            utxo_types::{
-                BtcUtxoAndValue,
-                BtcUtxosAndValues,
+    btc_on_eth::eth::redeem_info::BtcOnEthRedeemInfos,
+    chains::{
+        eth::eth_state::EthState,
+        btc::{
+            btc_utils::calculate_btc_tx_fee,
+            utxo_manager::{
+                utxo_types::BtcUtxosAndValues,
+                utxo_database_utils::get_utxo_and_value,
             },
         },
     },
-    btc_on_eth::{
-        btc::{
-            btc_transaction::create_signed_raw_btc_tx_for_n_input_n_outputs,
-            btc_database_utils::{
-                get_btc_fee_from_db,
-                get_btc_network_from_db,
-                get_btc_address_from_db,
-                get_btc_private_key_from_db,
-            },
-            btc_types::{
-                BtcRecipientAndAmount,
-                BtcRecipientsAndAmounts,
-            },
-        },
-        eth::{
-            eth_state::EthState,
-            eth_types::RedeemParams,
+    btc_on_eth::btc::{
+        btc_transaction::create_signed_raw_btc_tx_for_n_input_n_outputs,
+        btc_database_utils::{
+            get_btc_fee_from_db,
+            get_btc_network_from_db,
+            get_btc_address_from_db,
+            get_btc_private_key_from_db,
         },
     },
 };
-
-fn sum_redeem_params(redeem_params: &[RedeemParams]) -> u64 {
-    info!("✔ Summing redeem param amounts...");
-    redeem_params.iter().map(|params| params.amount.as_u64()).sum()
-}
 
 fn get_enough_utxos_to_cover_total<D>(
     db: &D,
     required_btc_amount: u64,
     num_outputs: usize,
     sats_per_byte: u64,
-    mut inputs: Vec<BtcUtxoAndValue>,
+    inputs: BtcUtxosAndValues,
 ) -> Result<BtcUtxosAndValues>
     where D: DatabaseInterface
 {
@@ -59,41 +42,33 @@ fn get_enough_utxos_to_cover_total<D>(
             debug!("✔ Retrieved UTXO of value: {}", utxo_and_value.value);
             let fee = calculate_btc_tx_fee(inputs.len() + 1, num_outputs, sats_per_byte);
             let total_cost = fee + required_btc_amount;
-            inputs.push(utxo_and_value);
-            let total_utxo_value = get_total_value_of_utxos_and_values(&inputs);
-            debug!("✔ Calculated fee for {} input(s) & {} output(s): {} Satoshis", inputs.len(), num_outputs, fee);
+            let updated_inputs = {
+                let mut v = inputs.clone();
+                v.push(utxo_and_value); // FIXME - can we make more efficient?
+                v
+            };
+            let total_utxo_value = updated_inputs.iter().fold(0, |acc, utxo_and_value| acc + utxo_and_value.value);
+            debug!("✔ Calculated fee for {} input(s) & {} output(s): {} Sats", updated_inputs.len(), num_outputs, fee);
             debug!("✔ Fee + required BTC value of tx: {} Satoshis", total_cost);
             debug!("✔ Current total UTXO value: {} Satoshis", total_utxo_value);
             match total_cost > total_utxo_value {
                 true => {
                     trace!("✔ UTXOs do not cover fee + amount, need another!");
-                    get_enough_utxos_to_cover_total(db, required_btc_amount, num_outputs, sats_per_byte, inputs)
+                    get_enough_utxos_to_cover_total(db, required_btc_amount, num_outputs, sats_per_byte, updated_inputs)
                 }
                 false => {
                     trace!("✔ UTXO(s) covers fee and required btc amount!");
-                    Ok(inputs)
+                    Ok(updated_inputs)
                 }
             }
         })
 }
 
-fn get_address_and_amounts_from_redeem_params(redeem_params: &[RedeemParams]) -> Result<BtcRecipientsAndAmounts> {
-    info!("✔ Getting BTC addresses & amounts from redeem params...");
-    redeem_params
-        .iter()
-        .map(|params| {
-            let recipient_and_amount = BtcRecipientAndAmount::new(&params.recipient[..], params.amount.as_u64());
-            info!("✔ Recipients & amount retrieved from redeem: {:?}", recipient_and_amount);
-            recipient_and_amount
-         })
-        .collect()
-}
-
-fn create_btc_tx_from_redeem_params<D>(
+fn create_btc_tx_from_redeem_infos<D>(
     db: &D,
     sats_per_byte: u64,
     btc_network: BtcNetwork,
-    redeem_params: &[RedeemParams],
+    redeem_infos: &BtcOnEthRedeemInfos,
 ) -> Result<BtcTransaction>
     where D: DatabaseInterface
 {
@@ -102,16 +77,16 @@ fn create_btc_tx_from_redeem_params<D>(
     debug!("✔ Satoshis per byte: {}", sats_per_byte);
     let utxos_and_values = get_enough_utxos_to_cover_total(
         db,
-        sum_redeem_params(&redeem_params),
-        redeem_params.len(),
+        redeem_infos.sum(),
+        redeem_infos.len(),
         sats_per_byte,
-        Vec::new(),
+        vec![].into(),
     )?;
     debug!("✔ Retrieved {} UTXOs!", utxos_and_values.len());
     info!("✔ Creating BTC transaction...");
     create_signed_raw_btc_tx_for_n_input_n_outputs(
         sats_per_byte,
-        get_address_and_amounts_from_redeem_params(&redeem_params)?,
+        redeem_infos.to_btc_addresses_and_amounts()?,
         &get_btc_address_from_db(db)?[..],
         get_btc_private_key_from_db(db)?,
         utxos_and_values,
@@ -124,18 +99,18 @@ pub fn maybe_create_btc_txs_and_add_to_state<D>(
     where D: DatabaseInterface
 {
     info!("✔ Maybe creating BTC transaction(s) from redeem params...");
-    match &state.redeem_params.len() {
+    match &state.btc_on_eth_redeem_infos.len() {
         0 => {
             info!("✔ No redeem params in state ∴ not creating BTC txs!");
             Ok(state)
         }
         _ => {
             info!("✔ Burn event params in state ∴ creating BTC txs...");
-            create_btc_tx_from_redeem_params(
+            create_btc_tx_from_redeem_infos(
                 &state.db,
                 get_btc_fee_from_db(&state.db)?,
                 get_btc_network_from_db(&state.db)?,
-                &state.redeem_params,
+                &state.btc_on_eth_redeem_infos,
             )
                 .and_then(|signed_tx| {
                     #[cfg(feature="debug")] { debug!("✔ Signed transaction: {:?}", signed_tx); }

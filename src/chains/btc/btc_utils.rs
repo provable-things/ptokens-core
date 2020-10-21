@@ -14,23 +14,20 @@ use crate::{
         from as from_base58,
         encode_slice as base58_encode_slice,
     },
-    chains::btc::{
-        utxo_manager::utxo_types::BtcUtxoAndValue,
-        btc_constants::{
+    chains::{
+        btc::btc_constants::{
             DEFAULT_BTC_SEQUENCE,
             PTOKEN_P2SH_SCRIPT_BYTES,
         },
-    },
-    btc_on_eth::{
-        btc::btc_types::{
-            MintingParams,
-            MintingParamStruct,
-            BtcBlockInDbFormat,
-        },
-        utils::{
+        eth::eth_utils::{
             convert_bytes_to_u64,
             convert_u64_to_bytes,
         },
+    },
+    btc_on_eth::btc::btc_types::{
+        MintingParams,
+        MintingParamStruct,
+        BtcBlockInDbFormat,
     },
 };
 use bitcoin::{
@@ -219,15 +216,6 @@ pub fn deserialize_btc_block_in_db_format(
     )
 }
 
-pub fn get_total_value_of_utxos_and_values(
-    utxos_and_values: &[BtcUtxoAndValue]
-) -> u64 {
-   utxos_and_values
-        .iter()
-        .map(|utxo_and_value| utxo_and_value.value)
-        .sum()
-}
-
 pub fn get_hex_tx_from_signed_btc_tx(
     signed_btc_tx: &BtcTransaction
 ) -> String {
@@ -331,22 +319,25 @@ mod tests {
             sha256d,
         },
     };
-    use crate::btc_on_eth::{
-        utils::convert_satoshis_to_ptoken,
-        btc::{
-            btc_types::MintingParamStruct,
-            btc_test_utils::{
-                get_sample_btc_utxo,
-                SAMPLE_TRANSACTION_INDEX,
-                SAMPLE_TARGET_BTC_ADDRESS,
-                SAMPLE_SERIALIZED_BTC_UTXO,
-                get_sample_btc_private_key,
-                SAMPLE_OUTPUT_INDEX_OF_UTXO,
-                get_sample_testnet_block_and_txs,
-                get_sample_p2sh_redeem_script_sig,
-                get_sample_btc_block_in_db_format,
-                get_sample_op_return_utxo_and_value_n,
-                create_op_return_btc_utxo_and_value_from_tx_output,
+    use crate::{
+        chains::btc::utxo_manager::utxo_types::BtcUtxosAndValues,
+        btc_on_eth::{
+            utils::convert_satoshis_to_ptoken,
+            btc::{
+                btc_types::MintingParamStruct,
+                btc_test_utils::{
+                    get_sample_btc_utxo,
+                    SAMPLE_TRANSACTION_INDEX,
+                    SAMPLE_TARGET_BTC_ADDRESS,
+                    SAMPLE_SERIALIZED_BTC_UTXO,
+                    get_sample_btc_private_key,
+                    SAMPLE_OUTPUT_INDEX_OF_UTXO,
+                    get_sample_testnet_block_and_txs,
+                    get_sample_p2sh_redeem_script_sig,
+                    get_sample_btc_block_in_db_format,
+                    get_sample_op_return_utxo_and_value_n,
+                    create_op_return_btc_utxo_and_value_from_tx_output,
+                },
             },
         },
     };
@@ -454,12 +445,12 @@ mod tests {
     #[test]
     fn should_get_total_value_of_utxos_and_values() {
         let expected_result = 1942233;
-        let utxos = vec![
+        let utxos = BtcUtxosAndValues::new(vec![
             get_sample_op_return_utxo_and_value_n(2).unwrap(),
             get_sample_op_return_utxo_and_value_n(3).unwrap(),
             get_sample_op_return_utxo_and_value_n(4).unwrap(),
-        ];
-        let result = get_total_value_of_utxos_and_values(&utxos);
+        ]);
+        let result = utxos.iter().fold(0, |acc, utxo_and_value| acc + utxo_and_value.value);
         assert_eq!(result, expected_result);
     }
 

@@ -8,25 +8,21 @@ use crate::{
     chains::{
         btc::btc_constants::DEFAULT_BTC_ADDRESS,
         eth::{
-            any_sender::relay_transaction::RelayTransaction,
+            eth_traits::EthTxInfoCompatible,
             eth_crypto::eth_transaction::EthTransaction,
-            eth_traits::EthTxInfoCompatible
+            any_sender::relay_transaction::RelayTransaction,
+            eth_database_utils::{
+                get_any_sender_nonce_from_db,
+                get_eth_account_nonce_from_db,
+            },
         },
     },
-    btc_on_eth::{
-        eth::{
-            eth_database_utils::{
-                get_eth_account_nonce_from_db,
-                get_any_sender_nonce_from_db,
-            },
-        },
-        btc::{
-            btc_state::BtcState,
-            btc_types::MintingParamStruct,
-            btc_database_utils::{
-                get_btc_canon_block_from_db,
-                get_btc_latest_block_from_db,
-            },
+    btc_on_eth::btc::{
+        btc_state::BtcState,
+        btc_types::MintingParamStruct,
+        btc_database_utils::{
+            get_btc_canon_block_from_db,
+            get_btc_latest_block_from_db,
         },
     },
 };

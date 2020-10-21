@@ -8,6 +8,17 @@ use crate::{
     },
 };
 
+pub fn right_pad_or_truncate(s: &str, width: usize) -> String {
+    if s.len() >= width { truncate_str(&s, width).to_string() } else { right_pad_with_zeroes(&s, width) }
+}
+
+pub fn truncate_str(s: &str, num_chars: usize) -> &str {
+    match s.char_indices().nth(num_chars) {
+        None => s,
+        Some((i, _)) => &s[..i],
+    }
+}
+
 pub fn get_prefixed_db_key(suffix: &str) -> [u8; 32] {
     keccak256(format!("{}{}", DB_KEY_PREFIX.to_string(), suffix).as_bytes())
 }
@@ -25,11 +36,19 @@ pub fn convert_bytes_to_u64(bytes: &[Byte]) -> Result<u64> {
     }
 }
 
+pub fn right_pad_with_zeroes(s: &str, width: usize) -> String {
+    format!("{:0<width$}", s, width = width)
+}
+
+pub fn left_pad_with_zeroes(s: &str, width: usize) -> String {
+    format!("{:0>width$}", s, width = width)
+}
+
 fn left_pad_with_zero(string: &str) -> Result<String> {
     Ok(format!("0{}", string))
 }
 
-fn maybe_strip_hex_prefix(hex: &str) -> Result<&str> {
+pub fn maybe_strip_hex_prefix(hex: &str) -> Result<&str> {
     let lowercase_hex_prefix = "0x";
     let uppercase_hex_prefix = "0X";
     match hex.starts_with(lowercase_hex_prefix) || hex.starts_with(uppercase_hex_prefix) {
@@ -53,12 +72,27 @@ pub fn decode_hex_with_err_msg(hex: &str, err_msg: &str) -> Result<Bytes> {
     }
 }
 
+pub fn decode_hex_with_no_padding_with_err_msg(hex: &str, err_msg: &str) -> Result<Bytes> {
+    match hex::decode(maybe_strip_hex_prefix(hex)?) {
+        Ok(bytes) => Ok(bytes),
+        Err(err) => Err(format!("{} {}", err_msg, err).into()),
+    }
+}
+
 pub fn convert_u64_to_bytes(u_64: u64) -> Bytes {
     u_64.to_le_bytes().to_vec()
 }
 
 pub fn prepend_debug_output_marker_to_string(string_to_prepend: String) -> String {
     format!("{}_{}", DEBUG_OUTPUT_MARKER, &string_to_prepend)
+}
+
+pub fn get_not_in_state_err(substring: &str) -> String {
+    format!("✘ No {} in state!" , substring)
+}
+
+pub fn get_no_overwrite_state_err(substring: &str) -> String {
+    format!("✘ Cannot overwrite {} in state!" , substring)
 }
 
 #[cfg(test)]
@@ -68,7 +102,9 @@ mod tests {
 
     #[test]
     fn should_maybe_initialize_simple_logger() {
-        if option_env!("ENABLE_LOGGING").is_some() { simple_logger::init().unwrap() };
+        if option_env!("ENABLE_LOGGING").is_some() {
+            simple_logger::SimpleLogger::new().init().unwrap();
+        };
         debug!("Test logging enabled!");
     }
 
@@ -143,5 +179,77 @@ mod tests {
         let expected_result = format!("{}_{}", DEBUG_OUTPUT_MARKER, &string);
         let result = prepend_debug_output_marker_to_string(string);
         assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn should_get_no_state_err_string() {
+        let thing = "thing".to_string();
+        let expected_result = "✘ No thing in state!";
+        let result = get_not_in_state_err(&thing);
+        assert_eq!(result, expected_result)
+    }
+
+    #[test]
+    fn should_get_no_overwrite_err_string() {
+        let thing = "thing".to_string();
+        let expected_result = "✘ Cannot overwrite thing in state!";
+        let result = get_no_overwrite_state_err(&thing);
+        assert_eq!(result, expected_result)
+    }
+
+    #[test]
+    fn should_truncate_str() {
+        let s = "some string";
+        let len = 3;
+        let result = truncate_str(s, len);
+        assert_eq!(result, "som");
+    }
+
+    #[test]
+    fn should_not_truncate_str_if_i_gt_len() {
+        let s = "some string";
+        let len = s.len() + 1;
+        let result = truncate_str(s, len);
+        assert_eq!(result, s);
+    }
+
+    #[test]
+    fn should_truncate_str_correctly_if_i_0() {
+        let s = "some string";
+        let len = 0;
+        let result = truncate_str(s, len);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn should_right_pad_with_zeroes() {
+        let s = "some string";
+        let width = s.len() + 3;
+        let result = right_pad_with_zeroes(s, width);
+        assert_eq!(result, "some string000")
+    }
+
+    #[test]
+    fn should_left_pad_with_zeroes() {
+        let s = "some string";
+        let width = s.len() + 3;
+        let result = left_pad_with_zeroes(s, width);
+        assert_eq!(result, "000some string")
+    }
+
+    #[test]
+    fn right_pad_or_truncate_should_truncate_correctly() {
+        let s = "some string";
+        let width = s.len() - 3;
+        let result = right_pad_or_truncate(s, width);
+        assert_eq!(result, "some str");
+    }
+
+    #[test]
+    fn right_pad_or_truncate_should_pad_correctly() {
+        let s = "some string";
+        let width = s.len() + 3;
+        let result = right_pad_or_truncate(s, width);
+        assert_eq!(result, "some string000");
     }
 }

@@ -1,3 +1,4 @@
+//! # pToken types.
 use std::result;
 use crate::errors::AppError;
 

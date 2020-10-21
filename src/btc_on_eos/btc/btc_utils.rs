@@ -12,12 +12,9 @@ use crate::{
         convert_bytes_to_u64,
         convert_u64_to_bytes,
     },
-    chains::btc::{
-        utxo_manager::utxo_types::BtcUtxoAndValue,
-        btc_constants::{
-            DEFAULT_BTC_SEQUENCE,
-            PTOKEN_P2SH_SCRIPT_BYTES,
-        },
+    chains::btc::btc_constants::{
+        DEFAULT_BTC_SEQUENCE,
+        PTOKEN_P2SH_SCRIPT_BYTES,
     },
     btc_on_eos::{
         btc::btc_types::{
@@ -193,15 +190,6 @@ pub fn deserialize_btc_block_in_db_format(
         btc_deserialize(&serialized_struct.block)?,
         serialized_struct.extra_data,
     )
-}
-
-pub fn get_total_value_of_utxos_and_values(
-    utxos_and_values: &[BtcUtxoAndValue]
-) -> u64 {
-   utxos_and_values
-        .iter()
-        .map(|utxo_and_value| utxo_and_value.value)
-        .sum()
 }
 
 pub fn get_hex_tx_from_signed_btc_tx(

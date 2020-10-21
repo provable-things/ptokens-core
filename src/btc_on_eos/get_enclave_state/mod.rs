@@ -1,25 +1,7 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    constants::{
-        DEBUG_MODE,
-        DB_KEY_PREFIX,
-        CORE_IS_VALIDATING,
-    },
-    chains::btc::{
-        btc_constants::BTC_TAIL_LENGTH,
-        utxo_manager::utxo_database_utils::{
-            get_utxo_nonce_from_db,
-            get_total_utxo_balance_from_db,
-            get_total_number_of_utxos_from_db,
-        },
-    },
-    btc_on_eos::{
-        check_core_is_initialized::check_core_is_initialized,
-        constants::{
-            SAFE_EOS_ADDRESS,
-            SAFE_BTC_ADDRESS,
-        },
+    chains::{
         eos::{
             eos_types::EosKnownSchedulesJsons,
             protocol_features::EnabledFeatures,
@@ -30,11 +12,29 @@ use crate::{
                 get_eos_account_nonce_from_db,
                 get_eos_known_schedules_from_db,
                 get_eos_last_seen_block_id_from_db,
-                get_eos_last_seen_block_num_from_db,
+                get_latest_eos_block_number,
                 get_eos_account_name_string_from_db,
                 get_eos_enabled_protocol_features_from_db,
             },
         },
+        btc::{
+            btc_constants::BTC_TAIL_LENGTH,
+            utxo_manager::utxo_database_utils::{
+                get_utxo_nonce_from_db,
+                get_total_utxo_balance_from_db,
+                get_total_number_of_utxos_from_db,
+            },
+        },
+    },
+    constants::{
+        DEBUG_MODE,
+        DB_KEY_PREFIX,
+        SAFE_EOS_ADDRESS,
+        SAFE_BTC_ADDRESS,
+        CORE_IS_VALIDATING,
+    },
+    btc_on_eos::{
+        check_core_is_initialized::check_core_is_initialized,
         btc::{
             update_btc_linker_hash::{
                 get_linker_hash_or_genesis_hash as get_btc_linker_hash,
@@ -90,8 +90,8 @@ struct EnclaveState {
     eos_last_seen_block_id: String,
     eos_known_schedules: EosKnownSchedulesJsons,
     eos_enabled_protocol_features: EnabledFeatures,
-    safe_eos_address: String,
-    safe_btc_address: String,
+    eos_safe_address: String,
+    btc_safe_address: String,
 }
 
 pub fn get_enclave_state<D>(
@@ -123,8 +123,8 @@ pub fn get_enclave_state<D>(
                     btc_sats_per_byte: get_btc_fee_from_db(&db)?,
                     btc_utxo_nonce: get_utxo_nonce_from_db(&db)?,
                     eos_symbol: get_eos_token_symbol_from_db(&db)?,
-                    safe_btc_address: SAFE_BTC_ADDRESS.to_string(),
-                    safe_eos_address: SAFE_EOS_ADDRESS.to_string(),
+                    btc_safe_address: SAFE_BTC_ADDRESS.to_string(),
+                    eos_safe_address: SAFE_EOS_ADDRESS.to_string(),
                     btc_canon_block_number: btc_canon_block.height,
                     btc_latest_block_number: btc_latest_block.height,
                     btc_anchor_block_number: btc_anchor_block.height,
@@ -141,7 +141,7 @@ pub fn get_enclave_state<D>(
                     eos_account_name: get_eos_account_name_string_from_db(&db)?,
                     btc_number_of_utxos: get_total_number_of_utxos_from_db(&db)?,
                     btc_canon_to_tip_length: get_btc_canon_to_tip_length_from_db(&db)?,
-                    eos_last_seen_block_num: get_eos_last_seen_block_num_from_db(&db)?,
+                    eos_last_seen_block_num: get_latest_eos_block_number(&db)?,
                     eos_last_seen_block_id: get_eos_last_seen_block_id_from_db(&db)?.to_string(),
                     eos_enabled_protocol_features: get_eos_enabled_protocol_features_from_db(&db)?,
                     eos_known_schedules: EosKnownSchedulesJsons::from_schedules(get_eos_known_schedules_from_db(&db)?),
