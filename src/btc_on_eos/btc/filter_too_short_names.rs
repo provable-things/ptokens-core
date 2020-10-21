@@ -1,14 +1,12 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    btc_on_eos::{
-	constants::SAFE_EOS_ADDRESS,
-        btc::{
-            btc_state::BtcState,
-            btc_types::{
-                MintingParams,
-                MintingParamStruct
-            },
+    constants::SAFE_EOS_ADDRESS,
+    btc_on_eos::btc::{
+        btc_state::BtcState,
+        btc_types::{
+            MintingParams,
+            MintingParamStruct
         },
     },
 };

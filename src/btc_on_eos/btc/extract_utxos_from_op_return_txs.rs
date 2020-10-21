@@ -15,24 +15,26 @@ pub fn extract_utxos_from_txs(
     txs: &[BtcTransaction]
 ) -> BtcUtxosAndValues {
     info!("✔ Extracting UTXOs from {} `op_return` txs...", txs.len());
-    txs
-        .iter()
-        .map(|tx_data|
-            tx_data
-                .output
-                .iter()
-                .enumerate()
-                .filter(|(_, output)| &output.script_pubkey == target_script)
-                .map(|(index, output)|
-                    BtcUtxoAndValue::new(
-                        output.value,
-                        &create_unsigned_utxo_from_tx(tx_data, index as u32),
-                        None,
-                        None,
+    BtcUtxosAndValues::new(
+        txs
+            .iter()
+            .map(|tx_data|
+                tx_data
+                    .output
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, output)| &output.script_pubkey == target_script)
+                    .map(|(index, output)|
+                        BtcUtxoAndValue::new(
+                            output.value,
+                            &create_unsigned_utxo_from_tx(tx_data, index as u32),
+                            None,
+                            None,
+                        )
                     )
-                )
-                .collect::<BtcUtxosAndValues>()
-        )
-        .flatten()
-        .collect::<BtcUtxosAndValues>()
+                    .collect::<Vec<BtcUtxoAndValue>>()
+            )
+            .flatten()
+            .collect::<Vec<BtcUtxoAndValue>>()
+    )
 }

@@ -1,22 +1,28 @@
 use crate::{
-    types::{
-        Bytes,
-        Result,
-    },
     chains::btc::{
+        btc_utils::{deserialize_btc_utxo, serialize_btc_utxo},
         deposit_address_info::DepositAddressInfoJson,
-        btc_utils::{
-            serialize_btc_utxo,
-            deserialize_btc_utxo,
-        },
     },
+    types::{Bytes, Result},
 };
-use bitcoin::{
-    hashes::sha256d,
-    blockdata::transaction::TxIn as BtcUtxo,
-};
+use bitcoin::{blockdata::transaction::TxIn as BtcUtxo, hashes::sha256d};
+use derive_more::{Constructor, Deref, DerefMut, From, Into, IntoIterator};
 
-pub type BtcUtxosAndValues = Vec<BtcUtxoAndValue>;
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    Eq,
+    Constructor,
+    Deref,
+    DerefMut,
+    From,
+    Into,
+    IntoIterator,
+)]
+pub struct BtcUtxosAndValues(pub Vec<BtcUtxoAndValue>);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct BtcUtxoAndValue {

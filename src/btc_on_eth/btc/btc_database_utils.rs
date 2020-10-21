@@ -7,49 +7,49 @@ use crate::{
     errors::AppError,
     traits::DatabaseInterface,
     constants::MIN_DATA_SENSITIVITY_LEVEL,
+    database_utils::{
+        put_u64_in_db,
+        get_u64_from_db,
+    },
     types::{
         Byte,
         Result,
         DataSensitivity,
     },
-    chains::btc::{
-        btc_constants::{
-            BTC_FEE_KEY,
-            BTC_NETWORK_KEY,
-            BTC_ADDRESS_KEY,
-            BTC_LINKER_HASH_KEY,
-            BTC_PRIVATE_KEY_DB_KEY,
-            BTC_ACCOUNT_NONCE_KEY,
-            BTC_TAIL_BLOCK_HASH_KEY,
-            BTC_CANON_BLOCK_HASH_KEY,
-            BTC_DIFFICULTY_THRESHOLD,
-            BTC_ANCHOR_BLOCK_HASH_KEY,
-            BTC_LATEST_BLOCK_HASH_KEY,
-            BTC_CANON_TO_TIP_LENGTH_KEY,
-        },
-        btc_utils::{
-            convert_btc_network_to_bytes,
-            convert_bytes_to_btc_network,
-            convert_bytes_to_btc_address,
-            convert_btc_address_to_bytes,
-            serialize_btc_block_in_db_format,
-            deserialize_btc_block_in_db_format,
-        },
-    },
-    btc_on_eth::{
-        database_utils::{
-            put_u64_in_db,
-            get_u64_from_db,
-        },
-        utils::{
+    chains::{
+        eth::eth_utils::{
             convert_bytes_to_u64,
             convert_u64_to_bytes,
         },
         btc::{
-            btc_state::BtcState,
-            btc_types::BtcBlockInDbFormat,
-            btc_crypto::btc_private_key::BtcPrivateKey,
+            btc_constants::{
+                BTC_FEE_KEY,
+                BTC_NETWORK_KEY,
+                BTC_ADDRESS_KEY,
+                BTC_LINKER_HASH_KEY,
+                BTC_PRIVATE_KEY_DB_KEY,
+                BTC_ACCOUNT_NONCE_KEY,
+                BTC_TAIL_BLOCK_HASH_KEY,
+                BTC_CANON_BLOCK_HASH_KEY,
+                BTC_DIFFICULTY_THRESHOLD,
+                BTC_ANCHOR_BLOCK_HASH_KEY,
+                BTC_LATEST_BLOCK_HASH_KEY,
+                BTC_CANON_TO_TIP_LENGTH_KEY,
+            },
+            btc_utils::{
+                convert_btc_network_to_bytes,
+                convert_bytes_to_btc_network,
+                convert_bytes_to_btc_address,
+                convert_btc_address_to_bytes,
+                serialize_btc_block_in_db_format,
+                deserialize_btc_block_in_db_format,
+            },
         },
+    },
+    btc_on_eth::btc::{
+        btc_state::BtcState,
+        btc_types::BtcBlockInDbFormat,
+        btc_crypto::btc_private_key::BtcPrivateKey,
     },
 };
 
@@ -165,7 +165,7 @@ pub fn get_btc_difficulty_from_db<D>(db: &D) -> Result<u64>
         .and_then(|bytes| convert_bytes_to_u64(&bytes))
 }
 
-pub fn get_btc_latest_block_number<D>(db: &D) -> Result<u64>
+pub fn get_latest_btc_block_number<D>(db: &D) -> Result<u64>
     where D: DatabaseInterface
 {
     trace!("✔ Getting BTC latest block number from db...");
@@ -723,7 +723,7 @@ mod tests {
     }
 
     #[test]
-    fn should_get_btc_latest_block_number() {
+    fn should_get_latest_btc_block_number() {
         let db = get_test_database();
         let block = get_sample_btc_block_in_db_format().unwrap();
         if let Err(e) = put_btc_latest_block_in_db(&db, &block) {
@@ -732,7 +732,7 @@ mod tests {
         if let Err(e) = put_btc_latest_block_hash_in_db(&db, &block.id) {
             panic!("Error putting latest block hash in db: {}", e);
         }
-        match get_btc_latest_block_number(&db) {
+        match get_latest_btc_block_number(&db) {
             Err(e) => panic!("Error getting latest block number: {}", e),
             Ok(num_from_db) => assert_eq!(num_from_db, block.height),
         };

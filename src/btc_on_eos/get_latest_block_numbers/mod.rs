@@ -1,10 +1,10 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
+    chains::eos::eos_database_utils::get_latest_eos_block_number,
     btc_on_eos::{
-        btc::btc_database_utils::get_btc_latest_block_number,
+        btc::btc_database_utils::get_latest_btc_block_number,
         check_core_is_initialized::check_btc_core_is_initialized,
-        eos::eos_database_utils::get_eos_last_seen_block_num_from_db,
     },
 };
 
@@ -24,10 +24,8 @@ pub fn get_latest_block_numbers<D>(
         .and_then(|_| {
             Ok(serde_json::to_string(
                 &BlockNumbers {
-                    btc_latest_block_number:
-                        get_btc_latest_block_number(&db)?,
-                    eos_latest_block_number:
-                        get_eos_last_seen_block_num_from_db(&db)?,
+                    btc_latest_block_number: get_latest_btc_block_number(&db)?,
+                    eos_latest_block_number: get_latest_eos_block_number(&db)?,
                 }
             )?)
         })

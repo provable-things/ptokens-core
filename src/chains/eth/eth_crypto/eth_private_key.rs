@@ -24,12 +24,12 @@ use crate::{
             set_eth_signature_recovery_param,
         },
     },
-    btc_on_eth::eth::{
-       eth_types::EthSignature,
-    },
-    chains::eth::eth_constants::{
-        PREFIXED_MESSAGE_HASH_LEN,
-        ETH_MESSAGE_PREFIX,
+    chains::eth::{
+        eth_types::EthSignature,
+        eth_constants::{
+            PREFIXED_MESSAGE_HASH_LEN,
+            ETH_MESSAGE_PREFIX,
+        },
     },
 };
 

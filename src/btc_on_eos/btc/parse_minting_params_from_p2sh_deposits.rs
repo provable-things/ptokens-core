@@ -6,16 +6,16 @@ use bitcoin::{
 use crate::{
     types::{NoneError, Result},
     traits::DatabaseInterface,
-    chains::btc::deposit_address_info::DepositInfoHashMap,
-    btc_on_eos::{
+    chains::{
+        btc::deposit_address_info::DepositInfoHashMap,
         eos::eos_database_utils::get_eos_token_symbol_from_db,
-        btc::{
-            btc_state::BtcState,
-            btc_database_utils::get_btc_network_from_db,
-            btc_types::{
-                MintingParams,
-                MintingParamStruct,
-            },
+    },
+    btc_on_eos::btc::{
+        btc_state::BtcState,
+        btc_database_utils::get_btc_network_from_db,
+        btc_types::{
+            MintingParams,
+            MintingParamStruct,
         },
     },
 };
@@ -38,30 +38,18 @@ fn parse_minting_params_from_p2sh_deposit_tx(
                 btc_network,
             ) {
                 None => {
-                    info!(
-                        "✘ Could not derive BTC address from tx: {:?}",
-                        p2sh_deposit_containing_tx,
-                    );
+                    info!("✘ Could not derive BTC address from tx: {:?}", p2sh_deposit_containing_tx);
                     None
                 }
                 Some(btc_address) => {
-                    info!(
-                        "✔ BTC address extracted from `tx_out`: {}",
-                        btc_address,
-                    );
+                    info!("✔ BTC address extracted from `tx_out`: {}", btc_address);
                     match deposit_info_hash_map.get(&btc_address) {
                         None => {
-                            info!(
-                                "✘ BTC address {} not in deposit hash map!",
-                                btc_address,
-                            );
+                            info!("✘ BTC address {} not in deposit hash map!", btc_address);
                             None
                         }
                         Some(deposit_info) => {
-                            info!(
-                                "✔ Deposit info extracted from hash map: {:?}",
-                                deposit_info,
-                            );
+                            info!("✔ Deposit info extracted from hash map: {:?}", deposit_info);
                             Some(
                                 MintingParamStruct::new(
                                     p2sh_tx_out.value,
@@ -77,9 +65,7 @@ fn parse_minting_params_from_p2sh_deposit_tx(
             }
         })
         .filter(|maybe_minting_params| maybe_minting_params.is_some())
-        .map(|maybe_minting_params| Ok(maybe_minting_params
-            .ok_or(NoneError("Could not unwrap minting param struct!"))?
-        ))
+        .map(|maybe_minting_params| Ok(maybe_minting_params.ok_or(NoneError("Could not unwrap minting params!"))?))
         .collect::<Result<MintingParams>>()
 }
 
@@ -94,13 +80,8 @@ fn parse_minting_params_from_p2sh_deposit_txs(
         p2sh_deposit_containing_txs
             .iter()
             .flat_map(|tx|
-                 parse_minting_params_from_p2sh_deposit_tx(
-                     tx,
-                     deposit_info_hash_map,
-                     btc_network,
-                     eos_token_symbol,
-                 )
-            )
+                 parse_minting_params_from_p2sh_deposit_tx(tx, deposit_info_hash_map, btc_network, eos_token_symbol)
+             )
             .flatten()
             .collect::<MintingParams>()
    )

@@ -7,6 +7,10 @@ use crate::{
     errors::AppError,
     traits::DatabaseInterface,
     constants::MIN_DATA_SENSITIVITY_LEVEL,
+    database_utils::{
+        put_u64_in_db,
+        get_u64_from_db,
+    },
     types::{
         Byte,
         Result,
@@ -27,10 +31,6 @@ use crate::{
         BTC_CANON_TO_TIP_LENGTH_KEY,
     },
     btc_on_eos::{
-        database_utils::{
-            put_u64_in_db,
-            get_u64_from_db,
-        },
         utils::{
             convert_bytes_to_u64,
             convert_u64_to_bytes,
@@ -154,7 +154,7 @@ pub fn get_btc_difficulty_from_db<D>(db: &D) -> Result<u64>
         .and_then(|bytes| convert_bytes_to_u64(&bytes))
 }
 
-pub fn get_btc_latest_block_number<D>(db: &D) -> Result<u64>
+pub fn get_latest_btc_block_number<D>(db: &D) -> Result<u64>
     where D: DatabaseInterface
 {
     trace!("✔ Getting BTC latest block number from db...");

@@ -1,34 +1,32 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::eos::eos_constants::{
-        MEMO,
-        EOS_MAX_EXPIRATION_SECS,
-        PEOS_ACCOUNT_PERMISSION_LEVEL,
+    chains::eos::{
+        eos_crypto::{
+            eos_private_key::EosPrivateKey,
+            eos_transaction::{
+                sign_peos_transaction,
+                get_unsigned_eos_minting_tx,
+            },
+        },
+        eos_database_utils::{
+            get_eos_chain_id_from_db,
+            get_eos_account_name_string_from_db,
+        },
+        eos_constants::{
+            MEMO,
+            EOS_MAX_EXPIRATION_SECS,
+            PEOS_ACCOUNT_PERMISSION_LEVEL,
+        },
+        eos_types::{
+            EosSignedTransaction,
+            EosSignedTransactions,
+        },
     },
-    btc_on_eos::{
-        btc::{
-            btc_state::BtcState,
-            btc_types::MintingParamStruct,
-            btc_database_utils::get_btc_canon_block_from_db,
-        },
-        eos::{
-            eos_types::{
-                EosSignedTransaction,
-                EosSignedTransactions,
-            },
-            eos_crypto::{
-                eos_private_key::EosPrivateKey,
-                eos_transaction::{
-                    sign_peos_transaction,
-                    get_unsigned_eos_minting_tx,
-                },
-            },
-            eos_database_utils::{
-                get_eos_chain_id_from_db,
-                get_eos_account_name_string_from_db,
-            },
-        },
+    btc_on_eos::btc::{
+        btc_state::BtcState,
+        btc_types::MintingParamStruct,
+        btc_database_utils::get_btc_canon_block_from_db,
     },
 };
 
@@ -134,7 +132,7 @@ mod tests {
                 put_eth_gas_price_in_db,
                 put_eth_private_key_in_db,
                 put_eth_account_nonce_in_db,
-                put_eth_smart_contract_address_in_db,
+                put_btc_on_eth_smart_contract_address_in_db,
             }
         }
     };
@@ -147,7 +145,7 @@ mod tests {
         let gas_price = 20_000_000_000;
         let contract_address = get_sample_eth_address();
         let eth_private_key = get_sample_eth_private_key();
-        if let Err(e) = put_eth_smart_contract_address_in_db(
+        if let Err(e) = put_btc_on_eth_smart_contract_address_in_db(
             &db,
             &contract_address,
         ) {
@@ -172,7 +170,7 @@ mod tests {
                     signing_params.gas_price == gas_price &&
                     signing_params.eth_account_nonce == nonce &&
                     signing_params.eth_private_key == eth_private_key &&
-                    signing_params.ptoken_contract_address == contract_address
+                    signing_params.smart_contract_address == contract_address
                 );
             }
             Err(e) => {
@@ -188,7 +186,7 @@ mod tests {
             eth_account_nonce: 0,
             gas_price: 20_000_000_000,
             eth_private_key: get_sample_eth_private_key(),
-            ptoken_contract_address: get_sample_eth_address(),
+            smart_contract_address: get_sample_eth_address(),
         };
         let originating_address = BtcAddress::from_str(
             SAMPLE_TARGET_BTC_ADDRESS

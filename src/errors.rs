@@ -1,3 +1,4 @@
+//! # The pToken error enum.
 quick_error! {
     #[derive(Debug)]
     pub enum AppError {
@@ -81,6 +82,10 @@ quick_error! {
         RlpDecoderError(err: rlp::DecoderError) {
             from()
             display("✘ RLP Decoder Error!\n✘ {}", err)
+        }
+        FromDecStrErr(err: ethereum_types::FromDecStrErr) {
+            from()
+            display("✘ Ethereum types `from_dec_str` err: {}", err)
         }
         NoneError(err: &'static str) {
             display("✘ None Error!\n✘ {}", err)

@@ -7,22 +7,20 @@ use ethereum_types::{
 use crate::{
     types::{Byte, Bytes, Result},
     chains::eth::{
+        eth_traits::EthTxInfoCompatible,
+        eth_utils::strip_new_line_chars,
         eth_crypto::eth_private_key::EthPrivateKey,
+        any_sender::relay_transaction::RelayTransaction,
         eth_contracts::erc777::encode_erc777_mint_fxn_maybe_with_data,
+        eth_types::{
+            EthSignature,
+            EthSignedTransaction,
+        },
         eth_constants::{
             VALUE_FOR_MINTING_TX,
             VALUE_FOR_PTOKEN_DEPLOY,
             GAS_LIMIT_FOR_MINTING_TX,
             GAS_LIMIT_FOR_PTOKEN_DEPLOY,
-        },
-        any_sender::relay_transaction::RelayTransaction,
-        eth_traits::EthTxInfoCompatible
-    },
-    btc_on_eth::{
-        utils::strip_new_line_chars,
-        eth::eth_types::{
-            EthSignature,
-            EthSignedTransaction,
         },
     },
 };
@@ -103,9 +101,7 @@ impl EthTransaction {
     }
 
     pub fn sign(self, eth_private_key: EthPrivateKey) -> Result<Self> {
-        eth_private_key
-            .sign_message_bytes(&self.serialize_bytes())
-            .map(|signature| self.add_signature_to_transaction(signature))
+        eth_private_key.sign_message_bytes(&self.serialize_bytes()).map(|sig| self.add_signature_to_transaction(sig))
     }
 
     pub fn serialize_hex(&self) -> String {

@@ -1,5 +1,7 @@
+pub(crate) mod perc20;
 pub(crate) mod erc777;
 pub(crate) mod erc777_proxy;
+
 use crate::types::{
     Bytes,
     Result,

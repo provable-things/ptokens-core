@@ -1,21 +1,21 @@
 use crate::{
+    types::Result,
+    traits::DatabaseInterface,
+    chains::eth::{
+        any_sender::relay_transaction::RelayTransaction,
+        eth_database_utils::get_any_sender_signing_params_from_db,
+        eth_types::{
+            AnySenderSigningParams,
+            RelayTransactions
+        },
+    },
     btc_on_eth::{
         btc::{
             btc_database_utils::get_btc_canon_block_from_db,
             btc_state::BtcState,
             btc_types::MintingParamStruct,
         },
-        eth::{
-            eth_database_utils::get_any_sender_signing_params_from_db,
-            eth_types::{
-                AnySenderSigningParams,
-                RelayTransactions
-            },
-        },
     },
-    chains::eth::any_sender::relay_transaction::RelayTransaction,
-    traits::DatabaseInterface,
-    types::Result,
 };
 
 pub fn get_any_sender_signed_txs(
@@ -76,19 +76,21 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::btc_on_eth::{
-        btc::{
-            btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
-            btc_types::MintingParamStruct
-        },
-        eth::{
-            eth_test_utils::{
-                get_sample_eth_address,
-                get_sample_eth_private_key
+    use crate::{
+        chains::eth::eth_types::EthAddress,
+        btc_on_eth::{
+            btc::{
+                btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
+                btc_types::MintingParamStruct
             },
-            eth_types::EthAddress,
-        },
-        utils::convert_satoshis_to_ptoken,
+            eth::{
+                eth_test_utils::{
+                    get_sample_eth_address,
+                    get_sample_eth_private_key
+                },
+            },
+            utils::convert_satoshis_to_ptoken,
+        }
     };
     use bitcoin::util::address::Address as BtcAddress;
     use bitcoin_hashes::{

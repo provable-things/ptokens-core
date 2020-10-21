@@ -5,7 +5,7 @@ use crate::{
         btc_state::BtcState,
         btc_database_utils::{
             get_btc_address_from_db,
-            get_btc_latest_block_number,
+            get_latest_btc_block_number,
         },
     },
 };
@@ -46,7 +46,7 @@ pub fn get_btc_init_output_json<D>(
 {
     BtcInitializationOutput::new(
         get_btc_address_from_db(&state.db)?,
-        get_btc_latest_block_number(&state.db)?,
+        get_latest_btc_block_number(&state.db)?,
     )
         .and_then(json_stringify)
 }

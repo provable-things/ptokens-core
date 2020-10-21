@@ -19,7 +19,7 @@ use crate::{
         deposit_address_info::DepositAddressInfoJson,
     },
     btc_on_eos::{
-        utils::convert_u64_to_eos_asset,
+        utils::convert_u64_to_8_decimal_eos_asset,
         btc::{
             btc_utils::create_unsigned_utxo_from_tx,
             btc_crypto::btc_private_key::BtcPrivateKey,
@@ -112,15 +112,15 @@ pub fn get_sample_minting_params() -> MintingParams {
     let eos_address_1 = originating_tx_address_1.clone();
     let eos_address_2 = originating_tx_address_2.clone();
     let eos_address_3 = originating_tx_address_3.clone();
-    let amount_1 = convert_u64_to_eos_asset(
+    let amount_1 = convert_u64_to_8_decimal_eos_asset(
         MINIMUM_REQUIRED_SATOSHIS,
         &symbol
     );
-    let amount_2 = convert_u64_to_eos_asset(
+    let amount_2 = convert_u64_to_8_decimal_eos_asset(
         MINIMUM_REQUIRED_SATOSHIS + 1,
         &symbol
     );
-    let amount_3 = convert_u64_to_eos_asset(
+    let amount_3 = convert_u64_to_8_decimal_eos_asset(
         MINIMUM_REQUIRED_SATOSHIS - 1,
         &symbol
     );

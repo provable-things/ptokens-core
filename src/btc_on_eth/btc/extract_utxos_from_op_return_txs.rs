@@ -24,26 +24,28 @@ pub fn extract_utxos_from_txs(
     txs: &[BtcTransaction]
 ) -> BtcUtxosAndValues {
     info!("✔ Extracting UTXOs from {} `op_return` txs...", txs.len());
-    txs
-        .iter()
-        .map(|tx_data|
-            tx_data
-                .output
-                .iter()
-                .enumerate()
-                .filter(|(_, output)| &output.script_pubkey == target_script)
-                .map(|(index, output)|
-                    BtcUtxoAndValue::new(
-                        output.value,
-                        &create_unsigned_utxo_from_tx(tx_data, index as u32),
-                        None,
-                        None,
+    BtcUtxosAndValues::new(
+        txs
+            .iter()
+            .map(|tx_data|
+                tx_data
+                    .output
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, output)| &output.script_pubkey == target_script)
+                    .map(|(index, output)|
+                        BtcUtxoAndValue::new(
+                            output.value,
+                            &create_unsigned_utxo_from_tx(tx_data, index as u32),
+                            None,
+                            None,
+                        )
                     )
-                )
-                .collect::<BtcUtxosAndValues>()
-        )
-        .flatten()
-        .collect::<BtcUtxosAndValues>()
+                    .collect::<Vec<BtcUtxoAndValue>>()
+            )
+            .flatten()
+            .collect::<Vec<BtcUtxoAndValue>>()
+    )
 }
 
 pub fn maybe_extract_utxos_from_op_return_txs_and_put_in_state<D>(
@@ -103,6 +105,6 @@ mod tests {
         let target_script = get_sample_pay_to_pub_key_hash_script();
         let result = extract_utxos_from_txs(&target_script, &txs);
         assert_eq!(result.len(), expected_num_utxos);
-        assert_eq!(result, vec![expected_utxo_and_value]);
+        assert_eq!(result, BtcUtxosAndValues::new(vec![expected_utxo_and_value]));
     }
 }

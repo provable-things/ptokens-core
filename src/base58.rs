@@ -137,7 +137,9 @@ pub fn from(data: &str) -> Result<Vec<u8>, Error> {
             *d256 = carry as u8;
             carry /= 256;
         }
-        assert_eq!(carry, 0);
+        if carry != 0 {
+            return Err(Error::Other("`carry` did NOT equal 0 in `base58::from` fxn!".to_string()))
+        }
     }
 
     // Copy leading zeroes directly

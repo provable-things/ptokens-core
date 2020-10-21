@@ -25,22 +25,27 @@ use crate::{
         Bytes,
         Result,
     },
-    chains::btc::{
-        utxo_manager::utxo_types::BtcUtxoAndValue,
-        deposit_address_info::DepositAddressInfoJson,
-        btc_constants::{
-            BTC_LATEST_BLOCK_HASH_KEY,
-            MINIMUM_REQUIRED_SATOSHIS,
-        },
-        btc_utils::{
-            get_p2sh_redeem_script_sig,
-            create_unsigned_utxo_from_tx,
-            get_pay_to_pub_key_hash_script,
+    chains::{
+        eth::eth_types::EthAddress,
+        btc::{
+            deposit_address_info::DepositAddressInfoJson,
+            utxo_manager::utxo_types::{
+                BtcUtxoAndValue,
+                BtcUtxosAndValues,
+            },
+            btc_constants::{
+                BTC_LATEST_BLOCK_HASH_KEY,
+                MINIMUM_REQUIRED_SATOSHIS,
+            },
+            btc_utils::{
+                get_p2sh_redeem_script_sig,
+                create_unsigned_utxo_from_tx,
+                get_pay_to_pub_key_hash_script,
+            },
         },
     },
     btc_on_eth::{
         utils::convert_satoshis_to_ptoken,
-        eth::eth_types::EthAddress,
         btc::{
             btc_crypto::btc_private_key::BtcPrivateKey,
             btc_database_utils::{
@@ -364,15 +369,15 @@ pub fn get_sample_p2sh_utxo_with_value_too_low() -> BtcUtxoAndValue {
     )
 }
 
-pub fn get_sample_utxo_and_values() -> Vec<BtcUtxoAndValue> {
-    vec![
+pub fn get_sample_utxo_and_values() -> BtcUtxosAndValues {
+    BtcUtxosAndValues::new(vec![
         get_sample_op_return_utxo_and_value_n(2).unwrap(),
         get_sample_op_return_utxo_and_value_n(3).unwrap(),
         get_sample_op_return_utxo_and_value_n(4).unwrap(),
         get_sample_op_return_utxo_and_value(),
         get_sample_op_return_utxo_with_value_too_low(),
         get_sample_p2sh_utxo_with_value_too_low(),
-    ]
+    ])
 }
 
 pub fn get_sample_p2sh_utxo_and_value() -> Result<BtcUtxoAndValue> {

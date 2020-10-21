@@ -72,7 +72,7 @@ pub fn extract_p2sh_utxos_from_txs(
     btc_network: BtcNetwork,
 ) -> Result<BtcUtxosAndValues> {
     info!("✔ Extracting UTXOs from `p2sh` transactions...");
-    Ok(
+    Ok(BtcUtxosAndValues::new(
         transactions
             .iter()
             .map(|full_tx|
@@ -86,8 +86,8 @@ pub fn extract_p2sh_utxos_from_txs(
                     .collect::<Vec<BtcUtxoAndValue>>()
             )
             .flatten()
-            .collect::<BtcUtxosAndValues>()
-    )
+            .collect::<Vec<BtcUtxoAndValue>>()
+    ))
 }
 
 pub fn maybe_extract_utxos_from_p2sh_txs_and_put_in_state<D>(
@@ -152,7 +152,7 @@ mod tests {
         let filtered_txs = filter_p2sh_deposit_txs(&hash_map, &pub_key[..], &txs, btc_network).unwrap();
         let result = extract_p2sh_utxos_from_txs(&filtered_txs, &hash_map, btc_network).unwrap();
         assert_eq!(result.len(), expected_num_utxos);
-        assert_eq!(result[0], expected_result);
+        assert_eq!(result.0[0], expected_result);
     }
 
     #[test]
@@ -172,8 +172,8 @@ mod tests {
         let expected_deposit_info_2 = Some(hash_map.get(&expected_btc_address_2).unwrap().to_json());
         let filtered_txs = filter_p2sh_deposit_txs(&hash_map, &pub_key_bytes[..], &txs, btc_network).unwrap();
         let result = extract_p2sh_utxos_from_txs(&filtered_txs, &hash_map, btc_network).unwrap();
-        let result_1 = result[0].clone();
-        let result_2 = result[1].clone();
+        let result_1 = result.0[0].clone();
+        let result_2 = result.0[1].clone();
         assert_eq!(result.len(), expected_num_results);
         assert_eq!(result_1.value, expected_value_1);
         assert_eq!(result_2.value, expected_value_2);

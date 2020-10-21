@@ -1,21 +1,19 @@
 use std::str::FromStr;
 use eos_primitives::AccountName as EosAccountName;
 use crate::{
+    btc_on_eos::utils::convert_u64_to_8_decimal_eos_asset,
     types::{
         Bytes,
         Result,
+    },
+    constants::{
+        SAFE_BTC_ADDRESS,
+        SAFE_EOS_ADDRESS,
     },
     chains::btc::deposit_address_info::{
         DepositInfoList,
         DepositAddressInfoJson,
         DepositAddressInfoJsonList,
-    },
-    btc_on_eos::{
-        utils::convert_u64_to_eos_asset,
-        constants::{
-            SAFE_BTC_ADDRESS,
-            SAFE_EOS_ADDRESS,
-        },
     },
 };
 use bitcoin::{
@@ -128,7 +126,7 @@ impl MintingParamStruct {
                     SAFE_EOS_ADDRESS.to_string()
                 }
             },
-            amount: convert_u64_to_eos_asset(amount, symbol),
+            amount: convert_u64_to_8_decimal_eos_asset(amount, symbol),
             originating_tx_hash: originating_tx_hash.to_string(),
             originating_tx_address: originating_tx_address.to_string(),
         }

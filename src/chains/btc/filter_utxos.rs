@@ -15,33 +15,35 @@ use crate::{
 
 pub fn filter_out_utxos_extant_in_db<D>(
     db: &D,
-    utxos: &[BtcUtxoAndValue]
+    utxos: &BtcUtxosAndValues
 ) -> Result<BtcUtxosAndValues>
     where D: DatabaseInterface
 {
     utxos_exist_in_db(db, utxos)
-        .map(|bool_arr| {
+        .map(|bool_arr| BtcUtxosAndValues::new(
             utxos
+                .0
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| {
                     match !bool_arr[*i] {
                         true => true,
                         false => {
-                            info!("✔ Filtering out UTXO because it's already in the db: {:?}", utxos[*i]);
+                            info!("✔ Filtering out UTXO because it's already in the db: {:?}", utxos.0[*i]);
                             false
                         }
                     }
                 })
                 .map(|(_, utxo)| utxo)
                 .cloned()
-                .collect::<BtcUtxosAndValues>()
-        })
+                .collect::<Vec<BtcUtxoAndValue>>()
+        ))
 }
 
-pub fn filter_out_utxos_whose_value_is_too_low(utxos: &[BtcUtxoAndValue]) -> Result<BtcUtxosAndValues> {
-    Ok(
+pub fn filter_out_utxos_whose_value_is_too_low(utxos: &BtcUtxosAndValues) -> Result<BtcUtxosAndValues> {
+    Ok(BtcUtxosAndValues::new(
         utxos
+            .0
             .iter()
             .filter(|utxo| {
                 match utxo.value >= MINIMUM_REQUIRED_SATOSHIS {
@@ -53,8 +55,8 @@ pub fn filter_out_utxos_whose_value_is_too_low(utxos: &[BtcUtxoAndValue]) -> Res
                 }
             })
             .cloned()
-            .collect::<BtcUtxosAndValues>()
-    )
+            .collect::<Vec<BtcUtxoAndValue>>()
+    ))
 }
 
 #[cfg(test)]
@@ -88,12 +90,12 @@ mod tests {
         let all_utxos = get_sample_utxo_and_values();
         let num_utxos = all_utxos.len();
         let random_index = get_random_num_between(0, num_utxos);
-        let expected_utxo_after_filtering = all_utxos[random_index].clone();
+        let expected_utxo_after_filtering = all_utxos.0[random_index].clone();
         let mut utxos_to_insert_in_db = all_utxos.clone();
-        utxos_to_insert_in_db.remove(random_index);
+        utxos_to_insert_in_db.0.remove(random_index);
         save_utxos_to_db(&db, &utxos_to_insert_in_db).unwrap();
         let result = filter_out_utxos_extant_in_db(&db, &all_utxos).unwrap();
         assert_eq!(result.len(), expected_num_utxos_after_filtering);
-        assert_eq!(result[0], expected_utxo_after_filtering);
+        assert_eq!(result.0[0], expected_utxo_after_filtering);
     }
 }

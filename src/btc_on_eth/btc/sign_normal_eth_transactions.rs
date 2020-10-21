@@ -2,7 +2,12 @@ use crate::{
     types::Result,
     traits::DatabaseInterface,
     chains::eth::{
+        eth_database_utils::get_signing_params_from_db,
         eth_crypto::eth_transaction::get_signed_minting_tx,
+        eth_types::{
+            EthTransactions,
+            EthSigningParams,
+        },
         eth_metadata::{
             EthMetadataFromBtc,
             EthMetadataVersion,
@@ -13,13 +18,6 @@ use crate::{
             btc_state::BtcState,
             btc_types::MintingParamStruct,
             btc_database_utils::get_btc_canon_block_from_db,
-        },
-        eth::{
-            eth_database_utils::get_signing_params_from_db,
-            eth_types::{
-                EthTransactions,
-                EthSigningParams,
-            },
         },
     },
 };
@@ -42,7 +40,7 @@ pub fn get_eth_signed_txs(
                 &minting_param_struct.amount,
                 signing_params.eth_account_nonce + i as u64,
                 signing_params.chain_id,
-                signing_params.ptoken_contract_address,
+                signing_params.smart_contract_address,
                 signing_params.gas_price,
                 &minting_param_struct.eth_address,
                 signing_params.eth_private_key.clone(),
@@ -93,25 +91,25 @@ mod tests {
     };
     use crate::{
         test_utils::get_test_database,
-            btc_on_eth::{
+        chains::eth::{
+            eth_types::EthAddress,
+            eth_database_utils::{
+                put_eth_chain_id_in_db,
+                put_eth_gas_price_in_db,
+                put_eth_private_key_in_db,
+                put_eth_account_nonce_in_db,
+                put_btc_on_eth_smart_contract_address_in_db,
+            },
+        },
+        btc_on_eth::{
             utils::convert_satoshis_to_ptoken,
             btc::{
                 btc_types::MintingParamStruct,
                 btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
             },
-            eth::{
-                eth_types::EthAddress,
-                eth_test_utils::{
-                    get_sample_eth_address,
-                    get_sample_eth_private_key,
-                },
-                eth_database_utils::{
-                    put_eth_chain_id_in_db,
-                    put_eth_gas_price_in_db,
-                    put_eth_private_key_in_db,
-                    put_eth_account_nonce_in_db,
-                    put_eth_smart_contract_address_in_db,
-                },
+            eth::eth_test_utils::{
+                get_sample_eth_address,
+                get_sample_eth_private_key,
             },
         },
     };
@@ -124,7 +122,7 @@ mod tests {
         let gas_price = 20_000_000_000;
         let contract_address = get_sample_eth_address();
         let eth_private_key = get_sample_eth_private_key();
-        if let Err(e) = put_eth_smart_contract_address_in_db(
+        if let Err(e) = put_btc_on_eth_smart_contract_address_in_db(
             &db,
             &contract_address,
         ) {
@@ -149,7 +147,7 @@ mod tests {
                     signing_params.gas_price == gas_price &&
                     signing_params.eth_account_nonce == nonce &&
                     signing_params.eth_private_key == eth_private_key &&
-                    signing_params.ptoken_contract_address == contract_address
+                    signing_params.smart_contract_address == contract_address
                 );
             }
             Err(e) => {
@@ -165,7 +163,7 @@ mod tests {
             eth_account_nonce: 0,
             gas_price: 20_000_000_000,
             eth_private_key: get_sample_eth_private_key(),
-            ptoken_contract_address: get_sample_eth_address(),
+            smart_contract_address: get_sample_eth_address(),
         };
         let originating_address = BtcAddress::from_str(
             SAMPLE_TARGET_BTC_ADDRESS

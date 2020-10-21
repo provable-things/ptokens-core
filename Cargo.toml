@@ -2,7 +2,7 @@
 license = "MIT"
 publish = false
 edition = "2018"
-version = "1.11.0"
+version = "1.18.2"
 readme = "README.md"
 name = "ptokens_core"
 keywords = ["provable", "defi", "crypto"]
@@ -35,6 +35,7 @@ bitcoin = { git = "https://github.com/provable-things/rust-bitcoin.git", rev = "
 eos-primitives = { git = "https://github.com/provable-things/rust-eos.git", branch = "provable-additions" }
 secp256k1 = { git = "https://github.com/bifrost-codes/rust-secp256k1", features = ["recovery", "unstable"] }
 quick-error = "2.0.0"
+derive_more = "0.99.10"
 
 [dev-dependencies]
 simple_logger = "1.6.0"

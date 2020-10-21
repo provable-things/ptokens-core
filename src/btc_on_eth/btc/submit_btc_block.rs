@@ -49,6 +49,14 @@ use crate::{
     },
 };
 
+/// # Submit BTC Block to Enclave
+///
+/// The main submission pipeline. Submitting a BTC block to the enclave will - if that block is
+/// valid & subsequent to the enclave's current latest block - advanced the piece of the BTC
+/// blockchain held by the enclave in it's encrypted database. Should the submitted block
+/// contain a deposit to an address derived from the enclave's BTC public key, an ETH
+/// transaction will be signed & returned to the caller.
+///
 pub fn submit_btc_block_to_enclave<D: DatabaseInterface>(db: D, block_json_string: &str) -> Result<String> {
     info!("✔ Submitting BTC block to enclave...");
     parse_btc_submission_json_and_put_in_state(block_json_string, BtcState::init(db))
