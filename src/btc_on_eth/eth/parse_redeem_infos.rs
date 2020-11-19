@@ -21,7 +21,7 @@ pub fn maybe_parse_redeem_infos_and_add_to_state<D>(
                     Ok(state)
                 }
                 false => {
-                    info!("✔ Receipts in canon block #{}∴ parsing infos...", submission_material.block.number);
+                    info!("✔ Receipts in canon block #{}∴ parsing infos...", submission_material.get_block_number()?);
                     submission_material.get_btc_on_eth_redeem_infos()
                         .and_then(|infos| state.add_btc_on_eth_redeem_infos(infos))
                 }

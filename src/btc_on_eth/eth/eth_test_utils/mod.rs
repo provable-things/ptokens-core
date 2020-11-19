@@ -409,7 +409,7 @@ pub fn get_valid_state_with_invalid_block_and_receipts(
 }
 
 pub fn get_sample_invalid_block() -> EthBlock {
-    let mut invalid_block = get_sample_eth_submission_material().block;
+    let mut invalid_block = get_sample_eth_submission_material().get_block().unwrap();
     invalid_block.timestamp = U256::from(1234);
     invalid_block
 }
@@ -520,15 +520,15 @@ mod tests {
     #[test]
     fn should_get_sample_eth_submission_material_json() {
         let expected_block_number = 8503804;
-        let result = get_sample_eth_submission_material_json().unwrap();
-        assert_eq!(result.block.number, expected_block_number);
+        let result = get_sample_eth_submission_material_json().unwrap().block.unwrap().number;
+        assert_eq!(result, expected_block_number);
     }
 
     #[test]
     fn should_get_sample_eth_submission_material() {
         let expected_receipt = get_expected_receipt();
         let result = get_sample_eth_submission_material();
-        let block = result.block.clone();
+        let block = result.get_block().unwrap();
         let receipt = result.receipts.0[SAMPLE_RECEIPT_INDEX].clone();
         let expected_block = get_expected_block();
         assert_eq!(receipt, expected_receipt);
@@ -560,7 +560,7 @@ mod tests {
     #[test]
     fn should_get_valid_state_with_invalid_block_and_receipts() {
         let state = get_valid_state_with_invalid_block_and_receipts().unwrap();
-        let is_valid = state.get_eth_submission_material().unwrap().block.is_valid().unwrap();
+        let is_valid = state.get_eth_submission_material().unwrap().get_block().unwrap().is_valid().unwrap();
         assert!(!is_valid);
     }
 
@@ -642,7 +642,9 @@ mod tests {
         block_and_receipts
             .iter()
             .enumerate()
-            .map(|(i, block)| assert_eq!(block.block.number.as_usize(), SEQUENTIAL_BLOCKS_FIRST_NUMBER + i))
+            .map(|(i, block)|
+                 assert_eq!(block.get_block_number().unwrap().as_usize(), SEQUENTIAL_BLOCKS_FIRST_NUMBER + i)
+             )
             .for_each(drop);
     }
 }

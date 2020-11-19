@@ -18,7 +18,7 @@ pub fn add_block_and_receipts_to_db_if_not_extant<D>(
     where D: DatabaseInterface
 {
     info!("✔ Adding ETH block and receipts if not already in db...");
-    match eth_block_exists_in_db(db, &block_and_receipts.block.hash) {
+    match eth_block_exists_in_db(db, &block_and_receipts.get_block_hash()?) {
         false => {
             info!("✔ Block & receipts not in db, adding them now...");
             put_eth_submission_material_in_db(db, block_and_receipts)
@@ -49,7 +49,7 @@ mod tests {
     fn should_maybe_add_block_and_receipts_to_db() {
         let db = get_test_database();
         let block_and_receipts = get_sample_eth_submission_material_n(1).unwrap();
-        let eth_block_hash = block_and_receipts.block.hash;
+        let eth_block_hash = block_and_receipts.get_block_hash().unwrap();
         let bool_before = eth_block_exists_in_db(&db, &eth_block_hash);
         assert!(!bool_before);
         if let Err(e) = add_block_and_receipts_to_db_if_not_extant(&db, &block_and_receipts) {
@@ -63,7 +63,7 @@ mod tests {
     fn should_error_if_block_already_in_db() {
         let db = get_test_database();
         let block_and_receipts = get_sample_eth_submission_material_n(1).unwrap();
-        let eth_block_hash = block_and_receipts.block.hash;
+        let eth_block_hash = block_and_receipts.get_block_hash().unwrap();
         let bool_before = eth_block_exists_in_db(&db, &eth_block_hash);
         assert!(!bool_before);
         if let Err(e) = add_block_and_receipts_to_db_if_not_extant(&db, &block_and_receipts) {

@@ -139,7 +139,7 @@ impl<D> EthState<D> where D: DatabaseInterface {
     }
 
     pub fn get_parent_hash(&self) -> Result<EthHash> {
-        Ok(self.get_eth_submission_material()?.block.parent_hash)
+        Ok(self.get_eth_submission_material()?.get_parent_hash()?)
     }
 
     pub fn get_num_eos_txs(&self) -> usize {
@@ -208,17 +208,13 @@ mod tests {
             _ => panic!("Wrong error received!")
         };
         let updated_state = initial_state.add_eth_submission_material(eth_submission_material).unwrap();
-        match updated_state.get_eth_submission_material() {
-            Ok(block_and_receipt) => {
-                let block = block_and_receipt.block.clone();
-                let receipt = block_and_receipt.receipts.0[SAMPLE_RECEIPT_INDEX].clone();
-                let expected_block = get_expected_block();
-                let expected_receipt = get_expected_receipt();
-                assert_eq!(block, expected_block);
-                assert_eq!(receipt, expected_receipt);
-            }
-            _ => panic!("Eth block & receipts should be in state!"),
-        }
+        let submission_material = updated_state.get_eth_submission_material().unwrap();
+        let block = submission_material.get_block().unwrap();
+        let receipt = submission_material.receipts.0[SAMPLE_RECEIPT_INDEX].clone();
+        let expected_block = get_expected_block();
+        let expected_receipt = get_expected_receipt();
+        assert_eq!(block, expected_block);
+        assert_eq!(receipt, expected_receipt);
     }
 
     #[test]
@@ -240,15 +236,15 @@ mod tests {
         let eth_submission_material_2 = get_sample_eth_submission_material_n(1).unwrap();
         let initial_state = EthState::init(get_test_database());
         let updated_state = initial_state.add_eth_submission_material(eth_submission_material_1).unwrap();
-        let initial_state_block_num = updated_state.get_eth_submission_material().unwrap().block.number;
+        let initial_state_block_num = updated_state.get_eth_submission_material().unwrap().get_block_number().unwrap();
         let final_state = updated_state.update_eth_submission_material(eth_submission_material_2).unwrap();
-        let final_state_block_number = final_state.get_eth_submission_material().unwrap().block.number;
+        let final_state_block_number = final_state.get_eth_submission_material().unwrap().get_block_number().unwrap();
         assert_ne!(final_state_block_number, initial_state_block_num);
     }
 
     #[test]
     fn should_get_eth_parent_hash() {
-        let expected_result = get_sample_eth_submission_material().block.parent_hash;
+        let expected_result = get_sample_eth_submission_material().get_parent_hash().unwrap();
         let state = get_valid_state_with_block_and_receipts().unwrap();
         let result = state.get_parent_hash().unwrap();
         assert_eq!(result, expected_result);

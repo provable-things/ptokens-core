@@ -49,12 +49,10 @@ use crate::{
                 generate_and_put_incremerkle_in_db,
             },
             eos_state::EosState,
-            get_eos_incremerkle::get_incremerkle_and_add_to_state,
             add_schedule::maybe_add_new_eos_schedule_to_db_and_return_state,
             get_active_schedule::get_active_schedule_from_db_and_add_to_state,
             parse_submission_material::parse_submission_material_and_add_to_state,
             eos_erc20_dictionary::get_erc20_dictionary_from_db_and_add_to_eos_state,
-            append_interim_block_ids::append_interim_block_ids_to_incremerkle_in_state,
             get_enabled_protocol_features::get_enabled_protocol_features_and_add_to_state,
             eos_database_transactions::{
                 end_eos_db_transaction_and_return_state,
@@ -90,7 +88,7 @@ use crate::{
                 get_eth_private_key_from_db,
                 get_eth_account_nonce_from_db,
                 increment_eth_account_nonce_in_db,
-                get_eos_erc20_smart_contract_address_from_db,
+                get_erc20_on_eos_smart_contract_address_from_db,
                 put_erc20_on_eos_smart_contract_address_in_db,
             },
             eth_constants::{
@@ -263,7 +261,7 @@ pub fn debug_get_perc20_migration_tx<D>(
     db.start_transaction()?;
     info!("✔ Debug getting migration transaction...");
     let current_eth_account_nonce = get_eth_account_nonce_from_db(&db)?;
-    let current_eos_erc20_smart_contract_address = get_eos_erc20_smart_contract_address_from_db(&db)?;
+    let current_eos_erc20_smart_contract_address = get_erc20_on_eos_smart_contract_address_from_db(&db)?;
     let new_eos_erc20_smart_contract_address = get_eth_address_from_str(new_eos_erc20_smart_contract_address_string)?;
     check_debug_mode()
         .and_then(|_| check_core_is_initialized(&db))
@@ -322,7 +320,7 @@ pub fn debug_get_add_supported_token_tx<D>(
             tx_data,
             current_eth_account_nonce,
             0,
-            get_eos_erc20_smart_contract_address_from_db(&db)?,
+            get_erc20_on_eos_smart_contract_address_from_db(&db)?,
             get_eth_chain_id_from_db(&db)?,
             PERC20_CHANGE_SUPPORTED_TOKEN_GAS_LIMIT,
             get_eth_gas_price_from_db(&db)?,
@@ -366,7 +364,7 @@ pub fn debug_get_remove_supported_token_tx<D>(
             tx_data,
             current_eth_account_nonce,
             0,
-            get_eos_erc20_smart_contract_address_from_db(&db)?,
+            get_erc20_on_eos_smart_contract_address_from_db(&db)?,
             get_eth_chain_id_from_db(&db)?,
             PERC20_CHANGE_SUPPORTED_TOKEN_GAS_LIMIT,
             get_eth_gas_price_from_db(&db)?,
@@ -410,7 +408,7 @@ pub fn debug_reprocess_eth_block<D: DatabaseInterface>(db: D, block_json_string:
                     Ok(state)
                 }
                 false => {
-                    info!("✔ {} receipts in block ∴ parsing info...", submission_material.block.number);
+                    info!("✔ {} receipts in block ∴ parsing info...", submission_material.get_block_number()?);
                     EosErc20Dictionary::get_from_db(&state.db)
                         .and_then(|accounts| submission_material.get_erc20_on_eos_peg_in_infos(&accounts))
                         .and_then(|peg_in_infos| state.add_erc20_on_eos_peg_in_infos(peg_in_infos))
@@ -439,8 +437,6 @@ pub fn debug_reprocess_eos_block<D>(db: D, block_json: &str) -> Result<String> w
     parse_submission_material_and_add_to_state(block_json, EosState::init(db))
         .and_then(check_core_is_initialized_and_return_eos_state)
         .and_then(get_enabled_protocol_features_and_add_to_state)
-        .and_then(get_incremerkle_and_add_to_state)
-        .and_then(append_interim_block_ids_to_incremerkle_in_state)
         .and_then(get_active_schedule_from_db_and_add_to_state)
         .and_then(start_eos_db_transaction_and_return_state)
         .and_then(get_erc20_dictionary_from_db_and_add_to_eos_state)
@@ -456,4 +452,5 @@ pub fn debug_reprocess_eos_block<D>(db: D, block_json: &str) -> Result<String> w
         .and_then(maybe_increment_eth_nonce_in_db_and_return_state)
         .and_then(end_eos_db_transaction_and_return_state)
         .and_then(get_eos_output)
+        .map(prepend_debug_output_marker_to_string)
 }

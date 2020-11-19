@@ -1229,7 +1229,7 @@ mod tests {
     fn should_put_valid_sample_receipts_in_trie_correctly() {
         let index = 0;
         let block_and_receipts = get_sample_eth_submission_material();
-        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.block.receipts_root).unwrap();
+        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.get_receipts_root().unwrap()).unwrap();
         let receipts = block_and_receipts.receipts;
         let trie = Trie::get_new_trie().unwrap();
         let key_value_tuples = receipts.get_rlp_encoded_receipts_and_nibble_tuples().unwrap();
@@ -1243,7 +1243,7 @@ mod tests {
         let index = 0;
         let state = get_valid_state_with_invalid_block_and_receipts().unwrap();
         let block_and_receipts = state.get_eth_submission_material().unwrap();
-        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.block.receipts_root).unwrap();
+        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.get_receipts_root().unwrap()).unwrap();
         let receipts = block_and_receipts.receipts.clone();
         let trie = Trie::get_new_trie().unwrap();
         let key_value_tuples = receipts.get_rlp_encoded_receipts_and_nibble_tuples().unwrap();
@@ -1255,7 +1255,7 @@ mod tests {
     #[test]
     fn should_validate_root_hash_correctly() {
         let block_and_receipts = get_sample_eth_submission_material_n(1).unwrap();
-        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.block.receipts_root).unwrap();
+        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.get_receipts_root().unwrap()).unwrap();
         let start_index = 0;
         let receipts = block_and_receipts.receipts;
         let key_value_tuples = receipts.get_rlp_encoded_receipts_and_nibble_tuples().unwrap();
