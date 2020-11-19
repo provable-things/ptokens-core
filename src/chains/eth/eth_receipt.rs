@@ -471,7 +471,7 @@ mod tests {
     fn should_get_receipts_merkle_root_from_receipts() {
         let block_and_receipts = get_sample_eth_submission_material();
         let result = block_and_receipts.receipts.get_merkle_root().unwrap();
-        let expected_result = block_and_receipts.block.receipts_root;
+        let expected_result = block_and_receipts.get_receipts_root().unwrap();
         assert_eq!(result, expected_result);
     }
 

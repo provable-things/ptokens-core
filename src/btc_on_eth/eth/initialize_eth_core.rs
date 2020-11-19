@@ -7,8 +7,8 @@ use crate::{
             generate_eth_address::generate_and_store_eth_address,
             check_eth_core_is_initialized::is_eth_core_initialized,
             generate_eth_private_key::generate_and_store_eth_private_key,
-            get_eth_core_init_output_json::get_eth_core_init_output_json,
             generate_eth_contract_tx::generate_eth_contract_tx_and_put_in_state,
+            get_eth_core_init_output_json::get_btc_on_eth_eth_core_init_output_json,
             generate_eth_contract_address::generate_and_store_btc_on_eth_contract_address,
             eth_core_init_utils::{
                 remove_receipts_from_block_in_state,
@@ -75,7 +75,7 @@ pub fn maybe_initialize_eth_enclave<D>(
                             generate_eth_contract_tx_and_put_in_state(chain_id, gas_price, &bytecode_path, state)
                         )
                         .and_then(end_eth_db_transaction_and_return_state)
-                        .and_then(get_eth_core_init_output_json)
+                        .and_then(get_btc_on_eth_eth_core_init_output_json)
                 }
             }
         )

@@ -22,18 +22,19 @@ fn does_tail_block_require_updating<D>(
     where D: DatabaseInterface
 {
     info!("✔ Checking if ETH tail block needs updating...");
-    get_eth_tail_block_from_db(db).map(|db_tail_block| db_tail_block.block.number < calculated_tail_block.block.number)
+    get_eth_tail_block_from_db(db)
+        .and_then(|db_tail_block| Ok(db_tail_block.get_block_number()? < calculated_tail_block.get_block_number()?))
 }
 
 pub fn maybe_update_eth_tail_block_hash<D>(db: &D) -> Result<()> where D: DatabaseInterface {
     info!("✔ Maybe updating ETH tail block hash...");
     let canon_to_tip_length = get_eth_canon_to_tip_length_from_db(db)?;
     get_eth_latest_block_from_db(db)
-        .map(|latest_eth_block| {
+        .and_then(|latest_eth_block| {
             info!("✔ Searching for tail block {} blocks back from tip...", canon_to_tip_length + ETH_TAIL_LENGTH);
             maybe_get_nth_ancestor_eth_submission_material(
                 db,
-                &latest_eth_block.block.hash,
+                &latest_eth_block.get_block_hash()?,
                 canon_to_tip_length + ETH_TAIL_LENGTH,
             )
         })
@@ -52,7 +53,7 @@ pub fn maybe_update_eth_tail_block_hash<D>(db: &D) -> Result<()> where D: Databa
                         }
                         true => {
                             info!("✔ Updating ETH tail block...");
-                            put_eth_tail_block_hash_in_db(db, &ancestor_block.block.hash)
+                            put_eth_tail_block_hash_in_db(db, &ancestor_block.get_block_hash()?)
                         }
                     }
                 }

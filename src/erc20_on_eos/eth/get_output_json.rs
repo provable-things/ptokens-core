@@ -83,7 +83,7 @@ pub fn get_output_json<D>(state: EthState<D>) -> Result<String>
     info!("✔ Getting `erc20-on-eos` ETH submission output json...");
     Ok(serde_json::to_string(
         &Erc20OnEosEthOutput {
-            eth_latest_block_number: get_eth_latest_block_from_db(&state.db)?.block.number.as_u64(),
+            eth_latest_block_number: get_eth_latest_block_from_db(&state.db)?.get_block_number()?.as_u64(),
             eos_signed_transactions: match state.eos_transactions {
                 None => vec![],
                 Some(ref eos_txs) => {

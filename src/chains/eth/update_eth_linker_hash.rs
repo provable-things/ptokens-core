@@ -23,7 +23,7 @@ fn get_new_linker_hash<D>(db: &D, block_hash_to_link_to: &EthHash) -> Result<Eth
             Ok(
                 calculate_linker_hash(
                     *block_hash_to_link_to,
-                    anchor_block.block.hash,
+                    anchor_block.get_block_hash()?,
                     get_linker_hash_or_genesis_hash(db)?,
                 )
             )
@@ -33,14 +33,14 @@ fn get_new_linker_hash<D>(db: &D, block_hash_to_link_to: &EthHash) -> Result<Eth
 fn maybe_get_parent_of_eth_tail_block<D>(db: &D) -> Result<Option<EthSubmissionMaterial>> where D: DatabaseInterface {
     info!("✔ Maybe getting parent of ETH tail block from db...");
     get_eth_tail_block_from_db(db)
-        .map(|eth_canon_block| maybe_get_parent_eth_submission_material(db, &eth_canon_block.block.hash))
+        .and_then(|canon_block| Ok(maybe_get_parent_eth_submission_material(db, &canon_block.get_block_hash()?)))
 }
 
 pub fn maybe_update_eth_linker_hash<D>(db: &D) -> Result<()> where D: DatabaseInterface {
     match maybe_get_parent_of_eth_tail_block(db)? {
         Some(parent_of_eth_tail_block) => {
             info!("✔ Updating ETH linker hash...");
-            get_new_linker_hash(db, &parent_of_eth_tail_block.block.hash)
+            get_new_linker_hash(db, &parent_of_eth_tail_block.get_block_hash()?)
                 .and_then(|linker_hash| put_eth_linker_hash_in_db(db, linker_hash))
                 .map(|_| ())
         }
@@ -80,17 +80,12 @@ mod tests {
         let blocks_and_receipts = get_sequential_eth_blocks_and_receipts();
         let canon_block = blocks_and_receipts[5].clone();
         let parent_of_eth_tail_block = blocks_and_receipts[4].clone();
-        assert!(
-            canon_block.block.parent_hash == parent_of_eth_tail_block.block.hash
-        );
-        put_eth_tail_block_in_db(&db, &canon_block)
-            .unwrap();
-        put_eth_submission_material_in_db(&db, &parent_of_eth_tail_block)
-            .unwrap();
-        let result = maybe_get_parent_of_eth_tail_block(&db)
-            .unwrap()
-            .unwrap();
-        assert_eq!(result, parent_of_eth_tail_block);
+        let expected_result = parent_of_eth_tail_block.remove_block();
+        assert!(canon_block.get_parent_hash().unwrap() == parent_of_eth_tail_block.get_block_hash().unwrap());
+        put_eth_tail_block_in_db(&db, &canon_block).unwrap();
+        put_eth_submission_material_in_db(&db, &parent_of_eth_tail_block).unwrap();
+        let result = maybe_get_parent_of_eth_tail_block(&db).unwrap().unwrap();
+        assert_eq!(result, expected_result);
     }
 
     #[test]
@@ -108,9 +103,9 @@ mod tests {
         let db = get_test_database();
         let expected_result_hex = "5cfaf026b198808363c898b2f7fcada79d88fe163fa6281211956a5431481ecf";
         let blocks_and_receipts = get_sequential_eth_blocks_and_receipts();
-        let block_hash_to_link_to = blocks_and_receipts[5].block.hash;
+        let block_hash_to_link_to = blocks_and_receipts[5].get_block_hash().unwrap();
         let anchor_block = blocks_and_receipts[1].clone();
-        let linker_hash = blocks_and_receipts[3].block.hash;
+        let linker_hash = blocks_and_receipts[3].get_block_hash().unwrap();
         put_eth_linker_hash_in_db(&db, linker_hash).unwrap();
         put_eth_anchor_block_in_db(&db, &anchor_block).unwrap();
         let result = get_new_linker_hash(&db, &block_hash_to_link_to).unwrap();
@@ -123,7 +118,7 @@ mod tests {
         let db = get_test_database();
         let expected_result_hex = "726d388bff7dd43ccb0f91e995ec83fd56228a3a7cd6f6eae1bc2855c7e942be";
         let blocks_and_receipts = get_sequential_eth_blocks_and_receipts();
-        let linker_hash_before = blocks_and_receipts[9].block.hash;
+        let linker_hash_before = blocks_and_receipts[9].get_block_hash().unwrap();
         let anchor_block = blocks_and_receipts[1].clone();
         let canon_block = blocks_and_receipts[5].clone();
         let parent_of_eth_tail_block = blocks_and_receipts[4].clone();
@@ -143,7 +138,7 @@ mod tests {
         let db = get_test_database();
         let expected_result_hex = "f8e2c3efa74ff5523bcb26c7088d982c60440a7f8ccc9027c548386853f962df";
         let blocks_and_receipts = get_sequential_eth_blocks_and_receipts();
-        let linker_hash_before = blocks_and_receipts[9].block.hash;
+        let linker_hash_before = blocks_and_receipts[9].get_block_hash().unwrap();
         let anchor_block = blocks_and_receipts[1].clone();
         let canon_block = blocks_and_receipts[5].clone();
         put_eth_linker_hash_in_db(&db, linker_hash_before).unwrap();

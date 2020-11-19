@@ -12,7 +12,7 @@ use crate::{
 pub fn validate_block_in_state<D>(state: EthState<D>) -> Result<EthState<D>> where D: DatabaseInterface {
     if CORE_IS_VALIDATING {
         info!("✔ Validating block header...");
-        match state.get_eth_submission_material()?.block.is_valid()? {
+        match state.get_eth_submission_material()?.get_block()?.is_valid()? {
             true => Ok(state),
             false => Err("✘ Not accepting ETH block - header hash not valid!".into()),
         }

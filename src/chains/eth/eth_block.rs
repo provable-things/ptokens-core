@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn should_encode_eth_block_as_json() {
-        let block = get_sample_eth_submission_material().block;
+        let block = get_sample_eth_submission_material().get_block().unwrap();
         let uncles: Vec<String> = vec![];
         let expected_result = json!({
             "size": 5774,
@@ -254,7 +254,7 @@ mod tests {
     #[test]
     fn should_parse_eth_block_json_to_eth_block() {
         let eth_json = get_sample_eth_submission_material_json().unwrap();
-        match EthBlock::from_json(&eth_json.block) {
+        match EthBlock::from_json(&eth_json.block.unwrap()) {
             Ok(block) => assert_eq!(block, get_expected_block()),
             _ => panic!("Failed to get eth block json!"),
         }
@@ -264,7 +264,7 @@ mod tests {
     fn should_rlp_encode_block() {
         let expected_log_bloom = "10040060000810a000180002060000042000328000101012000204800010010000412401000100080012600209a005001200048a0c048008413ca08d8021414000000012002200004880b408400810408000040401c0005000018009804b000480020000122004003200004004080920080020058081444000080a9000a000004080000041100202000000004006040080a80001a12000100000400020340050020080040200200008000082104010040080010481020080000220000124051640075007890200000040c420000820400020800028420018000800020000208080322000000a200008a002000000800101044000000920418600200666900601";
         let expected_encoded_block = "f9021aa026e9930dafaf07f59b6c8fe2963819b7d9319ad4ff556cb12eefba0dbd3af3fba01dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347945a0b54d5dc17e0aadc383d2db43b0a0d3e029c4ca0061d01dd552a3538b3eadf6234382aeb27cd80cd5cd88b3825fd6990fd762824a0989081ea9213babd8e82b99b579b3012c3d33434b420c3f97af0e9f6f8b8e047a0937e08f03388b32d7c776e7a02371b930d71e3ec096d495230b6735e7f9b20aeb9010010040060000810a000180002060000042000328000101012000204800010010000412401000100080012600209a005001200048a0c048008413ca08d8021414000000012002200004880b408400810408000040401c0005000018009804b000480020000122004003200004004080920080020058081444000080a9000a000004080000041100202000000004006040080a80001a12000100000400020340050020080040200200008000082104010040080010481020080000220000124051640075007890200000040c420000820400020800028420018000800020000208080322000000a200008a00200000080010104400000092041860020066690060187081366f7e754dc8381c1fc837a21398379ef51845d73d38a995050594520737061726b706f6f6c2d6574682d636e2d687a33a0b3a1d476b9632a39df2edd3116692165a7bc363b7f5647c069f54b670cd564ae889f6d788005a450ed";
-        let block = get_sample_eth_submission_material().block;
+        let block = get_sample_eth_submission_material().get_block().unwrap();
         let result = hex::encode(block.rlp_encode().unwrap());
         assert_eq!(expected_log_bloom, hex::encode(block.logs_bloom));
         assert_eq!(result, expected_encoded_block);
@@ -272,14 +272,14 @@ mod tests {
 
     #[test]
     fn should_hash_block() {
-        let block = get_sample_eth_submission_material().block;
+        let block = get_sample_eth_submission_material().get_block().unwrap();
         let result = block.hash().unwrap();
         assert_eq!(result, block.hash)
     }
 
     #[test]
     fn valid_block_header_should_return_true() {
-        let block = get_sample_eth_submission_material().block;
+        let block = get_sample_eth_submission_material().get_block().unwrap();
         let result = block.is_valid().unwrap();
         assert!(result);
     }

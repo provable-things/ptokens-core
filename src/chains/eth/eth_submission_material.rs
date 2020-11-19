@@ -3,6 +3,7 @@ use serde_json::{
     Value as JsonValue,
 };
 use ethereum_types::{
+    U256,
     H256 as EthHash,
     Address as EthAddress,
 };
@@ -43,10 +44,14 @@ use crate::{
 // TODO The same would need to be true of the Receipts themselves since that's where the redeem param parsing is done!
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct EthSubmissionMaterial {
-    pub block: EthBlock,
+    pub block: Option<EthBlock>,
     pub receipts: EthReceipts,
     pub eos_ref_block_num: Option<u16>,
     pub eos_ref_block_prefix: Option<u32>,
+    pub hash: Option<EthHash>,
+    pub block_number: Option<U256>,
+    pub parent_hash: Option<EthHash>,
+    pub receipts_root: Option<EthHash>,
 }
 
 impl EthSubmissionMaterial {
@@ -56,15 +61,44 @@ impl EthSubmissionMaterial {
         eos_ref_block_num: Option<u16>,
         eos_ref_block_prefix: Option<u32>
     ) -> Self {
-        Self { block, receipts, eos_ref_block_num, eos_ref_block_prefix }
+        Self {
+            receipts,
+            eos_ref_block_num,
+            eos_ref_block_prefix,
+            hash: Some(block.hash),
+            block_number: Some(block.number),
+            parent_hash: Some(block.parent_hash),
+            receipts_root: Some(block.receipts_root),
+            block: Some(block),
+        }
+    }
+
+    pub fn get_block(&self) -> Result<EthBlock> {
+        self.block.clone().ok_or(NoneError("✘ No block in ETH submisson material!"))
+    }
+
+    pub fn get_block_hash(&self) -> Result<EthHash> {
+        self.hash.ok_or(NoneError("✘ No `hash` in ETH submission material!"))
+    }
+
+    pub fn get_parent_hash(&self) -> Result<EthHash> {
+        self.parent_hash.ok_or(NoneError("✘ No` parent_hash` in ETH submission material!"))
+    }
+
+    pub fn get_block_number(&self) -> Result<U256> {
+        self.block_number.ok_or(NoneError("✘ No `block_number` in ETH submission material!"))
+    }
+
+    pub fn get_receipts_root(&self) -> Result<EthHash> {
+        self.receipts_root.ok_or(NoneError("✘ No `receipts_root` in ETH submission material!"))
     }
 
     pub fn get_eos_ref_block_num(&self) -> Result<u16> {
-        Ok(self.eos_ref_block_num.ok_or(NoneError("No `eos_ref_block_num` in submission material!"))?)
+        self.eos_ref_block_num.ok_or(NoneError("No `eos_ref_block_num` in submission material!"))
     }
 
     pub fn get_eos_ref_block_prefix(&self) -> Result<u32> {
-        Ok(self.eos_ref_block_prefix.ok_or(NoneError("No `eos_ref_block_prefix` in submission material!"))?)
+        self.eos_ref_block_prefix.ok_or(NoneError("No `eos_ref_block_prefix` in submission material!"))
     }
 
     pub fn get_receipts(&self) -> Vec<EthReceipt> {
@@ -72,8 +106,18 @@ impl EthSubmissionMaterial {
     }
 
     pub fn to_json(&self) -> Result<JsonValue> {
+        let block_json = match &self.block {
+            Some(block) => Some(block.to_json()?),
+            None => None,
+        };
         Ok(json!({
-            "block": &self.block.to_json()?,
+            "hash": self.hash,
+            "block": block_json,
+            "parent_hash": self.parent_hash,
+            "block_number": self.block_number,
+            "receipts_root": self.receipts_root,
+            "eos_ref_block_num": self.eos_ref_block_num,
+            "eos_ref_block_prefix": self.eos_ref_block_prefix,
             "receipts": self.receipts.0.iter().map(|receipt| receipt.to_json()).collect::<Result<Vec<JsonValue>>>()?,
         }))
     }
@@ -87,14 +131,51 @@ impl EthSubmissionMaterial {
     }
 
     pub fn from_json(json: &EthSubmissionMaterialJson) -> Result<Self> {
-        Ok(
-            EthSubmissionMaterial {
-                block: EthBlock::from_json(&json.block)?,
+        /*
+         * NOTE: Legacy cores originally stored the full block. To reduce the size of the encrypted DB,
+         * cores v1.19.0 and later remove the ETH block when saving to the db. Hence why here we
+         * first check if there *is* a block in the json retrieved from the DB and then create the correct
+         * (new) struct that way. Otherwise, we check the json correctly adheres to the new format
+         * and if so create the struct from that instead.
+         */
+        let block = match json.block {
+            Some(ref block_json) => Some(EthBlock::from_json(block_json)?),
+            None => None,
+        };
+        let receipts = EthReceipts::from_jsons(&json.receipts.clone())?;
+        match block {
+            Some(block) => Ok(EthSubmissionMaterial {
+                receipts,
+                hash: Some(block.hash),
+                block_number: Some(block.number),
+                parent_hash: Some(block.parent_hash),
+                receipts_root: Some(block.receipts_root),
                 eos_ref_block_num: json.eos_ref_block_num,
                 eos_ref_block_prefix: json.eos_ref_block_prefix,
-                receipts: EthReceipts::from_jsons(&json.receipts)?,
+                block: Some(block),
+            }),
+            None =>  {
+                if json.hash.is_none() {
+                    return Err("Error parsing `EthSubmissionInfo` from json: missing `hash`!".into())
+                } else if json.parent_hash.is_none() {
+                    return Err("Error parsing `EthSubmissionInfo` from json: missing `parent_hash`!".into())
+                } else if json.block_number.is_none() {
+                    return Err("Error parsing `EthSubmissionInfo` from json: missing `block_number`!".into())
+                } else if json.receipts_root.is_none() {
+                    return Err("Error parsing `EthSubmissionInfo` from json: missing `receipts_root`!".into())
+                };
+                Ok(EthSubmissionMaterial {
+                    receipts,
+                    block: None,
+                    hash: json.hash,
+                    parent_hash: json.parent_hash,
+                    block_number: json.block_number,
+                    receipts_root:json.receipts_root,
+                    eos_ref_block_num: json.eos_ref_block_num,
+                    eos_ref_block_prefix: json.eos_ref_block_prefix,
+                })
             }
-        )
+        }
     }
 
     pub fn from_str(json_str: &str) -> Result<Self> {
@@ -113,7 +194,7 @@ impl EthSubmissionMaterial {
     ) -> Result<Self> {
         info!("✔ Number of receipts before filtering: {}", self.receipts.len());
         let filtered = Self::new(
-            self.block.clone(),
+            self.get_block()?,
             self.receipts.filter_for_receipts_containing_log_with_address_and_topics(address, topics),
             self.eos_ref_block_num,
             self.eos_ref_block_prefix,
@@ -136,17 +217,18 @@ impl EthSubmissionMaterial {
                 .collect()
         );
         info!("✔ Num receipts after filtering for those pertaining to ERC20 dictionary: {}", filtered_receipts.len());
-        Ok(Self::new(self.block.clone(), filtered_receipts, self.eos_ref_block_num, self.eos_ref_block_prefix))
+        Ok(Self::new(self.get_block()?, filtered_receipts, self.eos_ref_block_num, self.eos_ref_block_prefix))
     }
 
     pub fn receipts_are_valid(&self) -> Result<bool> {
         self
             .receipts
             .get_merkle_root()
-            .map(|calculated_root| {
-                info!("✔    Block's receipts root: {}", self.block.receipts_root.to_string());
+            .and_then(|calculated_root| {
+                let receipts_root = self.get_receipts_root()?;
+                info!("✔    Block's receipts root: {}", receipts_root.to_string());
                 info!("✔ Calculated receipts root: {}", calculated_root.to_string());
-                calculated_root == self.block.receipts_root
+                Ok(calculated_root == receipts_root)
             })
     }
 
@@ -182,8 +264,25 @@ impl EthSubmissionMaterial {
 
     pub fn remove_receipts(&self) -> Self {
         EthSubmissionMaterial {
+            hash: self.hash,
             receipts: vec![].into(),
             block: self.block.clone(),
+            parent_hash: self.parent_hash,
+            block_number: self.block_number,
+            receipts_root: self.receipts_root,
+            eos_ref_block_num: self.eos_ref_block_num,
+            eos_ref_block_prefix: self.eos_ref_block_prefix,
+        }
+    }
+
+    pub fn remove_block(&self) -> Self {
+        EthSubmissionMaterial {
+            block: None,
+            hash: self.hash,
+            parent_hash: self.parent_hash,
+            receipts: self.receipts.clone(),
+            block_number: self.block_number,
+            receipts_root: self.receipts_root,
             eos_ref_block_num: self.eos_ref_block_num,
             eos_ref_block_prefix: self.eos_ref_block_prefix,
         }
@@ -192,10 +291,14 @@ impl EthSubmissionMaterial {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct EthSubmissionMaterialJson {
-    pub block: EthBlockJson,
+    pub block: Option<EthBlockJson>,
     pub receipts: Vec<EthReceiptJson>,
     pub eos_ref_block_num: Option<u16>,
     pub eos_ref_block_prefix: Option<u32>,
+    pub hash: Option<EthHash>,
+    pub block_number: Option<U256>,
+    pub parent_hash: Option<EthHash>,
+    pub receipts_root: Option<EthHash>,
 }
 
 impl EthSubmissionMaterialJson {
@@ -221,7 +324,6 @@ pub fn parse_eth_submission_material_and_put_in_state<D>(
 mod tests {
     use super::*;
     use std::str::FromStr;
-    use ethereum_types::U256;
     use crate::{
         chains::{
             eos::{
@@ -259,19 +361,13 @@ mod tests {
     #[test]
     fn should_parse_eth_submission_material_json() {
         let json_string = get_sample_eth_submission_material_string(0).unwrap();
-        match EthSubmissionMaterial::from_str(&json_string) {
-            Ok(block_and_receipt) => {
-                let block = block_and_receipt
-                    .block
-                    .clone();
-                let receipt = block_and_receipt.receipts.0[SAMPLE_RECEIPT_INDEX].clone();
-                let expected_block = get_expected_block();
-                let expected_receipt = get_expected_receipt();
-                assert_eq!(block, expected_block);
-                assert_eq!(receipt, expected_receipt);
-            }
-            _ => panic!("Should parse block & receipts correctly!"),
-        }
+        let submission_material = EthSubmissionMaterial::from_str(&json_string).unwrap();
+        let block = submission_material.get_block().unwrap();
+        let receipt = submission_material.receipts.0[SAMPLE_RECEIPT_INDEX].clone();
+        let expected_block = get_expected_block();
+        let expected_receipt = get_expected_receipt();
+        assert_eq!(block, expected_block);
+        assert_eq!(receipt, expected_receipt);
     }
 
     #[test]

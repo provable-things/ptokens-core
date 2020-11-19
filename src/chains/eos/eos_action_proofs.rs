@@ -123,14 +123,17 @@ impl EosActionProof {
         dictionary
             .get_entry_via_eos_address(&self.action.account.to_string())
             .and_then(|entry| {
+                let amount = self.get_erc20_on_eos_eth_redeem_amount(&entry)?;
+                let eos_tx_amount = entry.convert_u256_to_eos_asset_string(&amount)?;
                 info!("✔ Converting action proof to `erc20-on-eos` redeem info...");
                 Ok(Erc20OnEosRedeemInfo {
+                    amount,
+                    eos_tx_amount,
                     originating_tx_id: self.tx_id,
                     eth_token_address: entry.eth_address,
                     from: self.get_redeem_action_sender()?,
-                    eos_token_address: entry.eos_address.clone(),
+                    eos_token_address: entry.eos_address,
                     global_sequence: self.action_receipt.global_sequence,
-                    amount: self.get_erc20_on_eos_eth_redeem_amount(&entry)?,
                     recipient: self.get_erc20_on_eos_eth_redeem_address_or_default_to_safe_address()?,
                 })
             })
@@ -361,6 +364,7 @@ mod tests {
             convert_hex_to_checksum256("ed991197c5d571f39b4605f91bf1374dd69237070d44b46d4550527c245a01b9").unwrap(),
             250255005734,
             eos_account_name.clone(),
+            "0.000001337 PETH".to_string(),
         );
         let dictionary = EosErc20Dictionary::new(vec![EosErc20DictionaryEntry::new(
             18,

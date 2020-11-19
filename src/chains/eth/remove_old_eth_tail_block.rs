@@ -6,8 +6,8 @@ use crate::{
         eth_state::EthState,
         eth_submission_material::EthSubmissionMaterial,
         eth_database_utils::{
-            get_eth_block_from_db,
             get_eth_tail_block_from_db,
+            get_submission_material_from_db,
             get_eth_anchor_block_hash_from_db,
         },
     },
@@ -26,14 +26,14 @@ pub fn remove_parents_if_not_anchor<D>(
 ) -> Result<()>
     where D: DatabaseInterface
 {
-    match get_eth_block_from_db(db, &block_whose_parents_to_be_removed.block.parent_hash) {
+    match get_submission_material_from_db(db, &block_whose_parents_to_be_removed.get_parent_hash()?) {
         Err(_) => {
             info!("✔ No block found ∵ doing nothing!");
             Ok(())
         }
         Ok(parent_block) => {
             info!("✔ Block found, checking if it's the anchor block...");
-            match is_anchor_block(db, &parent_block.block.hash)? {
+            match is_anchor_block(db, &parent_block.get_block_hash()?)? {
                 true => {
                     info!("✔ Block IS the anchor block ∴ not removing it!");
                     Ok(())
@@ -41,7 +41,7 @@ pub fn remove_parents_if_not_anchor<D>(
                 false => {
                     info!("✔ Block is NOT the anchor ∴ removing it...");
                     db
-                        .delete(parent_block.block.hash.as_bytes().to_vec())
+                        .delete(parent_block.get_block_hash()?.as_bytes().to_vec())
                         .and_then(|_| remove_parents_if_not_anchor(db, &parent_block))
                 }
             }
@@ -80,16 +80,11 @@ mod tests {
     fn should_return_false_block_is_not_anchor_block() {
         let db = get_test_database();
         let blocks = get_sequential_eth_blocks_and_receipts();
-        let anchor_block = blocks[0]
-            .clone();
-        let non_anchor_block = blocks[1]
-            .clone();
+        let anchor_block = blocks[0].clone();
+        let non_anchor_block = blocks[1].clone();
         assert_ne!(anchor_block, non_anchor_block);
-        if let Err(e) = put_eth_anchor_block_in_db(&db, &anchor_block) {
-            panic!("Error putting btc anchor block in db: {}", e);
-        };
-        let result = is_anchor_block(&db, &non_anchor_block.block.hash)
-            .unwrap();
+        put_eth_anchor_block_in_db(&db, &anchor_block).unwrap();
+        let result = is_anchor_block(&db, &non_anchor_block.get_block_hash().unwrap()).unwrap();
         assert!(!result);
     }
 
@@ -97,13 +92,9 @@ mod tests {
     fn should_return_true_if_block_is_anchor_block() {
         let db = get_test_database();
         let blocks = get_sequential_eth_blocks_and_receipts();
-        let anchor_block = blocks[0]
-            .clone();
-        if let Err(e) = put_eth_anchor_block_in_db(&db, &anchor_block) {
-            panic!("Error putting btc anchor block in db: {}", e);
-        };
-        let result = is_anchor_block(&db, &anchor_block.block.hash)
-            .unwrap();
+        let anchor_block = blocks[0].clone();
+        put_eth_anchor_block_in_db(&db, &anchor_block).unwrap();
+        let result = is_anchor_block(&db, &anchor_block.get_block_hash().unwrap()).unwrap();
         assert!(result);
     }
 
@@ -111,27 +102,16 @@ mod tests {
     fn should_remove_parent_block_if_parent_is_not_anchor() {
         let db = get_test_database();
         let blocks = get_sequential_eth_blocks_and_receipts();
-        let anchor_block = blocks[0]
-            .clone();
-        let block = blocks[2]
-            .clone();
-        let parent_block = blocks[1]
-            .clone();
-        assert_eq!(parent_block.block.hash, block.block.parent_hash);
-        if let Err(e) = put_eth_anchor_block_in_db(&db, &anchor_block) {
-            panic!("Error putting btc anchor block in db: {}", e);
-        };
-        if let Err(e) = put_eth_submission_material_in_db(&db, &block) {
-            panic!("Error putting btc block in db: {}", e);
-        };
-        if let Err(e) = put_eth_submission_material_in_db(&db, &parent_block) {
-            panic!("Error putting btc block in db: {}", e);
-        };
-        assert!(eth_block_exists_in_db(&db, &parent_block.block.hash));
-        if let Err(e) = remove_parents_if_not_anchor(&db, &block) {
-            panic!("Error removing parent block if not anchor: {}", e);
-        };
-        assert!(!eth_block_exists_in_db(&db, &parent_block.block.hash));
+        let anchor_block = blocks[0].clone();
+        let block = blocks[2].clone();
+        let parent_block = blocks[1].clone();
+        assert_eq!(parent_block.get_block_hash().unwrap(), block.get_parent_hash().unwrap());
+        put_eth_anchor_block_in_db(&db, &anchor_block).unwrap();
+        put_eth_submission_material_in_db(&db, &block).unwrap();
+        put_eth_submission_material_in_db(&db, &parent_block).unwrap();
+        assert!(eth_block_exists_in_db(&db, &parent_block.get_block_hash().unwrap()));
+        remove_parents_if_not_anchor(&db, &block).unwrap();
+        assert!(!eth_block_exists_in_db(&db, &parent_block.get_block_hash().unwrap()));
     }
 
     #[test]
@@ -142,18 +122,12 @@ mod tests {
             .clone();
         let block = blocks[1]
             .clone();
-        assert_eq!(block.block.parent_hash, anchor_block.block.hash);
-        if let Err(e) = put_eth_anchor_block_in_db(&db, &anchor_block) {
-            panic!("Error putting btc anchor block in db: {}", e);
-        };
-        if let Err(e) = put_eth_submission_material_in_db(&db, &block) {
-            panic!("Error putting btc block in db: {}", e);
-        };
-        assert!(eth_block_exists_in_db(&db, &anchor_block.block.hash));
-        if let Err(e) = remove_parents_if_not_anchor(&db, &block) {
-            panic!("Error removing parent block if not anchor: {}", e);
-        };
-        assert!(eth_block_exists_in_db(&db, &block.block.hash));
+        assert_eq!(block.get_parent_hash().unwrap(), anchor_block.get_block_hash().unwrap());
+        put_eth_anchor_block_in_db(&db, &anchor_block).unwrap();
+        put_eth_submission_material_in_db(&db, &block).unwrap();
+        assert!(eth_block_exists_in_db(&db, &anchor_block.get_block_hash().unwrap()));
+        remove_parents_if_not_anchor(&db, &block).unwrap();
+        assert!(eth_block_exists_in_db(&db, &block.get_block_hash().unwrap()));
     }
 
     #[test]
@@ -161,17 +135,11 @@ mod tests {
         let db = get_test_database();
         let all_blocks = get_sequential_eth_blocks_and_receipts();
         let blocks = &all_blocks[1..all_blocks.len() - 1];
-        let tail_block = all_blocks[all_blocks.len() - 1]
-            .clone();
-        let anchor_block = all_blocks[0]
-            .clone();
-        if let Err(e) = put_eth_anchor_block_in_db(&db, &anchor_block) {
-            panic!("Error putting btc anchor block in db: {}", e);
-        };
-        if let Err(e) = put_eth_tail_block_in_db(&db, &tail_block) {
-            panic!("Error putting btc tail block in db: {}", e);
-        };
-        assert!(eth_block_exists_in_db(&db, &anchor_block.block.hash));
+        let tail_block = all_blocks[all_blocks.len() - 1].clone();
+        let anchor_block = all_blocks[0].clone();
+        put_eth_anchor_block_in_db(&db, &anchor_block).unwrap();
+        put_eth_tail_block_in_db(&db, &tail_block).unwrap();
+        assert!(eth_block_exists_in_db(&db, &anchor_block.get_block_hash().unwrap()));
         blocks
             .iter()
             .map(|block| put_eth_submission_material_in_db(&db, block))
@@ -179,21 +147,14 @@ mod tests {
             .unwrap();
         blocks
             .iter()
-            .map(|block| {
-                assert!(eth_block_exists_in_db(&db, &block.block.hash))
-            })
+            .map(|block| assert!(eth_block_exists_in_db(&db, &block.get_block_hash().unwrap())))
             .for_each(drop);
-        if let Err(e) = remove_parents_if_not_anchor(
-            &db,
-            &tail_block,
-        ) {
-            panic!("Error removing parent block if not anchor: {}", e);
-        };
+        remove_parents_if_not_anchor(&db, &tail_block).unwrap();
         blocks
             .iter()
-            .map(|block| assert!(!eth_block_exists_in_db(&db, &block.block.hash)))
+            .map(|block| assert!(!eth_block_exists_in_db(&db, &block.get_block_hash().unwrap())))
             .for_each(drop);
-        assert!(eth_block_exists_in_db(&db, &tail_block.block.hash));
-        assert!(eth_block_exists_in_db(&db, &anchor_block.block.hash));
+        assert!(eth_block_exists_in_db(&db, &tail_block.get_block_hash().unwrap()));
+        assert!(eth_block_exists_in_db(&db, &anchor_block.get_block_hash().unwrap()));
     }
 }

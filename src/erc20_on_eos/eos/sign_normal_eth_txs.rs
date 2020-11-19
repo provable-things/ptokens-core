@@ -6,15 +6,18 @@ use crate::{
     chains::{
         eos::eos_state::EosState,
         eth::{
+            eth_types::EthTransactions,
             eth_constants::ZERO_ETH_VALUE,
-            eth_crypto::eth_transaction::EthTransaction,
-            eth_database_utils::{
-                get_signing_params_from_db,
-                get_erc20_on_eos_smart_contract_address_from_db,
+            eth_crypto::{
+                eth_private_key::EthPrivateKey,
+                eth_transaction::EthTransaction,
             },
-            eth_types::{
-                EthTransactions,
-                EthSigningParams,
+            eth_database_utils::{
+                get_eth_chain_id_from_db,
+                get_eth_gas_price_from_db,
+                get_eth_private_key_from_db,
+                get_eth_account_nonce_from_db,
+                get_erc20_on_eos_smart_contract_address_from_db,
             },
             eth_contracts::perc20::{
                 PERC20_PEGOUT_GAS_LIMIT,
@@ -25,11 +28,14 @@ use crate::{
 };
 
 pub fn get_eth_signed_txs(
-    signing_params: &EthSigningParams,
     redeem_infos: &Erc20OnEosRedeemInfos,
     erc20_on_eos_smart_contract_address: &EthAddress,
+    eth_account_nonce: u64,
+    chain_id: u8,
+    gas_price: u64,
+    eth_private_key: EthPrivateKey,
 ) -> Result<EthTransactions> {
-    trace!("✔ Getting ETH signed transactions from `erc20-on-eos` redeem infos...");
+    info!("✔ Getting ETH signed transactions from `erc20-on-eos` redeem infos...");
     redeem_infos
         .iter()
         .enumerate()
@@ -41,27 +47,34 @@ pub fn get_eth_signed_txs(
                     redeem_info.eth_token_address,
                     redeem_info.amount
                 )?,
-                signing_params.eth_account_nonce + i as u64,
+                eth_account_nonce + i as u64,
                 ZERO_ETH_VALUE,
                 *erc20_on_eos_smart_contract_address,
-                signing_params.chain_id,
+                chain_id,
                 PERC20_PEGOUT_GAS_LIMIT,
-                signing_params.gas_price,
+                gas_price,
             )
-                .sign(signing_params.eth_private_key.clone())
+                .sign(eth_private_key.clone())
         })
         .collect::<Result<EthTransactions>>()
 }
 
 pub fn maybe_sign_normal_eth_txs_and_add_to_state<D: DatabaseInterface>(state: EosState<D>) -> Result<EosState<D>> {
-    info!("✔ Maybe signing normal ETH txs...");
-    get_eth_signed_txs(
-        &get_signing_params_from_db(&state.db)?,
-        &state.erc20_on_eos_redeem_infos,
-        &get_erc20_on_eos_smart_contract_address_from_db(&state.db)?,
-    )
-        .and_then(|signed_txs| {
-            #[cfg(feature="debug")] { debug!("✔ Signed transactions: {:?}", signed_txs); }
-            state.add_erc20_on_eos_signed_txs(signed_txs)
-        })
+    if state.erc20_on_eos_redeem_infos.len() == 0 {
+        info!("✔ No redeem infos in state ∴ no ETH transactions to sign!");
+        Ok(state)
+    } else {
+        get_eth_signed_txs(
+            &state.erc20_on_eos_redeem_infos,
+            &get_erc20_on_eos_smart_contract_address_from_db(&state.db)?,
+            get_eth_account_nonce_from_db(&state.db)?,
+            get_eth_chain_id_from_db(&state.db)?,
+            get_eth_gas_price_from_db(&state.db)?,
+            get_eth_private_key_from_db(&state.db)?,
+        )
+            .and_then(|signed_txs| {
+                #[cfg(feature="debug")] { debug!("✔ Signed transactions: {:?}", signed_txs); }
+                state.add_erc20_on_eos_signed_txs(signed_txs)
+            })
+    }
 }
