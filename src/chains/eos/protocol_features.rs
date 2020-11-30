@@ -72,19 +72,13 @@ impl EnabledFeatures {
         info!("✔ Adding multiple features...");
         feature_hashes.sort();
         feature_hashes.dedup();
-        feature_hashes
+        let features = feature_hashes
             .iter()
-            .map(|hash| AVAILABLE_FEATURES.maybe_get_feature_from_hash(&hash))
-            .filter(|maybe_feature| maybe_feature.is_some())
-            .map(|feature| -> Result<()> {
-                info!("✔ Adding feature: {}", feature.clone()
-                    .ok_or(NoneError("Could not unwrap EOS protocol feature while adding!"))?
-                    .to_json()?
-                );
-                self.0.push(feature.ok_or(NoneError("Could not unwrap EOS protocol feature while adding!"))?);
-                Ok(())
-            })
-            .for_each(drop);
+            .filter_map(|hash| AVAILABLE_FEATURES.maybe_get_feature_from_hash(&hash));
+        for feature in features {
+            info!("✔ Adding feature: {}", feature.to_json()?);
+            self.0.push(feature);
+        }
         Ok(self)
     }
 

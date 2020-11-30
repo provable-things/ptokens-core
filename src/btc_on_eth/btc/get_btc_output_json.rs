@@ -5,8 +5,16 @@ use std::time::{
 use crate::{
     types::Result,
     traits::DatabaseInterface,
+    btc_on_eth::btc::minting_params::BtcOnEthMintingParamStruct,
     chains::{
-        btc::btc_constants::DEFAULT_BTC_ADDRESS,
+        btc::{
+            btc_state::BtcState,
+            btc_constants::DEFAULT_BTC_ADDRESS,
+            btc_database_utils::{
+                get_btc_canon_block_from_db,
+                get_btc_latest_block_from_db,
+            },
+        },
         eth::{
             eth_traits::EthTxInfoCompatible,
             eth_crypto::eth_transaction::EthTransaction,
@@ -15,14 +23,6 @@ use crate::{
                 get_any_sender_nonce_from_db,
                 get_eth_account_nonce_from_db,
             },
-        },
-    },
-    btc_on_eth::btc::{
-        btc_state::BtcState,
-        btc_types::MintingParamStruct,
-        btc_database_utils::{
-            get_btc_canon_block_from_db,
-            get_btc_latest_block_from_db,
         },
     },
 };
@@ -44,7 +44,7 @@ pub struct EthTxInfo {
 impl EthTxInfo {
     pub fn new<T: EthTxInfoCompatible>(
         tx: &T,
-        minting_param_struct: &MintingParamStruct,
+        minting_param_struct: &BtcOnEthMintingParamStruct,
         nonce: Option<u64>,
     ) -> Result<EthTxInfo> {
         let default_address = DEFAULT_BTC_ADDRESS.to_string();
@@ -87,7 +87,7 @@ pub struct BtcOutput {
 
 pub fn get_eth_signed_tx_info_from_eth_txs(
     eth_txs: &[EthTransaction],
-    minting_params: &[MintingParamStruct],
+    minting_params: &[BtcOnEthMintingParamStruct],
     eth_account_nonce: u64,
     use_any_sender_tx_type: bool,
     any_sender_nonce: u64,
@@ -122,7 +122,7 @@ pub fn create_btc_output_json_and_put_in_state<D>(
                 Some(txs) =>
                     get_eth_signed_tx_info_from_eth_txs(
                         txs,
-                        &get_btc_canon_block_from_db(&state.db)?.minting_params,
+                        &get_btc_canon_block_from_db(&state.db)?.get_eth_minting_params(),
                         get_eth_account_nonce_from_db(&state.db)?,
                         state.use_any_sender_tx_type(),
                         get_any_sender_nonce_from_db(&state.db)?,

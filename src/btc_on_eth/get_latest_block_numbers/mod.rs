@@ -1,10 +1,10 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::eth::eth_database_utils::get_latest_eth_block_number,
-    btc_on_eth::{
+    btc_on_eth::check_core_is_initialized::check_core_is_initialized,
+    chains::{
+        eth::eth_database_utils::get_latest_eth_block_number,
         btc::btc_database_utils::get_latest_btc_block_number,
-        check_core_is_initialized::check_core_is_initialized,
     },
 };
 
@@ -14,11 +14,7 @@ struct BlockNumbers {
     eth_latest_block_number: usize,
 }
 
-pub fn get_latest_block_numbers<D>(
-    db: D,
-) -> Result<String>
-    where D: DatabaseInterface
-{
+pub fn get_latest_block_numbers<D: DatabaseInterface>(db: D) -> Result<String> {
     info!("✔ Getting latest block numbers...");
     check_core_is_initialized(&db)
         .and_then(|_| {

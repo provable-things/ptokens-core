@@ -4,13 +4,13 @@ use ethereum_types::{
     Address as EthAddress,
 };
 use derive_more::{
-    Constructor,
     Deref,
+    Constructor,
     IntoIterator,
 };
 use crate::{
     types::Result,
-    btc_on_eth::btc::btc_types::{
+    chains::btc::btc_types::{
         BtcRecipientAndAmount,
         BtcRecipientsAndAmounts,
     },

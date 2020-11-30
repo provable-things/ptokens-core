@@ -147,13 +147,11 @@ mod tests {
             .unwrap();
         blocks
             .iter()
-            .map(|block| assert!(eth_block_exists_in_db(&db, &block.get_block_hash().unwrap())))
-            .for_each(drop);
+            .for_each(|block| assert!(eth_block_exists_in_db(&db, &block.get_block_hash().unwrap())));
         remove_parents_if_not_anchor(&db, &tail_block).unwrap();
         blocks
             .iter()
-            .map(|block| assert!(!eth_block_exists_in_db(&db, &block.get_block_hash().unwrap())))
-            .for_each(drop);
+            .for_each(|block| assert!(!eth_block_exists_in_db(&db, &block.get_block_hash().unwrap())));
         assert!(eth_block_exists_in_db(&db, &tail_block.get_block_hash().unwrap()));
         assert!(eth_block_exists_in_db(&db, &anchor_block.get_block_hash().unwrap()));
     }

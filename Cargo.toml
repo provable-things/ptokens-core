@@ -2,7 +2,7 @@
 license = "MIT"
 publish = false
 edition = "2018"
-version = "1.19.0"
+version = "2.4.0"
 readme = "README.md"
 name = "ptokens_core"
 keywords = ["provable", "defi", "crypto"]

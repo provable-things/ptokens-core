@@ -50,15 +50,33 @@ use crate::{
             },
         },
         btc::{
+            btc_state::BtcState,
+            validate_btc_merkle_root::validate_btc_merkle_root,
+            validate_btc_block_header::validate_btc_block_header_in_state,
+            filter_p2sh_deposit_txs::filter_p2sh_deposit_txs_and_add_to_state,
+            validate_btc_difficulty::validate_difficulty_of_btc_block_in_state,
+            btc_submission_material::parse_submission_material_and_put_in_state,
+            get_deposit_info_hash_map::get_deposit_info_hash_map_and_put_in_state,
+            validate_btc_proof_of_work::validate_proof_of_work_of_btc_block_in_state,
+            get_btc_block_in_db_format::create_btc_block_in_db_format_and_put_in_state,
             increment_btc_account_nonce::maybe_increment_btc_signature_nonce_and_return_eos_state,
+            btc_database_utils::{
+                start_btc_db_transaction,
+                get_btc_latest_block_from_db,
+            },
             btc_constants::{
                 get_btc_constants_db_keys,
                 BTC_PRIVATE_KEY_DB_KEY as BTC_KEY,
             },
             utxo_manager::{
-                debug_utxo_utils::clear_all_utxos,
                 utxo_utils::get_all_utxos_as_json_string,
                 utxo_constants::get_utxo_constants_db_keys,
+                debug_utxo_utils::{
+                    remove_utxo,
+                    clear_all_utxos,
+                    consolidate_utxos,
+                    get_child_pays_for_parent_btc_tx,
+                },
             },
         },
     },
@@ -69,22 +87,9 @@ use crate::{
             check_core_is_initialized_and_return_eos_state,
         },
         btc::{
-            btc_state::BtcState,
             sign_transactions::get_signed_txs,
-            btc_database_utils::start_btc_db_transaction,
             get_btc_output_json::get_btc_output_as_string,
-            btc_database_utils::get_btc_latest_block_from_db,
-            validate_btc_merkle_root::validate_btc_merkle_root,
-            filter_minting_params::maybe_filter_minting_params_in_state,
-            validate_btc_block_header::validate_btc_block_header_in_state,
-            filter_p2sh_deposit_txs::filter_p2sh_deposit_txs_and_add_to_state,
-            validate_btc_difficulty::validate_difficulty_of_btc_block_in_state,
-            filter_too_short_names::maybe_filter_name_too_short_params_in_state,
-            get_deposit_info_hash_map::get_deposit_info_hash_map_and_put_in_state,
-            parse_submission_material::parse_submission_material_and_put_in_state,
-            validate_btc_proof_of_work::validate_proof_of_work_of_btc_block_in_state,
-            get_btc_block_in_db_format::create_btc_block_in_db_format_and_put_in_state,
-            parse_minting_params_from_p2sh_deposits::parse_minting_params_from_p2sh_deposits_and_add_to_state,
+            minting_params::parse_minting_params_from_p2sh_deposits_and_add_to_state,
             get_btc_output_json::{
                     BtcOutput,
                     get_eos_signed_tx_info_from_eth_txs,
@@ -180,18 +185,16 @@ pub fn debug_reprocess_btc_block_for_stale_eos_tx<D>(
         .and_then(get_deposit_info_hash_map_and_put_in_state)
         .and_then(filter_p2sh_deposit_txs_and_add_to_state)
         .and_then(parse_minting_params_from_p2sh_deposits_and_add_to_state)
-        .and_then(maybe_filter_minting_params_in_state)
-        .and_then(maybe_filter_name_too_short_params_in_state)
         .and_then(create_btc_block_in_db_format_and_put_in_state)
         .and_then(|state| {
 	    info!("✔ Maybe signing reprocessed minting txs...");
 	    get_signed_txs(
-		state.ref_block_num,
-		state.ref_block_prefix,
+		state.get_eos_ref_block_num()?,
+		state.get_eos_ref_block_prefix()?,
 		&get_eos_chain_id_from_db(&state.db)?,
 		&EosPrivateKey::get_from_db(&state.db)?,
 		&get_eos_account_name_string_from_db(&state.db)?,
-		&state.minting_params,
+		&state.btc_on_eos_minting_params,
 	    )
 		.and_then(|signed_txs| {
 			info!("✔ EOS Signed Txs: {:?}", signed_txs);
@@ -210,7 +213,7 @@ pub fn debug_reprocess_btc_block_for_stale_eos_tx<D>(
 			_ =>
 			    get_eos_signed_tx_info_from_eth_txs(
 				&state.signed_txs,
-				&state.minting_params,
+				&state.btc_on_eos_minting_params,
 				get_eos_account_nonce_from_db(&state.db)?,
 			    )?,
 		    }
@@ -304,6 +307,54 @@ pub fn debug_get_key_from_db<D: DatabaseInterface>(db: D, key: &str) -> Result<S
 ///
 /// This function will return a JSON containing all the UTXOs the encrypted database currently has.
 pub fn debug_get_all_utxos<D: DatabaseInterface>(db: D) -> Result<String> {
-    check_debug_mode()
-        .and_then(|_| get_all_utxos_as_json_string(db))
+    check_debug_mode().and_then(|_| check_core_is_initialized(&db)).and_then(|_| get_all_utxos_as_json_string(&db))
+}
+
+/// # Debug Get Child-Pays-For-Parent BTC Transaction
+///
+/// This function attempts to find the UTXO via the passed in transaction hash and vOut values, and
+/// upon success creates a transaction spending that UTXO, sending it entirely to itself minus the
+/// passed in fee.
+///
+/// ### BEWARE:
+/// This function spends UTXOs and outputs the signed transactions. If the outputted transaction is NOT
+/// broadcast, the change output saved in the DB will NOT be spendable, leaving the enclave
+/// bricked. Use ONLY if you know exactly what you're doing and why!
+pub fn debug_get_child_pays_for_parent_btc_tx<D: DatabaseInterface>(
+    db: D,
+    fee: u64,
+    tx_id: &str,
+    v_out: u32,
+) -> Result<String> {
+    check_core_is_initialized(&db)
+        .and_then(|_| get_child_pays_for_parent_btc_tx(db, fee, tx_id, v_out))
+        .map(prepend_debug_output_marker_to_string)
+}
+
+/// # Debug Consolidate Utxos
+///
+/// This function removes X number of UTXOs from the database then crafts them into a single
+/// transcation to itself before returning the serialized output ready for broadcasting, thus
+/// consolidating those X UTXOs into a single one.
+///
+/// ### BEWARE:
+/// This function spends UTXOs and outputs a signed transaction. If the outputted transaction is NOT
+/// broadcast, the consolidated  output saved in the DB will NOT be spendable, leaving the enclave
+/// bricked. Use ONLY if you know exactly what you're doing and why!
+pub fn debug_consolidate_utxos<D: DatabaseInterface>(db: D, fee: u64, num_utxos: usize) -> Result<String> {
+    check_core_is_initialized(&db)
+        .and_then(|_| consolidate_utxos(db, fee, num_utxos))
+        .map(prepend_debug_output_marker_to_string)
+}
+
+/// # Debug Remove UTXO
+///
+/// Pluck a UTXO from the UTXO set and discard it, locating it via its transaction ID and v-out values.
+///
+/// ### BEWARE:
+/// Use ONLY if you know exactly what you're doing and why!
+pub fn debug_remove_utxo<D: DatabaseInterface>(db: D, tx_id: &str, v_out: u32) -> Result<String> {
+    check_core_is_initialized(&db)
+        .and_then(|_| remove_utxo(db, tx_id, v_out))
+        .map(prepend_debug_output_marker_to_string)
 }

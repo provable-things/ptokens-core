@@ -272,8 +272,7 @@ mod tests {
         vec![0; blocks_json.num_subsequent_blocks()]
             .iter()
             .enumerate()
-            .map(|(i, _)| validate_subsequent_block(i + 1, &blocks_json))
-            .for_each(drop);
+            .for_each(|(i, _)| validate_subsequent_block(i + 1, &blocks_json));
     }
 
     #[test]
@@ -283,8 +282,7 @@ mod tests {
         vec![0; blocks_json.num_subsequent_blocks()]
             .iter()
             .enumerate()
-            .map(|(i, _)| validate_subsequent_block(i + 1, &blocks_json))
-            .for_each(drop);
+            .for_each(|(i, _)| validate_subsequent_block(i + 1, &blocks_json));
     }
 
     #[ignore] // TODO: Fix this test

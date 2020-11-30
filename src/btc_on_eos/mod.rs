@@ -19,18 +19,21 @@ pub use get_latest_block_numbers::get_latest_block_numbers;
 pub use eos::enable_protocol_feature::enable_eos_protocol_feature;
 pub use eos::disable_protocol_feature::disable_eos_protocol_feature;
 pub use debug_functions::{
+    debug_remove_utxo,
     debug_get_all_utxos,
     debug_get_all_db_keys,
     debug_clear_all_utxos,
     debug_get_key_from_db,
+    debug_consolidate_utxos,
     debug_update_incremerkle,
-    debug_add_new_eos_schedule,
     debug_reprocess_eos_block,
+    debug_add_new_eos_schedule,
     debug_set_key_in_db_to_value,
+    debug_get_child_pays_for_parent_btc_tx,
     debug_reprocess_btc_block_for_stale_eos_tx,
 };
 pub use eos::initialize_eos_core::maybe_initialize_eos_core;
-pub use btc::initialize_btc::initialize_btc_core::maybe_initialize_btc_core;
+pub use btc::initialize_btc_core::maybe_initialize_btc_core;
 
 pub mod eos;
 pub mod btc;
@@ -38,6 +41,5 @@ pub mod debug_functions;
 pub mod get_enclave_state;
 pub mod get_latest_block_numbers;
 
-mod utils;
-mod crypto_utils;
-mod check_core_is_initialized;
+pub(crate) mod utils;
+pub(crate) mod check_core_is_initialized;

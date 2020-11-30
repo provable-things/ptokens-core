@@ -604,8 +604,7 @@ mod tests {
             .iter()
             .map(|eos_asset| entry.convert_eos_asset_to_eth_amount(&eos_asset).unwrap())
             .zip(expected_results.iter())
-            .map(|(result, expected_result)| assert_eq!(&result, expected_result))
-            .for_each(drop);
+            .for_each(|(result, expected_result)| assert_eq!(&result, expected_result));
     }
 
     #[test]
@@ -640,8 +639,7 @@ mod tests {
             .iter()
             .map(|eth_amount| entry.convert_u256_to_eos_asset_string(&eth_amount).unwrap())
             .zip(expected_results.iter())
-            .map(|(result, expected_result)| assert_eq!(&result, expected_result))
-            .for_each(drop);
+            .for_each(|(result, expected_result)| assert_eq!(&result, expected_result));
     }
 
     #[test]
@@ -692,8 +690,7 @@ mod tests {
             .iter()
             .map(|u_64| entry.convert_u64_to_eos_asset(*u_64).unwrap())
             .zip(expected_results.iter())
-            .map(|(result, expected_result)| assert_eq!(&result, expected_result))
-            .for_each(drop);
+            .for_each(|(result, expected_result)| assert_eq!(&result, expected_result));
 
     }
 

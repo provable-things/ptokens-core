@@ -681,11 +681,10 @@ mod tests {
             .data
             .iter()
             .enumerate()
-            .map(|(i, byte)| match i == byte_index {
+            .for_each(|(i, byte)| match i == byte_index {
                 true => assert_eq!(byte, &replacement_byte),
                 false => assert_eq!(byte, &original_bytes[i]),
-            })
-            .for_each(drop);
+            });
     }
 
     #[test]
@@ -704,11 +703,10 @@ mod tests {
             .data
             .iter()
             .enumerate()
-            .map(|(i, byte)| match i == byte_index {
+            .for_each(|(i, byte)| match i == byte_index {
                 true => assert_eq!(byte, &replacement_byte),
                 false => assert_eq!(byte, &original_bytes[i]),
-            })
-            .for_each(drop)
+            });
     }
 
     #[test]

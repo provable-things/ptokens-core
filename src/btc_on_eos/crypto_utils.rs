@@ -40,7 +40,6 @@ mod test {
 
     #[test]
     fn should_generate_random_private_key() {
-        generate_random_private_key()
-            .unwrap();
+        generate_random_private_key().unwrap();
     }
 }
