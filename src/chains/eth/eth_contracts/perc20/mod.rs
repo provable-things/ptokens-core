@@ -11,7 +11,7 @@ use crate::{
     },
 };
 
-pub const PERC20_PEGOUT_GAS_LIMIT: usize = 100_000; // FIXME: Finesse this once we know the value required!
+pub const PERC20_PEGOUT_GAS_LIMIT: usize = 180_000;
 pub const PERC20_MIGRATE_GAS_LIMIT: usize = 6_000_000;
 pub const PERC20_CHANGE_SUPPORTED_TOKEN_GAS_LIMIT: usize = 100_000;
 

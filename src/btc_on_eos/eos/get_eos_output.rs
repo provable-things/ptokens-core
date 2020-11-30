@@ -6,18 +6,17 @@ use std::time::{
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::eos::{
-        eos_state::EosState,
+    chains::{
+        eos::eos_state::EosState,
+        btc::{
+            btc_utils::get_hex_tx_from_signed_btc_tx,
+            btc_database_utils::get_btc_account_nonce_from_db,
+        },
     },
     btc_on_eos::{
         eos::redeem_info::{
             BtcOnEosRedeemInfo,
             BtcOnEosRedeemInfos,
-        },
-        btc::{
-            btc_types::BtcTxInfo,
-            btc_utils::get_hex_tx_from_signed_btc_tx,
-            btc_database_utils::get_btc_account_nonce_from_db,
         },
     },
 };
@@ -25,6 +24,18 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EosOutput {
     pub btc_signed_transactions: Vec<BtcTxInfo>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BtcTxInfo {
+    pub btc_tx_hex: String,
+    pub btc_tx_amount: u64,
+    pub btc_tx_hash: String,
+    pub signature_timestamp: u64,
+    pub btc_account_nonce: u64,
+    pub btc_tx_recipient: String,
+    pub originating_tx_hash: String,
+    pub originating_address: String,
 }
 
 impl BtcTxInfo {

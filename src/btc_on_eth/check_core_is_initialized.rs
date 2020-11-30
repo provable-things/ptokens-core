@@ -1,13 +1,15 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::eth::{
-        eth_state::EthState,
-        core_initialization::check_eth_core_is_initialized::is_eth_core_initialized,
-    },
-    btc_on_eth::btc::{
-        btc_state::BtcState,
-        initialize_btc::is_btc_initialized::is_btc_enclave_initialized,
+    chains::{
+        btc::{
+            btc_state::BtcState,
+            core_initialization::is_btc_initialized::is_btc_enclave_initialized,
+        },
+        eth::{
+            eth_state::EthState,
+            core_initialization::check_eth_core_is_initialized::is_eth_core_initialized,
+        },
     },
 };
 
@@ -46,12 +48,12 @@ mod tests {
     use crate::{
         errors::AppError,
         test_utils::get_test_database,
-        chains::eth::eth_database_utils::put_public_eth_address_in_db,
-        btc_on_eth::{
-            eth::eth_test_utils::get_sample_eth_address,
+        btc_on_eth::eth::eth_test_utils::get_sample_eth_address,
+        chains::{
+            eth::eth_database_utils::put_public_eth_address_in_db,
             btc::{
-                btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
                 btc_database_utils::put_btc_address_in_db,
+                btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
             },
         },
     };

@@ -432,7 +432,7 @@ mod tests {
         let num_receipts_after = result.len();
         assert_eq!(num_receipts_after, expected_num_receipts_after);
         assert!(num_receipts_before > num_receipts_after);
-        result.0.iter().map(|receipt| assert!(receipt.logs.contain_topic(&topic))).for_each(drop);
+        result.0.iter().for_each(|receipt| assert!(receipt.logs.contain_topic(&topic)));
     }
 
     fn get_encoded_receipt() -> String {
@@ -460,11 +460,10 @@ mod tests {
         let results = receipts.get_rlp_encoded_receipts_and_nibble_tuples().unwrap();
         results
             .iter()
-            .map(|result| {
+            .for_each(|result| {
                 assert_eq!(result.0, expected_encoded_nibbles);
                 assert_eq!(hex::encode(&result.1), get_encoded_receipt());
-            })
-            .for_each(drop);
+            });
     }
 
     #[test]

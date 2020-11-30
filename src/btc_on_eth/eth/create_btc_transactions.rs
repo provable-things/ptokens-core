@@ -5,24 +5,24 @@ use bitcoin::{
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    btc_on_eth::eth::redeem_info::BtcOnEthRedeemInfos,
+    btc_on_eth::{
+        eth::redeem_info::BtcOnEthRedeemInfos,
+    },
     chains::{
         eth::eth_state::EthState,
         btc::{
             btc_utils::calculate_btc_tx_fee,
+            btc_transaction::create_signed_raw_btc_tx_for_n_input_n_outputs,
+            btc_database_utils::{
+                get_btc_fee_from_db,
+                get_btc_network_from_db,
+                get_btc_address_from_db,
+                get_btc_private_key_from_db,
+            },
             utxo_manager::{
                 utxo_types::BtcUtxosAndValues,
-                utxo_database_utils::get_utxo_and_value,
+                utxo_database_utils::get_first_utxo_and_value,
             },
-        },
-    },
-    btc_on_eth::btc::{
-        btc_transaction::create_signed_raw_btc_tx_for_n_input_n_outputs,
-        btc_database_utils::{
-            get_btc_fee_from_db,
-            get_btc_network_from_db,
-            get_btc_address_from_db,
-            get_btc_private_key_from_db,
         },
     },
 };
@@ -37,7 +37,7 @@ fn get_enough_utxos_to_cover_total<D>(
     where D: DatabaseInterface
 {
     info!("✔ Getting UTXO from db...");
-    get_utxo_and_value(db)
+    get_first_utxo_and_value(db)
         .and_then(|utxo_and_value| {
             debug!("✔ Retrieved UTXO of value: {}", utxo_and_value.value);
             let fee = calculate_btc_tx_fee(inputs.len() + 1, num_outputs, sats_per_byte);
@@ -93,11 +93,7 @@ fn create_btc_tx_from_redeem_infos<D>(
     )
 }
 
-pub fn maybe_create_btc_txs_and_add_to_state<D>(
-    state: EthState<D>
-) -> Result<EthState<D>>
-    where D: DatabaseInterface
-{
+pub fn maybe_create_btc_txs_and_add_to_state<D: DatabaseInterface>(state: EthState<D>) -> Result<EthState<D>> {
     info!("✔ Maybe creating BTC transaction(s) from redeem params...");
     match &state.btc_on_eth_redeem_infos.len() {
         0 => {

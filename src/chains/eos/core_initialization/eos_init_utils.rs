@@ -347,7 +347,6 @@ pub fn maybe_put_erc20_dictionary_in_db_and_return_state<D>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::btc_on_eos::{
         eos::eos_test_utils::{
             get_j3_init_json_n,
@@ -363,12 +362,10 @@ mod tests {
         vec![0; NUM_J3_INIT_SAMPLES]
             .iter()
             .enumerate()
-            .map(|(i, _)| -> Result<()> {
+            .for_each(|(i, _)| {
                 println!("Validating jungle 3 init block #{}...", i + 1);
-                get_j3_init_json_n(i + 1)?.validate();
-                Ok(())
-            })
-            .for_each(drop);
+                get_j3_init_json_n(i + 1).unwrap().validate();
+            });
     }
 
     #[test]
@@ -376,12 +373,10 @@ mod tests {
         vec![0; NUM_MAINNET_INIT_SAMPLES]
             .iter()
             .enumerate()
-            .map(|(i, _)| -> Result<()> {
+            .for_each(|(i, _)| {
                 println!("Validating mainnet init block #{}...", i + i);
-                get_mainnet_init_json_n(i + 1)?.validate();
-                Ok(())
-            })
-            .for_each(drop);
+                get_mainnet_init_json_n(i + 1).unwrap().validate();
+            });
     }
 
     #[test]

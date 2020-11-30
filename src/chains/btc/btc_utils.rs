@@ -15,19 +15,14 @@ use crate::{
         encode_slice as base58_encode_slice,
     },
     chains::{
-        btc::btc_constants::{
-            DEFAULT_BTC_SEQUENCE,
-            PTOKEN_P2SH_SCRIPT_BYTES,
-        },
         eth::eth_utils::{
             convert_bytes_to_u64,
             convert_u64_to_bytes,
         },
-    },
-    btc_on_eth::btc::btc_types::{
-        MintingParams,
-        MintingParamStruct,
-        BtcBlockInDbFormat,
+        btc::btc_constants::{
+            DEFAULT_BTC_SEQUENCE,
+            PTOKEN_P2SH_SCRIPT_BYTES,
+        },
     },
 };
 use bitcoin::{
@@ -52,40 +47,6 @@ use bitcoin::{
         },
     },
 };
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerializedBlockAndId {
-    pub id: Bytes,
-    pub block: Bytes,
-    pub height: Bytes,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerializedBlockInDbFormat {
-    pub id: Bytes,
-    pub block: Bytes,
-    pub height: Bytes,
-    pub extra_data: Bytes,
-    pub minting_params: Bytes,
-}
-
-impl SerializedBlockInDbFormat {
-    pub fn new(
-        serialized_id: Bytes,
-        serialized_block: Bytes,
-        serialized_height: Bytes,
-        serialized_extra_data: Bytes,
-        serialized_minting_params: Bytes,
-    ) -> Self {
-        SerializedBlockInDbFormat {
-            id: serialized_id,
-            block: serialized_block,
-            height: serialized_height,
-            extra_data: serialized_extra_data,
-            minting_params: serialized_minting_params,
-        }
-    }
-}
 
 pub fn convert_hex_to_sha256_hash(hex: &str) -> Result<sha256d::Hash> {
     Ok(sha256d::Hash::from_slice(&hex::decode(strip_hex_prefix(&hex)?)?)?)
@@ -130,22 +91,7 @@ pub fn get_p2sh_script_sig_from_redeem_script(
         .into_script()
 }
 
-pub fn serialize_minting_params(
-    minting_params: &[MintingParamStruct]
-) -> Result<Bytes> {
-    Ok(serde_json::to_vec(minting_params)?)
-}
-
-pub fn deserialize_minting_params(
-    serialized_minting_params: Bytes
-) -> Result<MintingParams> {
-    Ok(serde_json::from_slice(&serialized_minting_params[..])?)
-}
-
-pub fn create_unsigned_utxo_from_tx(
-    tx: &BtcTransaction,
-    output_index: u32,
-) -> BtcUtxo {
+pub fn create_unsigned_utxo_from_tx(tx: &BtcTransaction, output_index: u32) -> BtcUtxo {
     let outpoint = BtcOutPoint {
         txid: tx.txid(),
         vout: output_index,
@@ -175,45 +121,6 @@ pub fn convert_bytes_to_btc_network(bytes: &[Byte]) -> Result<BtcNetwork> {
         2 => Ok(BtcNetwork::Regtest),
         _ => Ok(BtcNetwork::Bitcoin),
     }
-}
-
-pub fn serialize_btc_block_in_db_format(
-    btc_block_in_db_format: &BtcBlockInDbFormat,
-) -> Result<(Bytes, Bytes)> {
-    let serialized_id = btc_block_in_db_format.id.to_vec();
-    Ok(
-        (
-            serialized_id.clone(),
-            serde_json::to_vec(
-                &SerializedBlockInDbFormat::new(
-                    serialized_id,
-                    btc_serialize(&btc_block_in_db_format.block),
-                    convert_u64_to_bytes(btc_block_in_db_format.height),
-                    btc_block_in_db_format.extra_data.clone(),
-                    serialize_minting_params(
-                        &btc_block_in_db_format.minting_params
-                    )?,
-                )
-            )?
-        )
-    )
-}
-
-pub fn deserialize_btc_block_in_db_format(
-    serialized_block_in_db_format: &[Byte]
-) -> Result<BtcBlockInDbFormat> {
-    let serialized_struct: SerializedBlockInDbFormat = serde_json::from_slice(
-        &serialized_block_in_db_format
-    )?;
-    BtcBlockInDbFormat::new(
-        convert_bytes_to_u64(&serialized_struct.height)?,
-        sha256d::Hash::from_slice(&serialized_struct.id)?,
-        deserialize_minting_params(
-            serialized_struct.minting_params
-        )?,
-        btc_deserialize(&serialized_struct.block)?,
-        serialized_struct.extra_data,
-    )
 }
 
 pub fn get_hex_tx_from_signed_btc_tx(
@@ -296,6 +203,13 @@ pub fn get_pay_to_pub_key_hash_script(btc_address: &str) -> Result<BtcScript> {
     )
 }
 
+pub fn get_btc_tx_id_from_str(tx_id: &str) -> Result<sha256d::Hash> {
+    match hex::decode(tx_id) {
+        Err(_) => Err("Could not decode tx_id hex string!".into()),
+        Ok(bytes) => Ok(sha256d::Hash::from_slice(&bytes)?),
+    }
+}
+
 #[cfg(test)] // TODO Create then move this to chains/btc_test_utils!
 pub fn get_tx_id_from_signed_btc_tx(
     signed_btc_tx: &BtcTransaction
@@ -320,24 +234,27 @@ mod tests {
         },
     };
     use crate::{
-        chains::btc::utxo_manager::utxo_types::BtcUtxosAndValues,
+        chains::btc::{
+            utxo_manager::utxo_types::BtcUtxosAndValues,
+            btc_test_utils::{
+                get_sample_btc_utxo,
+                SAMPLE_TRANSACTION_INDEX,
+                SAMPLE_TARGET_BTC_ADDRESS,
+                SAMPLE_SERIALIZED_BTC_UTXO,
+                get_sample_btc_private_key,
+                SAMPLE_OUTPUT_INDEX_OF_UTXO,
+                get_sample_btc_block_and_id,
+                get_sample_testnet_block_and_txs,
+                get_sample_p2sh_redeem_script_sig,
+                get_sample_op_return_utxo_and_value_n,
+                create_op_return_btc_utxo_and_value_from_tx_output,
+            },
+        },
         btc_on_eth::{
             utils::convert_satoshis_to_ptoken,
-            btc::{
-                btc_types::MintingParamStruct,
-                btc_test_utils::{
-                    get_sample_btc_utxo,
-                    SAMPLE_TRANSACTION_INDEX,
-                    SAMPLE_TARGET_BTC_ADDRESS,
-                    SAMPLE_SERIALIZED_BTC_UTXO,
-                    get_sample_btc_private_key,
-                    SAMPLE_OUTPUT_INDEX_OF_UTXO,
-                    get_sample_testnet_block_and_txs,
-                    get_sample_p2sh_redeem_script_sig,
-                    get_sample_btc_block_in_db_format,
-                    get_sample_op_return_utxo_and_value_n,
-                    create_op_return_btc_utxo_and_value_from_tx_output,
-                },
+            btc::minting_params::{
+                BtcOnEthMintingParams,
+                BtcOnEthMintingParamStruct,
             },
         },
     };
@@ -465,30 +382,21 @@ mod tests {
         let originating_tx_hash = sha256d::Hash::from_slice(
             &hex::decode("98eaf3812c998a46e0ee997ccdadf736c7bc13c18a5292df7a8d39089fd28d9e").unwrap()
         ).unwrap();
-        let minting_param_struct = MintingParamStruct::new(
+        let minting_param_struct = BtcOnEthMintingParamStruct::new(
             amount,
             hex::encode(eth_address),
             originating_tx_hash,
             originating_tx_address,
         ).unwrap();
-        let minting_params = vec![minting_param_struct];
-        let serialized_minting_params = serialize_minting_params(&minting_params).unwrap();
+        let minting_params = BtcOnEthMintingParams::new(vec![minting_param_struct]);
+        let serialized_minting_params = minting_params.to_bytes().unwrap();
         assert_eq!(serialized_minting_params, expected_serialization);
-        let deserialized = deserialize_minting_params(serialized_minting_params).unwrap();
+        let deserialized = BtcOnEthMintingParams::from_bytes(&serialized_minting_params).unwrap();
         assert_eq!(deserialized.len(), minting_params.len());
         deserialized
             .iter()
             .enumerate()
-            .map(|(i, minting_param_struct)| assert_eq!(minting_param_struct, &minting_params[i]))
-            .for_each(drop);
-    }
-
-    #[test]
-    fn should_serde_btc_block_in_db_format() {
-        let block = get_sample_btc_block_in_db_format().unwrap();
-        let (_db_key, serialized_block)= serialize_btc_block_in_db_format(&block).unwrap();
-        let deserialized = deserialize_btc_block_in_db_format(&serialized_block).unwrap();
-        assert_eq!(deserialized, block);
+            .for_each(|(i, minting_param_struct)| assert_eq!(minting_param_struct, &minting_params[i]));
     }
 
     #[test]
@@ -513,7 +421,7 @@ mod tests {
     fn should_create_unsigned_utxo_from_tx() {
         let expected_result = "f80c2f7c35f5df8441a5a5b52e2820793fc7e69f4603d38ba7217be41c20691d0000000016001497cfc76442fe717f2a3f0cc9c175f7561b661997ffffffff";
         let index = 0;
-        let tx = get_sample_btc_block_in_db_format().unwrap().block.txdata[0].clone();
+        let tx = get_sample_btc_block_and_id().unwrap().block.txdata[0].clone();
         let result = create_unsigned_utxo_from_tx(&tx, index);
         let result_hex = hex::encode(btc_serialize(&result));
         assert_eq!(result_hex, expected_result);
@@ -524,7 +432,7 @@ mod tests {
         let expected_value = 1261602424;
         let expected_utxo = "f80c2f7c35f5df8441a5a5b52e2820793fc7e69f4603d38ba7217be41c20691d0000000016001497cfc76442fe717f2a3f0cc9c175f7561b661997ffffffff";
         let index = 0;
-        let tx = get_sample_btc_block_in_db_format().unwrap().block.txdata[0] .clone();
+        let tx = get_sample_btc_block_and_id().unwrap().block.txdata[0].clone();
         let result = create_op_return_btc_utxo_and_value_from_tx_output(&tx, index);
         assert_eq!(result.maybe_pointer, None);
         assert_eq!(result.value, expected_value);
@@ -539,14 +447,5 @@ mod tests {
         let bytes = convert_btc_network_to_bytes(network).unwrap();
         let result = convert_bytes_to_btc_network(&bytes).unwrap();
         assert_eq!(result, network);
-    }
-
-    #[test]
-    fn should_serde_btc_block_in_db_format_correctly() {
-        let block_in_db_format = get_sample_btc_block_in_db_format().unwrap();
-        let (id, serialized_block) = serialize_btc_block_in_db_format(&block_in_db_format).unwrap();
-        assert_eq!(id, &block_in_db_format.id[..]);
-        let result = deserialize_btc_block_in_db_format(&serialized_block).unwrap();
-        assert_eq!(result, block_in_db_format);
     }
 }

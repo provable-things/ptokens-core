@@ -1,8 +1,10 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::eth::eth_state::EthState,
-    btc_on_eth::btc::btc_database_utils::increment_btc_account_nonce_in_db,
+    chains::{
+        eth::eth_state::EthState,
+        btc::btc_database_utils::increment_btc_account_nonce_in_db,
+    },
 };
 
 pub fn maybe_increment_btc_nonce_in_db_and_return_state<D>(

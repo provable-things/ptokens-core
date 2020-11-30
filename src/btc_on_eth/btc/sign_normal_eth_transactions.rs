@@ -1,30 +1,30 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::eth::{
-        eth_database_utils::get_signing_params_from_db,
-        eth_crypto::eth_transaction::get_signed_minting_tx,
-        eth_types::{
-            EthTransactions,
-            EthSigningParams,
-        },
-        eth_metadata::{
-            EthMetadataFromBtc,
-            EthMetadataVersion,
-        },
-    },
-    btc_on_eth::{
+    btc_on_eth::btc::minting_params::BtcOnEthMintingParamStruct,
+    chains::{
         btc::{
             btc_state::BtcState,
-            btc_types::MintingParamStruct,
             btc_database_utils::get_btc_canon_block_from_db,
+        },
+        eth::{
+            eth_database_utils::get_signing_params_from_db,
+            eth_crypto::eth_transaction::get_signed_minting_tx,
+            eth_types::{
+                EthTransactions,
+                EthSigningParams,
+            },
+            eth_metadata::{
+                EthMetadataFromBtc,
+                EthMetadataVersion,
+            },
         },
     },
 };
 
 pub fn get_eth_signed_txs(
     signing_params: &EthSigningParams,
-    minting_params: &[MintingParamStruct],
+    minting_params: &[BtcOnEthMintingParamStruct],
 ) -> Result<EthTransactions> {
     trace!("✔ Getting ETH signed transactions...");
     minting_params
@@ -65,17 +65,13 @@ pub fn maybe_sign_normal_canon_block_txs_and_add_to_state<D>(
         info!("✔ Using AnySender therefore not signing normal ETH transactions!");
         return Ok(state);
     }
-
     info!("✔ Maybe signing normal ETH txs...");
-
     get_eth_signed_txs(
         &get_signing_params_from_db(&state.db)?,
-        &get_btc_canon_block_from_db(&state.db)?.minting_params,
+        &get_btc_canon_block_from_db(&state.db)?.get_eth_minting_params(),
     )
         .and_then(|signed_txs| {
-            #[cfg(feature="debug")] {
-                debug!("✔ Signed transactions: {:?}", signed_txs);
-            }
+            #[cfg(feature="debug")] { debug!("✔ Signed transactions: {:?}", signed_txs); }
             state.add_eth_signed_txs(signed_txs)
         })
 }
@@ -91,22 +87,21 @@ mod tests {
     };
     use crate::{
         test_utils::get_test_database,
-        chains::eth::{
-            eth_types::EthAddress,
-            eth_database_utils::{
-                put_eth_chain_id_in_db,
-                put_eth_gas_price_in_db,
-                put_eth_private_key_in_db,
-                put_eth_account_nonce_in_db,
-                put_btc_on_eth_smart_contract_address_in_db,
+        chains::{
+            btc::btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
+            eth::{
+                eth_types::EthAddress,
+                eth_database_utils::{
+                    put_eth_chain_id_in_db,
+                    put_eth_gas_price_in_db,
+                    put_eth_private_key_in_db,
+                    put_eth_account_nonce_in_db,
+                    put_btc_on_eth_smart_contract_address_in_db,
+                },
             },
         },
         btc_on_eth::{
             utils::convert_satoshis_to_ptoken,
-            btc::{
-                btc_types::MintingParamStruct,
-                btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
-            },
             eth::eth_test_utils::{
                 get_sample_eth_address,
                 get_sample_eth_private_key,
@@ -175,13 +170,13 @@ mod tests {
             "9360a5C047e8Eb44647f17672638c3bB8e2B8a53",
         ).unwrap());
         let minting_params = vec![
-            MintingParamStruct::new(
+            BtcOnEthMintingParamStruct::new(
                 convert_satoshis_to_ptoken(1337),
                 hex::encode(recipient_1),
                 sha256d::Hash::hash(&[0xc0]),
                 originating_address.clone(),
             ).unwrap(),
-            MintingParamStruct::new(
+            BtcOnEthMintingParamStruct::new(
                 convert_satoshis_to_ptoken(666),
                 hex::encode(recipient_2),
                 sha256d::Hash::hash(&[0xc0]),

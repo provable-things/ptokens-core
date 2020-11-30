@@ -391,8 +391,7 @@ mod tests {
             .0
             .iter()
             .enumerate()
-            .map(|(i, receipt)| assert_eq!(receipt, &result.receipts.0[i]))
-            .for_each(drop);
+            .for_each(|(i, receipt)| assert_eq!(receipt, &result.receipts.0[i]));
     }
 
     #[test]
@@ -421,8 +420,7 @@ mod tests {
                 assert!(receipt.logs.contain_topic(&topics[0]));
                 receipt
             })
-            .map(|receipt| assert!(receipt.logs.contain_address(&address)))
-            .for_each(drop);
+            .for_each(|receipt| assert!(receipt.logs.contain_address(&address)));
     }
 
     #[test]
@@ -445,8 +443,7 @@ mod tests {
                 assert!(receipt.logs.contain_topic(&topics[0]));
                 receipt
             })
-            .map(|receipt| assert!(receipt.logs.contain_address(&address)))
-            .for_each(drop);
+            .for_each(|receipt| assert!(receipt.logs.contain_address(&address)));
     }
 
     #[test]

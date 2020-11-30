@@ -862,13 +862,12 @@ mod tests {
         blocks
             .iter()
             .enumerate()
-            .map(|(i, _)|
+            .for_each(|(i, _)|
                 match maybe_get_nth_ancestor_eth_submission_material(&db, &block_hash, i as u64).unwrap() {
                     None => panic!("Ancestor number {} should exist!", i),
                     Some(ancestor) => assert_eq!(ancestor, blocks[blocks.len() - i - 1].remove_block()),
                 }
-             )
-            .for_each(drop);
+             );
         let result =  maybe_get_nth_ancestor_eth_submission_material(&db, &block_hash, blocks.len() as u64).unwrap();
         assert!(result.is_none());
 

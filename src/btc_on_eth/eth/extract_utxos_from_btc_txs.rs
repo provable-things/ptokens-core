@@ -3,11 +3,11 @@ use crate::{
     traits::DatabaseInterface,
     chains::{
         eth::eth_state::EthState,
-        btc::btc_utils::get_pay_to_pub_key_hash_script,
-    },
-    btc_on_eth::btc::{
-        btc_database_utils::get_btc_address_from_db,
-        extract_utxos_from_op_return_txs::extract_utxos_from_txs,
+        btc::{
+            btc_utils::get_pay_to_pub_key_hash_script,
+            btc_database_utils::get_btc_address_from_db,
+            extract_utxos_from_op_return_txs::extract_utxos_from_txs,
+        },
     },
 };
 

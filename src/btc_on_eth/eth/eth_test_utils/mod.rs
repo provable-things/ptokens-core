@@ -642,9 +642,8 @@ mod tests {
         block_and_receipts
             .iter()
             .enumerate()
-            .map(|(i, block)|
+            .for_each(|(i, block)|
                  assert_eq!(block.get_block_number().unwrap().as_usize(), SEQUENTIAL_BLOCKS_FIRST_NUMBER + i)
-             )
-            .for_each(drop);
+             );
     }
 }

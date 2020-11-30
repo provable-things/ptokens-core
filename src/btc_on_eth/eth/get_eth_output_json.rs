@@ -6,15 +6,15 @@ use std::time::{
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    btc_on_eth::{
-        btc::btc_database_utils::get_btc_account_nonce_from_db,
-        eth::redeem_info::{
-            BtcOnEthRedeemInfo,
-            BtcOnEthRedeemInfos,
-        },
+    btc_on_eth::eth::redeem_info::{
+        BtcOnEthRedeemInfo,
+        BtcOnEthRedeemInfos,
     },
     chains::{
-        btc::btc_utils::get_hex_tx_from_signed_btc_tx,
+        btc::{
+            btc_utils::get_hex_tx_from_signed_btc_tx,
+            btc_database_utils::get_btc_account_nonce_from_db,
+        },
         eth::{
             eth_state::EthState,
             eth_database_utils::get_eth_latest_block_from_db,

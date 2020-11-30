@@ -247,14 +247,12 @@ impl EosInitAndSubsequentBlocksJson {
                                     .subsequent_blocks[i]
                                     .interim_block_ids
                                     .iter()
-                                    .map(|id| block_ids.push(id.clone()))
-                                    .for_each(drop);
+                                    .for_each(|id| { block_ids.push(id.clone()); });
                                 block_ids
                             })
                             .flatten()
                             .map(convert_hex_to_checksum256)
-                            .map(|checksum| incremerkle.append(checksum?))
-                            .for_each(drop);
+                            .for_each(|checksum| { incremerkle.append(checksum.unwrap()).unwrap(); });
                         Ok(incremerkle)
                     }
                 }

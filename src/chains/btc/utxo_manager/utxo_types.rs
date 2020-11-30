@@ -57,4 +57,12 @@ impl BtcUtxoAndValue {
         self.maybe_pointer = Some(hash);
         self
     }
+
+    pub fn get_tx_id(&self) -> Result<sha256d::Hash> {
+        Ok(self.get_utxo()?.previous_output.txid)
+    }
+
+    pub fn get_v_out(&self) -> Result<u32> {
+        Ok(self.get_utxo()?.previous_output.vout)
+    }
 }

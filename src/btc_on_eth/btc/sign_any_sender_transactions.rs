@@ -1,26 +1,26 @@
 use crate::{
     types::Result,
     traits::DatabaseInterface,
-    chains::eth::{
-        any_sender::relay_transaction::RelayTransaction,
-        eth_database_utils::get_any_sender_signing_params_from_db,
-        eth_types::{
-            AnySenderSigningParams,
-            RelayTransactions
-        },
-    },
-    btc_on_eth::{
+    btc_on_eth::btc::minting_params::BtcOnEthMintingParamStruct,
+    chains::{
         btc::{
-            btc_database_utils::get_btc_canon_block_from_db,
             btc_state::BtcState,
-            btc_types::MintingParamStruct,
+            btc_database_utils::get_btc_canon_block_from_db,
+        },
+        eth::{
+            any_sender::relay_transaction::RelayTransaction,
+            eth_database_utils::get_any_sender_signing_params_from_db,
+            eth_types::{
+                RelayTransactions,
+                AnySenderSigningParams,
+            },
         },
     },
 };
 
 pub fn get_any_sender_signed_txs(
     signing_params: &AnySenderSigningParams,
-    minting_params: &[MintingParamStruct],
+    minting_params: &[BtcOnEthMintingParamStruct],
 ) -> Result<RelayTransactions> {
     trace!("✔ Getting AnySender signed transactions...");
     minting_params
@@ -62,7 +62,7 @@ where
 
     get_any_sender_signed_txs(
         &get_any_sender_signing_params_from_db(&state.db)?,
-        &get_btc_canon_block_from_db(&state.db)?.minting_params,
+        &get_btc_canon_block_from_db(&state.db)?.get_eth_minting_params(),
     )
     .and_then(|signed_txs| {
         #[cfg(feature = "debug")]
@@ -77,19 +77,17 @@ where
 mod tests {
     use super::*;
     use crate::{
-        chains::eth::eth_types::EthAddress,
+        chains::{
+            eth::eth_types::EthAddress,
+            btc::btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
+        },
         btc_on_eth::{
-            btc::{
-                btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
-                btc_types::MintingParamStruct
-            },
-            eth::{
-                eth_test_utils::{
-                    get_sample_eth_address,
-                    get_sample_eth_private_key
-                },
-            },
             utils::convert_satoshis_to_ptoken,
+            btc::minting_params::BtcOnEthMintingParamStruct,
+            eth::eth_test_utils::{
+                get_sample_eth_address,
+                get_sample_eth_private_key
+            },
         }
     };
     use bitcoin::util::address::Address as BtcAddress;
@@ -116,14 +114,14 @@ mod tests {
             &hex::decode("9360a5C047e8Eb44647f17672638c3bB8e2B8a53").unwrap(),
         );
         let minting_params = vec![
-            MintingParamStruct::new(
+            BtcOnEthMintingParamStruct::new(
                 convert_satoshis_to_ptoken(1337),
                 hex::encode(recipient_1),
                 sha256d::Hash::hash(&[0xc0]),
                 originating_address.clone(),
             )
             .unwrap(),
-            MintingParamStruct::new(
+            BtcOnEthMintingParamStruct::new(
                 convert_satoshis_to_ptoken(666),
                 hex::encode(recipient_2),
                 sha256d::Hash::hash(&[0xc0]),

@@ -9,14 +9,16 @@ use crate::{
     btc_on_eth::eth::redeem_info::BtcOnEthRedeemInfos,
     erc20_on_eos::eth::peg_in_info::Erc20OnEosPegInInfos,
     chains::{
-        btc::utxo_manager::utxo_types::BtcUtxosAndValues,
         eth::eth_submission_material::EthSubmissionMaterial,
+        btc::{
+            btc_types::BtcTransactions,
+            utxo_manager::utxo_types::BtcUtxosAndValues,
+        },
         eos::{
             eos_types::EosSignedTransactions,
             eos_erc20_dictionary::EosErc20Dictionary,
         },
     },
-    btc_on_eth::btc::btc_types::BtcTransactions,
 };
 
 #[derive(Clone, PartialEq, Eq)]

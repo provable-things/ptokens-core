@@ -12,7 +12,7 @@ pub fn append_block_ids_to_incremerkle(
     mut incremerkle: Incremerkle,
     block_ids: &[Checksum256],
 ) -> Result<Incremerkle> {
-    block_ids.iter().map(|id| incremerkle.append(*id)).for_each(drop);
+    block_ids.iter().for_each(|id| { incremerkle.append(*id).ok(); });
     Ok(incremerkle)
 }
 

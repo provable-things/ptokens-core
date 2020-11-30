@@ -629,10 +629,7 @@ mod tests {
                     .action_proof
                     .clone()
             )
-            .map(|merkle_proof|
-                 assert!(verify_merkle_proof(&merkle_proof).unwrap())
-            )
-            .for_each(drop);
+            .for_each(|merkle_proof| assert!(verify_merkle_proof(&merkle_proof).unwrap()));
     }
 
     #[test]
