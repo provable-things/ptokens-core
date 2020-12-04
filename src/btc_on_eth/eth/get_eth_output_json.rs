@@ -1,26 +1,14 @@
-use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
-use std::time::{
-    SystemTime,
-    UNIX_EPOCH
-};
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
-    btc_on_eth::eth::redeem_info::{
-        BtcOnEthRedeemInfo,
-        BtcOnEthRedeemInfos,
-    },
+    btc_on_eth::eth::redeem_info::{BtcOnEthRedeemInfo, BtcOnEthRedeemInfos},
     chains::{
-        btc::{
-            btc_utils::get_hex_tx_from_signed_btc_tx,
-            btc_database_utils::get_btc_account_nonce_from_db,
-        },
-        eth::{
-            eth_state::EthState,
-            eth_database_utils::get_eth_latest_block_from_db,
-        },
+        btc::{btc_database_utils::get_btc_account_nonce_from_db, btc_utils::get_hex_tx_from_signed_btc_tx},
+        eth::{eth_database_utils::get_eth_latest_block_from_db, eth_state::EthState},
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
+use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BtcTxInfo {
@@ -35,31 +23,17 @@ pub struct BtcTxInfo {
 }
 
 impl BtcTxInfo {
-    pub fn new(
-        btc_tx: &BtcTransaction,
-        redeem_info: &BtcOnEthRedeemInfo,
-        btc_account_nonce: u64,
-    ) -> Result<BtcTxInfo> {
-        Ok(
-            BtcTxInfo {
-                btc_account_nonce,
-                btc_tx_hash: btc_tx.txid().to_string(),
-                btc_tx_amount: redeem_info.amount.as_u64(),
-                btc_tx_hex: get_hex_tx_from_signed_btc_tx(&btc_tx),
-                btc_tx_recipient: redeem_info.recipient.clone(),
-                originating_address: format!(
-                    "0x{}",
-                    hex::encode(redeem_info.from.as_bytes())
-                ),
-                originating_tx_hash: format!(
-                    "0x{}",
-                    hex::encode(redeem_info.originating_tx_hash.as_bytes())
-                ),
-                signature_timestamp: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)?
-                    .as_secs(),
-            }
-        )
+    pub fn new(btc_tx: &BtcTransaction, redeem_info: &BtcOnEthRedeemInfo, btc_account_nonce: u64) -> Result<BtcTxInfo> {
+        Ok(BtcTxInfo {
+            btc_account_nonce,
+            btc_tx_hash: btc_tx.txid().to_string(),
+            btc_tx_amount: redeem_info.amount.as_u64(),
+            btc_tx_hex: get_hex_tx_from_signed_btc_tx(&btc_tx),
+            btc_tx_recipient: redeem_info.recipient.clone(),
+            originating_address: format!("0x{}", hex::encode(redeem_info.from.as_bytes())),
+            originating_tx_hash: format!("0x{}", hex::encode(redeem_info.originating_tx_hash.as_bytes())),
+            signature_timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+        })
     }
 }
 
@@ -79,33 +53,26 @@ pub fn get_btc_signed_tx_info_from_btc_txs(
     btc_txs
         .iter()
         .enumerate()
-        .map(|(i, btc_tx)|
-            BtcTxInfo::new(
-                btc_tx,
-                &redeem_info.0[i],
-                start_nonce + i as u64,
-            )
-        )
+        .map(|(i, btc_tx)| BtcTxInfo::new(btc_tx, &redeem_info.0[i], start_nonce + i as u64))
         .collect::<Result<Vec<BtcTxInfo>>>()
 }
 
 pub fn get_eth_output_json<D>(state: EthState<D>) -> Result<String>
-    where D: DatabaseInterface
+where
+    D: DatabaseInterface,
 {
     info!("✔ Getting ETH output json...");
-    let output = serde_json::to_string(
-        &EthOutput {
-            eth_latest_block_number: get_eth_latest_block_from_db(&state.db)?.get_block_number()?.as_usize(),
-            btc_signed_transactions: match state.btc_transactions {
-                Some(txs) => get_btc_signed_tx_info_from_btc_txs(
-                    get_btc_account_nonce_from_db(&state.db)?,
-                    txs,
-                    &state.btc_on_eth_redeem_infos,
-                )?,
-                None => vec![],
-            }
-        }
-    )?;
+    let output = serde_json::to_string(&EthOutput {
+        eth_latest_block_number: get_eth_latest_block_from_db(&state.db)?.get_block_number()?.as_usize(),
+        btc_signed_transactions: match state.btc_transactions {
+            Some(txs) => get_btc_signed_tx_info_from_btc_txs(
+                get_btc_account_nonce_from_db(&state.db)?,
+                txs,
+                &state.btc_on_eth_redeem_infos,
+            )?,
+            None => vec![],
+        },
+    })?;
     info!("✔ ETH Output: {}", output);
     Ok(output)
 }

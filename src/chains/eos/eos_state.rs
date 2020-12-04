@@ -1,34 +1,24 @@
-pub use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
-use eos_primitives::{
-    BlockHeader as EosBlockHeader,
-    ProducerScheduleV2 as EosProducerScheduleV2,
-};
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
-    utils::{
-        get_not_in_state_err,
-        get_no_overwrite_state_err,
-    },
     btc_on_eos::eos::redeem_info::BtcOnEosRedeemInfos,
-    erc20_on_eos::eos::redeem_info::Erc20OnEosRedeemInfos,
     chains::{
-        eth::eth_types::EthTransactions,
         btc::utxo_manager::utxo_types::BtcUtxosAndValues,
         eos::{
-            eos_merkle_utils::Incremerkle,
             eos_action_proofs::EosActionProofs,
-            protocol_features::EnabledFeatures,
             eos_erc20_dictionary::EosErc20Dictionary,
+            eos_merkle_utils::Incremerkle,
+            eos_types::{Checksum256s, GlobalSequences, ProcessedTxIds},
             parse_submission_material::EosSubmissionMaterial,
-            eos_types::{
-                Checksum256s,
-                ProcessedTxIds,
-                GlobalSequences,
-            },
+            protocol_features::EnabledFeatures,
         },
+        eth::eth_types::EthTransactions,
     },
+    erc20_on_eos::eos::redeem_info::Erc20OnEosRedeemInfos,
+    traits::DatabaseInterface,
+    types::Result,
+    utils::{get_no_overwrite_state_err, get_not_in_state_err},
 };
+pub use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
+use eos_primitives::{BlockHeader as EosBlockHeader, ProducerScheduleV2 as EosProducerScheduleV2};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EosState<D: DatabaseInterface> {
@@ -50,7 +40,10 @@ pub struct EosState<D: DatabaseInterface> {
     pub eos_erc20_dictionary: Option<EosErc20Dictionary>,
 }
 
-impl<D> EosState<D> where D: DatabaseInterface {
+impl<D> EosState<D>
+where
+    D: DatabaseInterface,
+{
     pub fn init(db: D) -> EosState<D> {
         EosState {
             db,
@@ -72,53 +65,46 @@ impl<D> EosState<D> where D: DatabaseInterface {
         }
     }
 
-    pub fn add_btc_utxos_and_values(
-        mut self,
-        btc_utxos_and_values: BtcUtxosAndValues,
-    ) -> Result<EosState<D>> {
+    pub fn add_btc_utxos_and_values(mut self, btc_utxos_and_values: BtcUtxosAndValues) -> Result<EosState<D>> {
         match self.btc_utxos_and_values {
             Some(_) => Err(get_no_overwrite_state_err("btc_utxos_and_values").into()),
             None => {
                 self.btc_utxos_and_values = Some(btc_utxos_and_values);
                 Ok(self)
-            }
+            },
         }
     }
 
-    pub fn add_active_schedule(
-        mut self,
-        active_schedule: EosProducerScheduleV2,
-    ) -> Result<EosState<D>> {
+    pub fn add_active_schedule(mut self, active_schedule: EosProducerScheduleV2) -> Result<EosState<D>> {
         match self.active_schedule {
             Some(_) => Err(get_no_overwrite_state_err("active_schedule").into()),
             None => {
                 self.active_schedule = Some(active_schedule);
                 Ok(self)
-            }
+            },
         }
     }
 
-    pub fn add_btc_on_eos_signed_txs(
-        mut self,
-        btc_on_eos_signed_txs: Vec<BtcTransaction>,
-    ) -> Result<EosState<D>>
-        where D: DatabaseInterface
+    pub fn add_btc_on_eos_signed_txs(mut self, btc_on_eos_signed_txs: Vec<BtcTransaction>) -> Result<EosState<D>>
+    where
+        D: DatabaseInterface,
     {
         self.btc_on_eos_signed_txs = btc_on_eos_signed_txs;
         Ok(self)
     }
 
-    pub fn add_erc20_on_eos_signed_txs(
-        mut self,
-        erc20_on_eos_signed_txs: EthTransactions,
-    ) -> Result<EosState<D>>
-        where D: DatabaseInterface
+    pub fn add_erc20_on_eos_signed_txs(mut self, erc20_on_eos_signed_txs: EthTransactions) -> Result<EosState<D>>
+    where
+        D: DatabaseInterface,
     {
         self.erc20_on_eos_signed_txs = erc20_on_eos_signed_txs;
         Ok(self)
     }
 
-    pub fn add_incremerkle(mut self, incremerkle: Incremerkle) -> EosState<D> where D: DatabaseInterface {
+    pub fn add_incremerkle(mut self, incremerkle: Incremerkle) -> EosState<D>
+    where
+        D: DatabaseInterface,
+    {
         self.incremerkle = incremerkle;
         self
     }
@@ -155,7 +141,7 @@ impl<D> EosState<D> where D: DatabaseInterface {
     pub fn get_eos_block_header(&self) -> Result<&EosBlockHeader> {
         match self.block_header {
             Some(ref block_header) => Ok(block_header),
-            None => Err(get_not_in_state_err("block_header").into())
+            None => Err(get_not_in_state_err("block_header").into()),
         }
     }
 
@@ -165,28 +151,28 @@ impl<D> EosState<D> where D: DatabaseInterface {
             None => {
                 self.eos_erc20_dictionary = Some(dictionary);
                 Ok(self)
-            }
+            },
         }
     }
 
     pub fn get_eos_erc20_dictionary(&self) -> Result<&EosErc20Dictionary> {
         match self.eos_erc20_dictionary {
             Some(ref dictionary) => Ok(dictionary),
-            None => Err(get_not_in_state_err("eos_erc20_dictionary").into())
+            None => Err(get_not_in_state_err("eos_erc20_dictionary").into()),
         }
     }
 
     pub fn get_eos_block_num(&self) -> Result<u64> {
         match self.block_num {
             Some(num) => Ok(num),
-            None => Err(get_not_in_state_err("block_num").into())
+            None => Err(get_not_in_state_err("block_num").into()),
         }
     }
 
     pub fn get_active_schedule(&self) -> Result<&EosProducerScheduleV2> {
-        match self.active_schedule{
+        match self.active_schedule {
             Some(ref active_schedule) => Ok(active_schedule),
-            None => Err(get_not_in_state_err("active_schedule").into())
+            None => Err(get_not_in_state_err("active_schedule").into()),
         }
     }
 
@@ -206,7 +192,7 @@ impl<D> EosState<D> where D: DatabaseInterface {
         match (self.btc_on_eos_redeem_infos.len(), self.erc20_on_eos_redeem_infos.len()) {
             (0, 0) => vec![],
             (0, _) => self.erc20_on_eos_redeem_infos.get_global_sequences(),
-            (_, _) => self.btc_on_eos_redeem_infos.get_global_sequences(),
+            (..) => self.btc_on_eos_redeem_infos.get_global_sequences(),
         }
     }
 }

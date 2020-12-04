@@ -1,29 +1,19 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
-    erc20_on_eos::eth::peg_in_info::Erc20OnEosPegInInfos,
     chains::{
-        eth::eth_state::EthState,
         eos::{
-            eos_database_utils::get_eos_chain_id_from_db,
+            eos_constants::{EOS_MAX_EXPIRATION_SECS, MEMO, PEOS_ACCOUNT_PERMISSION_LEVEL},
             eos_crypto::{
                 eos_private_key::EosPrivateKey,
-                eos_transaction::{
-                    sign_peos_transaction,
-                    get_unsigned_eos_minting_tx,
-                },
+                eos_transaction::{get_unsigned_eos_minting_tx, sign_peos_transaction},
             },
-            eos_constants::{
-                MEMO,
-                EOS_MAX_EXPIRATION_SECS,
-                PEOS_ACCOUNT_PERMISSION_LEVEL,
-            },
-            eos_types::{
-                EosSignedTransaction,
-                EosSignedTransactions,
-            },
+            eos_database_utils::get_eos_chain_id_from_db,
+            eos_types::{EosSignedTransaction, EosSignedTransactions},
         },
+        eth::eth_state::EthState,
     },
+    erc20_on_eos::eth::peg_in_info::Erc20OnEosPegInInfos,
+    traits::DatabaseInterface,
+    types::Result,
 };
 
 fn get_signed_tx(
@@ -47,7 +37,7 @@ fn get_signed_tx(
         EOS_MAX_EXPIRATION_SECS,
         PEOS_ACCOUNT_PERMISSION_LEVEL,
     )
-        .and_then(|unsigned_tx| sign_peos_transaction(to, amount, chain_id, private_key, &unsigned_tx))
+    .and_then(|unsigned_tx| sign_peos_transaction(to, amount, chain_id, private_key, &unsigned_tx))
 }
 
 pub fn get_signed_txs_from_erc20_on_eos_peg_in_infos(
@@ -57,7 +47,10 @@ pub fn get_signed_txs_from_erc20_on_eos_peg_in_infos(
     private_key: &EosPrivateKey,
     peg_in_infos: &Erc20OnEosPegInInfos,
 ) -> Result<EosSignedTransactions> {
-    info!("✔ Signing {} EOS txs from `erc20-on-eos` peg in infos...", peg_in_infos.len());
+    info!(
+        "✔ Signing {} EOS txs from `erc20-on-eos` peg in infos...",
+        peg_in_infos.len()
+    );
     peg_in_infos
         .iter()
         .map(|peg_in_info| {
@@ -75,10 +68,9 @@ pub fn get_signed_txs_from_erc20_on_eos_peg_in_infos(
         .collect()
 }
 
-pub fn maybe_sign_eos_txs_and_add_to_eth_state<D>(
-    state: EthState<D>
-) -> Result<EthState<D>>
-    where D: DatabaseInterface
+pub fn maybe_sign_eos_txs_and_add_to_eth_state<D>(state: EthState<D>) -> Result<EthState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Maybe signing `erc20-on-eos` peg in txs...");
     let submission_material = state.get_eth_submission_material()?;
@@ -89,5 +81,5 @@ pub fn maybe_sign_eos_txs_and_add_to_eth_state<D>(
         &EosPrivateKey::get_from_db(&state.db)?,
         &state.erc20_on_eos_peg_in_infos,
     )
-        .and_then(|signed_txs| state.add_eos_transactions(signed_txs))
+    .and_then(|signed_txs| state.add_eos_transactions(signed_txs))
 }

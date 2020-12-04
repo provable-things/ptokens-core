@@ -1,32 +1,20 @@
-use rlp::{
-    RlpStream,
-    Encodable,
-};
-use serde_json::{
-    json,
-    Value as JsonValue,
-};
-use ethereum_types::{
-    U256,
-    Bloom,
-    H256 as EthHash,
-    Address as EthAddress,
-};
 use crate::{
-    chains::eth::eth_crypto_utils::keccak_hash_bytes,
-    types::{
-        Bytes,
-        Result,
+    chains::eth::{
+        eth_crypto_utils::keccak_hash_bytes,
+        eth_utils::{
+            convert_dec_str_to_u256,
+            convert_hex_strings_to_h256s,
+            convert_hex_to_address,
+            convert_hex_to_bytes,
+            convert_hex_to_h256,
+            decode_prefixed_hex,
+        },
     },
-    chains::eth::eth_utils::{
-        decode_prefixed_hex,
-        convert_hex_to_h256,
-        convert_hex_to_bytes,
-        convert_hex_to_address,
-        convert_dec_str_to_u256,
-        convert_hex_strings_to_h256s,
-    },
+    types::{Bytes, Result},
 };
+use ethereum_types::{Address as EthAddress, Bloom, H256 as EthHash, U256};
+use rlp::{Encodable, RlpStream};
+use serde_json::{json, Value as JsonValue};
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct EthBlock {
@@ -64,57 +52,55 @@ impl EthBlock {
             .iter()
             .map(|uncle_hash| format!("0x{}", hex::encode(uncle_hash.as_bytes())))
             .collect::<Vec<String>>();
-        Ok(
-            json!({
-                "nonce": format!("0x{}", hex::encode(self.nonce.clone())),
-                "uncles": encoded_uncles,
-                "size": self.size.as_usize(),
-                "number": self.number.as_usize(),
-                "gasUsed": self.gas_used.as_usize(),
-                "transactions": encoded_transactions,
-                "gasLimit": self.gas_limit.as_usize(),
-                "timestamp": self.timestamp.as_usize(),
-                "difficulty": self.difficulty.to_string(),
-                "totalDifficulty": self.total_difficulty.to_string(),
-                "logsBloom": format!("0x{}", hex::encode(self.logs_bloom)),
-                "hash": format!("0x{}", hex::encode(self.hash.as_bytes())),
-                "miner": format!("0x{}", hex::encode(self.miner.as_bytes())),
-                "mixHash": format!("0x{}", hex::encode(self.mix_hash.as_bytes())),
-                "extraData": format!("0x{}", hex::encode(self.extra_data.clone())),
-                "stateRoot": format!("0x{}", hex::encode(self.state_root.as_bytes())),
-                "parentHash": format!("0x{}", hex::encode(self.parent_hash.as_bytes())),
-                "sha3Uncles": format!("0x{}", hex::encode(self.sha3_uncles.as_bytes())),
-                "receiptsRoot": format!("0x{}", hex::encode(self.receipts_root.as_bytes())),
-                "transactionsRoot": format!("0x{}", hex::encode(self.transactions_root.as_bytes())),
-            })
-        )
+        Ok(json!({
+            "nonce": format!("0x{}", hex::encode(self.nonce.clone())),
+            "uncles": encoded_uncles,
+            "size": self.size.as_usize(),
+            "number": self.number.as_usize(),
+            "gasUsed": self.gas_used.as_usize(),
+            "transactions": encoded_transactions,
+            "gasLimit": self.gas_limit.as_usize(),
+            "timestamp": self.timestamp.as_usize(),
+            "difficulty": self.difficulty.to_string(),
+            "totalDifficulty": self.total_difficulty.to_string(),
+            "logsBloom": format!("0x{}", hex::encode(self.logs_bloom)),
+            "hash": format!("0x{}", hex::encode(self.hash.as_bytes())),
+            "miner": format!("0x{}", hex::encode(self.miner.as_bytes())),
+            "mixHash": format!("0x{}", hex::encode(self.mix_hash.as_bytes())),
+            "extraData": format!("0x{}", hex::encode(self.extra_data.clone())),
+            "stateRoot": format!("0x{}", hex::encode(self.state_root.as_bytes())),
+            "parentHash": format!("0x{}", hex::encode(self.parent_hash.as_bytes())),
+            "sha3Uncles": format!("0x{}", hex::encode(self.sha3_uncles.as_bytes())),
+            "receiptsRoot": format!("0x{}", hex::encode(self.receipts_root.as_bytes())),
+            "transactionsRoot": format!("0x{}", hex::encode(self.transactions_root.as_bytes())),
+        }))
     }
 
     pub fn from_json(eth_block_json: &EthBlockJson) -> Result<Self> {
-        Ok(
-            EthBlock {
-                size: U256::from(eth_block_json.size),
-                number: U256::from(eth_block_json.number),
-                gas_used: U256::from(eth_block_json.gasUsed),
-                gas_limit: U256::from(eth_block_json.gasLimit),
-                hash: convert_hex_to_h256(&eth_block_json.hash)?,
-                timestamp: U256::from(eth_block_json.timestamp),
-                nonce: decode_prefixed_hex(&eth_block_json.nonce)?,
-                miner: convert_hex_to_address(&eth_block_json.miner)?,
-                mix_hash: convert_hex_to_h256(&eth_block_json.mixHash)?,
-                state_root: convert_hex_to_h256(&eth_block_json.stateRoot)?,
-                extra_data: convert_hex_to_bytes(&eth_block_json.extraData)?,
-                parent_hash: convert_hex_to_h256(&eth_block_json.parentHash)?,
-                sha3_uncles: convert_hex_to_h256(&eth_block_json.sha3Uncles)?,
-                difficulty: convert_dec_str_to_u256(&eth_block_json.difficulty)?,
-                receipts_root: convert_hex_to_h256(&eth_block_json.receiptsRoot)?,
-                transactions_root: convert_hex_to_h256(&eth_block_json.transactionsRoot)?,
-                total_difficulty: convert_dec_str_to_u256(&eth_block_json.totalDifficulty)?,
-                logs_bloom: Bloom::from_slice(&convert_hex_to_bytes(&eth_block_json.logsBloom)?[..]),
-                uncles: convert_hex_strings_to_h256s(eth_block_json.uncles.iter().map(AsRef::as_ref).collect())?,
-                transactions: convert_hex_strings_to_h256s(eth_block_json.transactions.iter().map(AsRef::as_ref).collect())?,
-            }
-        )
+        Ok(EthBlock {
+            size: U256::from(eth_block_json.size),
+            number: U256::from(eth_block_json.number),
+            gas_used: U256::from(eth_block_json.gasUsed),
+            gas_limit: U256::from(eth_block_json.gasLimit),
+            hash: convert_hex_to_h256(&eth_block_json.hash)?,
+            timestamp: U256::from(eth_block_json.timestamp),
+            nonce: decode_prefixed_hex(&eth_block_json.nonce)?,
+            miner: convert_hex_to_address(&eth_block_json.miner)?,
+            mix_hash: convert_hex_to_h256(&eth_block_json.mixHash)?,
+            state_root: convert_hex_to_h256(&eth_block_json.stateRoot)?,
+            extra_data: convert_hex_to_bytes(&eth_block_json.extraData)?,
+            parent_hash: convert_hex_to_h256(&eth_block_json.parentHash)?,
+            sha3_uncles: convert_hex_to_h256(&eth_block_json.sha3Uncles)?,
+            difficulty: convert_dec_str_to_u256(&eth_block_json.difficulty)?,
+            receipts_root: convert_hex_to_h256(&eth_block_json.receiptsRoot)?,
+            transactions_root: convert_hex_to_h256(&eth_block_json.transactionsRoot)?,
+            total_difficulty: convert_dec_str_to_u256(&eth_block_json.totalDifficulty)?,
+            logs_bloom: Bloom::from_slice(&convert_hex_to_bytes(&eth_block_json.logsBloom)?[..]),
+            uncles: convert_hex_strings_to_h256s(eth_block_json.uncles.iter().map(AsRef::as_ref).collect())?,
+            transactions: convert_hex_strings_to_h256s(
+                eth_block_json.transactions.iter().map(AsRef::as_ref).collect(),
+            )?,
+        })
     }
 
     pub fn rlp_encode(&self) -> Result<Bytes> {
@@ -128,13 +114,11 @@ impl EthBlock {
     }
 
     pub fn is_valid(&self) -> Result<bool> {
-        self
-            .hash()
-            .map(|calculated_hash| {
-                debug!("✔ Block hash from from block: {}", self.hash);
-                debug!("✔ Calculated block hash: {}", calculated_hash);
-                calculated_hash == self.hash
-            })
+        self.hash().map(|calculated_hash| {
+            debug!("✔ Block hash from from block: {}", self.hash);
+            debug!("✔ Calculated block hash: {}", calculated_hash);
+            calculated_hash == self.hash
+        })
     }
 }
 
@@ -190,9 +174,9 @@ mod tests {
     use super::*;
     use crate::btc_on_eth::eth::eth_test_utils::{
         get_expected_block,
-        get_sample_invalid_block,
         get_sample_eth_submission_material,
         get_sample_eth_submission_material_json,
+        get_sample_invalid_block,
     };
 
     #[test]

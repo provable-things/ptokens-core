@@ -1,8 +1,5 @@
+use crate::{chains::eth::eth_crypto_utils::keccak_hash_bytes, types::Bytes};
 use ethereum_types::Address as EthAddress;
-use crate::{
-    types::Bytes,
-    chains::eth::eth_crypto_utils::keccak_hash_bytes,
-};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct EthPublicKey {
@@ -17,18 +14,16 @@ impl EthPublicKey {
 
     pub fn to_address(&self) -> EthAddress {
         let mut eth_address = EthAddress::zero();
-        eth_address.assign_from_slice(
-            &keccak_hash_bytes(&self.to_bytes()[1..65].to_vec())[12..]
-        );
+        eth_address.assign_from_slice(&keccak_hash_bytes(&self.to_bytes()[1..65].to_vec())[12..]);
         eth_address
     }
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use crate::btc_on_eth::eth::eth_test_utils::{
-        get_sample_eth_public_key,
         get_sample_eth_address_string,
+        get_sample_eth_public_key,
         get_sample_eth_public_key_bytes,
     };
 

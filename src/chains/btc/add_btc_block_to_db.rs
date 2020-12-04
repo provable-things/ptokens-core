@@ -1,13 +1,10 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::btc::{
+        btc_database_utils::{btc_block_exists_in_db, put_btc_block_in_db},
         btc_state::BtcState,
-        btc_database_utils::{
-            put_btc_block_in_db,
-            btc_block_exists_in_db,
-        },
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
 
 pub fn maybe_add_btc_block_to_db<D: DatabaseInterface>(state: BtcState<D>) -> Result<BtcState<D>> {
@@ -18,11 +15,10 @@ pub fn maybe_add_btc_block_to_db<D: DatabaseInterface>(state: BtcState<D>) -> Re
             let block = state.get_btc_block_in_db_format()?;
             info!("✔ BTC block not in db!");
             info!("✔ Adding BTC block to db: {:?}", block);
-            put_btc_block_in_db(&state.db, block)
-                .map(|_| {
-                    info!("✔ BTC block added to database!");
-                    state
-                })
-        }
+            put_btc_block_in_db(&state.db, block).map(|_| {
+                info!("✔ BTC block added to database!");
+                state
+            })
+        },
     }
 }

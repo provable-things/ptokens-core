@@ -1,60 +1,69 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::eth::{
-        eth_types::EthHash,
+        calculate_linker_hash::calculate_linker_hash,
+        eth_database_utils::{
+            get_eth_anchor_block_from_db,
+            get_eth_tail_block_from_db,
+            maybe_get_parent_eth_submission_material,
+            put_eth_linker_hash_in_db,
+        },
         eth_state::EthState,
         eth_submission_material::EthSubmissionMaterial,
-        calculate_linker_hash::calculate_linker_hash,
+        eth_types::EthHash,
         get_linker_hash::get_linker_hash_or_genesis_hash,
-        eth_database_utils::{
-            put_eth_linker_hash_in_db,
-            get_eth_tail_block_from_db,
-            get_eth_anchor_block_from_db,
-            maybe_get_parent_eth_submission_material,
-        },
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
 
-fn get_new_linker_hash<D>(db: &D, block_hash_to_link_to: &EthHash) -> Result<EthHash> where D: DatabaseInterface {
+fn get_new_linker_hash<D>(db: &D, block_hash_to_link_to: &EthHash) -> Result<EthHash>
+where
+    D: DatabaseInterface,
+{
     info!("✔ Calculating new linker hash...");
-    get_eth_anchor_block_from_db(db)
-        .and_then(|anchor_block|
-            Ok(
-                calculate_linker_hash(
-                    *block_hash_to_link_to,
-                    anchor_block.get_block_hash()?,
-                    get_linker_hash_or_genesis_hash(db)?,
-                )
-            )
-        )
+    get_eth_anchor_block_from_db(db).and_then(|anchor_block| {
+        Ok(calculate_linker_hash(
+            *block_hash_to_link_to,
+            anchor_block.get_block_hash()?,
+            get_linker_hash_or_genesis_hash(db)?,
+        ))
+    })
 }
 
-fn maybe_get_parent_of_eth_tail_block<D>(db: &D) -> Result<Option<EthSubmissionMaterial>> where D: DatabaseInterface {
+fn maybe_get_parent_of_eth_tail_block<D>(db: &D) -> Result<Option<EthSubmissionMaterial>>
+where
+    D: DatabaseInterface,
+{
     info!("✔ Maybe getting parent of ETH tail block from db...");
-    get_eth_tail_block_from_db(db)
-        .and_then(|canon_block| Ok(maybe_get_parent_eth_submission_material(db, &canon_block.get_block_hash()?)))
+    get_eth_tail_block_from_db(db).and_then(|canon_block| {
+        Ok(maybe_get_parent_eth_submission_material(
+            db,
+            &canon_block.get_block_hash()?,
+        ))
+    })
 }
 
-pub fn maybe_update_eth_linker_hash<D>(db: &D) -> Result<()> where D: DatabaseInterface {
+pub fn maybe_update_eth_linker_hash<D>(db: &D) -> Result<()>
+where
+    D: DatabaseInterface,
+{
     match maybe_get_parent_of_eth_tail_block(db)? {
         Some(parent_of_eth_tail_block) => {
             info!("✔ Updating ETH linker hash...");
             get_new_linker_hash(db, &parent_of_eth_tail_block.get_block_hash()?)
                 .and_then(|linker_hash| put_eth_linker_hash_in_db(db, linker_hash))
                 .map(|_| ())
-        }
+        },
         None => {
             info!("✔ ETH tail has no parent in db ∴ NOT updating linker hash");
             Ok(())
-        }
+        },
     }
 }
 
-pub fn maybe_update_eth_linker_hash_and_return_state<D>(
-    state: EthState<D>
-) -> Result<EthState<D>>
-    where D: DatabaseInterface
+pub fn maybe_update_eth_linker_hash_and_return_state<D>(state: EthState<D>) -> Result<EthState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Maybe updating the ETH linker hash...");
     maybe_update_eth_linker_hash(&state.db).and(Ok(state))
@@ -64,14 +73,14 @@ pub fn maybe_update_eth_linker_hash_and_return_state<D>(
 mod tests {
     use super::*;
     use crate::{
-        test_utils::get_test_database,
-        chains::eth::eth_database_utils::put_eth_submission_material_in_db,
         btc_on_eth::eth::eth_test_utils::{
-            put_eth_tail_block_in_db,
-            put_eth_anchor_block_in_db,
             get_eth_linker_hash_from_db,
             get_sequential_eth_blocks_and_receipts,
+            put_eth_anchor_block_in_db,
+            put_eth_tail_block_in_db,
         },
+        chains::eth::eth_database_utils::put_eth_submission_material_in_db,
+        test_utils::get_test_database,
     };
 
     #[test]

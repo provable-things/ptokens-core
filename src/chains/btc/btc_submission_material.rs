@@ -1,31 +1,25 @@
-pub use bitcoin::{
-    hashes::sha256d,
-    util::address::Address as BtcAddress,
-    consensus::encode::deserialize as btc_deserialize,
-    blockdata::{
-        block::Block as BtcBlock,
-        block::BlockHeader as BtcBlockHeader,
-        transaction::Transaction as BtcTransaction,
-    },
-};
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::btc::{
+        btc_block::{BtcBlockAndId, BtcBlockJson},
         btc_state::BtcState,
         deposit_address_info::DepositAddressInfoJsonList,
-        btc_block::{
-            BtcBlockJson,
-            BtcBlockAndId,
-        },
     },
+    traits::DatabaseInterface,
+    types::Result,
+};
+pub use bitcoin::{
+    blockdata::{
+        block::{Block as BtcBlock, BlockHeader as BtcBlockHeader},
+        transaction::Transaction as BtcTransaction,
+    },
+    consensus::encode::deserialize as btc_deserialize,
+    hashes::sha256d,
+    util::address::Address as BtcAddress,
 };
 
-pub fn parse_btc_submission_json_and_put_in_state<D>(
-    json_str: &str,
-    state: BtcState<D>,
-) -> Result<BtcState<D>>
-    where D: DatabaseInterface
+pub fn parse_btc_submission_json_and_put_in_state<D>(json_str: &str, state: BtcState<D>) -> Result<BtcState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Parsing BTC submission json and adding to state...");
     BtcSubmissionMaterialJson::from_str(&json_str).and_then(|result| state.add_btc_submission_json(result))
@@ -51,7 +45,10 @@ pub struct BtcSubmissionMaterialJson {
 
 impl BtcSubmissionMaterialJson {
     fn convert_hex_txs_to_btc_transactions(hex_txs: Vec<String>) -> Result<Vec<BtcTransaction>> {
-        hex_txs.into_iter().map(Self::convert_hex_tx_to_btc_transaction).collect::<Result<Vec<BtcTransaction>>>()
+        hex_txs
+            .into_iter()
+            .map(Self::convert_hex_tx_to_btc_transaction)
+            .collect::<Result<Vec<BtcTransaction>>>()
     }
 
     fn convert_hex_tx_to_btc_transaction(hex: String) -> Result<BtcTransaction> {
@@ -70,7 +67,7 @@ impl BtcSubmissionMaterialJson {
         info!("✔ Parsing `BtcSubmissionMaterialJson` from string...");
         match serde_json::from_str(string) {
             Ok(json) => Ok(json),
-            Err(err) => Err(err.into())
+            Err(err) => Err(err.into()),
         }
     }
 }

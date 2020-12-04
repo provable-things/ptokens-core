@@ -1,18 +1,10 @@
-use eos_primitives::Checksum256;
-use bitcoin_hashes::{
-    Hash,
-    sha256,
-};
 use crate::{
-    errors::AppError,
     chains::eos::eos_utils::convert_hex_to_checksum256,
-    types::{
-        Byte,
-        Bytes,
-        NoneError,
-        Result,
-    },
+    errors::AppError,
+    types::{Byte, Bytes, NoneError, Result},
 };
+use bitcoin_hashes::{sha256, Hash};
+use eos_primitives::Checksum256;
 
 pub type CanonicalLeft = Bytes;
 pub type CanonicalRight = Bytes;
@@ -58,14 +50,11 @@ fn is_canonical_right(hash: &[Byte]) -> bool {
 }
 
 fn make_canonical_pair(l: &[Byte], r: &[Byte]) -> CanonicalPair {
-    (
-        make_canonical_left(l),
-        make_canonical_right(r),
-    )
+    (make_canonical_left(l), make_canonical_right(r))
 }
 
 fn concatenate_canonical_pair(mut pair: CanonicalPair) -> Bytes {
-    pair.0.append(& mut pair.1);
+    pair.0.append(&mut pair.1);
     pair.0
 }
 
@@ -85,13 +74,15 @@ pub fn verify_merkle_proof(merkle_proof: &[String]) -> Result<bool> {
         .collect::<Result<Vec<Bytes>>>()?;
     for leaf in leaves.iter().skip(1) {
         match is_canonical_right(&leaf) {
-            true => {node = make_and_hash_canonical_pair(&node, &leaf);}
-            false => {node = make_and_hash_canonical_pair(&leaf, &node);}
+            true => {
+                node = make_and_hash_canonical_pair(&node, &leaf);
+            },
+            false => {
+                node = make_and_hash_canonical_pair(&leaf, &node);
+            },
         }
-    };
-    Ok(node == hex::decode(merkle_proof.last()
-        .ok_or(NoneError("Could not unwrap merkle proof!"))?
-    )?)
+    }
+    Ok(node == hex::decode(merkle_proof.last().ok_or(NoneError("Could not unwrap merkle proof!"))?)?)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -108,21 +99,19 @@ impl IncremerkleJson {
                 .active_nodes
                 .iter()
                 .map(|checksum| checksum.to_string())
-                .collect::<Vec<String>>()
+                .collect::<Vec<String>>(),
         }
     }
 
     pub fn to_incremerkle(&self) -> Result<Incremerkle> {
-        Ok(
-            Incremerkle {
-                node_count: self.node_count,
-                active_nodes: self
-                    .active_nodes
-                    .iter()
-                    .map(convert_hex_to_checksum256)
-                    .collect::<Result<Vec<Checksum256>>>()?
-            }
-        )
+        Ok(Incremerkle {
+            node_count: self.node_count,
+            active_nodes: self
+                .active_nodes
+                .iter()
+                .map(convert_hex_to_checksum256)
+                .collect::<Result<Vec<Checksum256>>>()?,
+        })
     }
 }
 
@@ -140,7 +129,10 @@ impl Incremerkle {
     }
 
     pub fn default() -> Self {
-        Incremerkle { node_count: 0, active_nodes: vec![] }
+        Incremerkle {
+            node_count: 0,
+            active_nodes: vec![],
+        }
     }
 
     fn make_canonical_left(val: &Checksum256) -> Checksum256 {
@@ -149,20 +141,14 @@ impl Incremerkle {
         canonical_l
     }
 
-    fn  make_canonical_right(val: &Checksum256) -> Checksum256 {
+    fn make_canonical_right(val: &Checksum256) -> Checksum256 {
         let mut canonical_r: Checksum256 = *val;
         canonical_r.set_hash0(canonical_r.hash0() | 0x0000_0000_0000_0080_u64);
         canonical_r
     }
 
-    pub fn make_canonical_pair(
-        l: &Checksum256,
-        r: &Checksum256
-    ) -> (Checksum256, Checksum256) {
-        (
-            Self::make_canonical_left(l),
-            Self::make_canonical_right(r)
-        )
+    pub fn make_canonical_pair(l: &Checksum256, r: &Checksum256) -> (Checksum256, Checksum256) {
+        (Self::make_canonical_left(l), Self::make_canonical_right(r))
     }
 
     fn next_power_of_2(mut value: u64) -> u64 {
@@ -180,13 +166,27 @@ impl Incremerkle {
     fn clz_power_2(value: u64) -> usize {
         let mut lz: usize = 64;
 
-        if value != 0 { lz -= 1; }
-        if (value & 0x0000_0000_FFFF_FFFF_u64) != 0 { lz -= 32; }
-        if (value & 0x0000_FFFF_0000_FFFF_u64) != 0 { lz -= 16; }
-        if (value & 0x00FF_00FF_00FF_00FF_u64) != 0 { lz -= 8; }
-        if (value & 0x0F0F_0F0F_0F0F_0F0F_u64) != 0 { lz -= 4; }
-        if (value & 0x3333_3333_3333_3333_u64) != 0 { lz -= 2; }
-        if (value & 0x5555_5555_5555_5555_u64) != 0 { lz -= 1; }
+        if value != 0 {
+            lz -= 1;
+        }
+        if (value & 0x0000_0000_FFFF_FFFF_u64) != 0 {
+            lz -= 32;
+        }
+        if (value & 0x0000_FFFF_0000_FFFF_u64) != 0 {
+            lz -= 16;
+        }
+        if (value & 0x00FF_00FF_00FF_00FF_u64) != 0 {
+            lz -= 8;
+        }
+        if (value & 0x0F0F_0F0F_0F0F_0F0F_u64) != 0 {
+            lz -= 4;
+        }
+        if (value & 0x3333_3333_3333_3333_u64) != 0 {
+            lz -= 2;
+        }
+        if (value & 0x5555_5555_5555_5555_u64) != 0 {
+            lz -= 1;
+        }
 
         lz
     }
@@ -213,9 +213,7 @@ impl Incremerkle {
         let mut index = self.node_count;
         let mut top = digest;
         let mut active_iter = self.active_nodes.iter();
-        let mut updated_active_nodes: Vec<Checksum256> = Vec::with_capacity(
-            max_depth
-        );
+        let mut updated_active_nodes: Vec<Checksum256> = Vec::with_capacity(max_depth);
 
         while current_depth > 0 {
             if (index & 0x1) == 0 {
@@ -223,22 +221,18 @@ impl Incremerkle {
                     updated_active_nodes.push(top);
                 }
 
-                top = Checksum256::hash(
-                    Self::make_canonical_pair(&top, &top)
-                )?;
+                top = Checksum256::hash(Self::make_canonical_pair(&top, &top))?;
                 partial = true;
             } else {
-                let left_value = active_iter.next().ok_or_else(
-                    || AppError::Custom("✘ Incremerkle error!".into())
-                )?;
+                let left_value = active_iter
+                    .next()
+                    .ok_or_else(|| AppError::Custom("✘ Incremerkle error!".into()))?;
 
                 if partial {
                     updated_active_nodes.push(*left_value);
                 }
 
-                top = Checksum256::hash(
-                    Self::make_canonical_pair(left_value, &top)
-                )?;
+                top = Checksum256::hash(Self::make_canonical_pair(left_value, &top))?;
             }
 
             current_depth -= 1;
@@ -267,21 +261,18 @@ impl Incremerkle {
 mod tests {
     #![allow(clippy::needless_range_loop)]
     use super::*;
-    use std::str::FromStr;
-    use crate::btc_on_eos::{
-        eos::eos_test_utils::get_sample_eos_submission_material_n,
-    };
+    use crate::btc_on_eos::eos::eos_test_utils::{get_sample_action_digests, get_sample_eos_submission_material_n};
     use eos_primitives::{
+        AccountName,
         Action,
         ActionName,
-        AccountName,
-        AuthSequence,
         ActionReceipt,
-        SerializeData,
-        PermissionName,
+        AuthSequence,
         PermissionLevel,
+        PermissionName,
+        SerializeData,
     };
-    use crate::btc_on_eos::eos::eos_test_utils::get_sample_action_digests;
+    use std::str::FromStr;
 
     fn get_expected_digest_1() -> &'static str {
         "9b9babebfbdff48ce4002b5f3c7f999c0ee74707b6d121c47ef5db68c6be7262"
@@ -308,15 +299,12 @@ mod tests {
     }
 
     fn get_sample_canonical_pair() -> CanonicalPair {
-        make_canonical_pair(
-            &get_expected_digest_bytes_1(),
-            &get_expected_digest_bytes_2(),
-        )
+        make_canonical_pair(&get_expected_digest_bytes_1(), &get_expected_digest_bytes_2())
     }
 
     pub fn get_merkle_digest(mut leaves: Vec<Bytes>) -> Bytes {
         if leaves.is_empty() {
-            return vec![0x00]
+            return vec![0x00];
         }
         while leaves.len() > 1 {
             if leaves.len() % 2 != 0 {
@@ -430,12 +418,7 @@ mod tests {
         let data = hex::decode(
             "e0d2b86b1a3962343021cd2a1eb3e9ad672b00000000000004454f53000000002a3078303236644336413433353631444138413641373735353338623139324133653933366330463239422301000000000000"
             ).unwrap();
-        let action = Action::new(
-            account_name,
-            action_name,
-            authorization,
-            data,
-        );
+        let action = Action::new(account_name, action_name, authorization, data);
         let serialized_action = action.to_serialize_data();
         let result = sha256::Hash::hash(&serialized_action).to_string();
         assert_eq!(result, get_expected_digest_1());
@@ -464,8 +447,7 @@ mod tests {
 
     #[test]
     fn should_hash_canonical_pair() {
-        let expected_result =
-            "a26284468e89fe4a5cce763ca3b3d3d37d5fcb35f289c63f0558487ec57ace28";
+        let expected_result = "a26284468e89fe4a5cce763ca3b3d3d37d5fcb35f289c63f0558487ec57ace28";
         let canonical_pair = get_sample_canonical_pair();
         let result = hash_canonical_pair(canonical_pair);
         assert_eq!(result.to_string(), expected_result);
@@ -473,9 +455,7 @@ mod tests {
 
     #[test]
     fn should_serialize_a_simple_action_receipt_correctly() {
-        let expected_result =
-            "6cd473b189a292bd520cac3430cc7934273da81cc3417376194a5d757b4abdc8"
-                .to_string();
+        let expected_result = "6cd473b189a292bd520cac3430cc7934273da81cc3417376194a5d757b4abdc8".to_string();
         let result = ActionReceipt::new(
             "eosio",
             "a6a370c6569034a4cc41935dd88f83d1c64e0414580872f29d87f69fe7a5d769",
@@ -485,16 +465,15 @@ mod tests {
             10,
             vec![AuthSequence::new("eosio", 59191700).unwrap()],
         )
-            .unwrap()
-            .to_digest();
+        .unwrap()
+        .to_digest();
         assert_eq!(hex::encode(result), expected_result);
     }
 
     #[test]
     fn should_get_merkle_root_for_an_even_number_of_action_receipts() {
         // NOTE: Test vector = https://jungle.bloks.io/block/58316764
-        let expected_result =
-            "2f013d3ed57c89f1824772d18a4a74c043574bad47e9c6f088136e7595511810";
+        let expected_result = "2f013d3ed57c89f1824772d18a4a74c043574bad47e9c6f088136e7595511810";
         let action_digest_1 = ActionReceipt::new(
             "eosio",
             "8e3e721a497dbae5e5fde0bb43e9086628809efaf102b763a3e9820adce9ce8f",
@@ -504,8 +483,8 @@ mod tests {
             10,
             vec![AuthSequence::new("eosio", 61275209).unwrap()],
         )
-            .unwrap()
-            .to_digest();
+        .unwrap()
+        .to_digest();
         let action_digest_2 = ActionReceipt::new(
             "provabletokn",
             "4b991cebb3e6667b242aca3fb011623cd8ce2be2e8c24958da551c7b3ba68903",
@@ -515,17 +494,16 @@ mod tests {
             80,
             vec![AuthSequence::new("provabletokn", 3090).unwrap()],
         )
-            .unwrap()
-            .to_digest();
-        let result = get_merkle_digest(vec![ action_digest_1, action_digest_2]);
+        .unwrap()
+        .to_digest();
+        let result = get_merkle_digest(vec![action_digest_1, action_digest_2]);
         assert_eq!(hex::encode(result), expected_result);
     }
 
     #[test]
     fn should_get_merkle_root_for_an_odd_number_of_action_receipts_gt_one() {
         // NOTE: Test vector = https://jungle.bloks.io/block/58319528
-        let expected_result =
-            "593f54cbc0b877b30cec5e510838b2b16ca00aca43e21d204d21eb8e8f947aa0";
+        let expected_result = "593f54cbc0b877b30cec5e510838b2b16ca00aca43e21d204d21eb8e8f947aa0";
         let action_digest_1 = ActionReceipt::new(
             "eosio",
             "23ab74b930cceea6061e1c4580ec988bf483a77e225cfca254d832928b4d1b36",
@@ -535,43 +513,38 @@ mod tests {
             10,
             vec![AuthSequence::new("eosio", 61277973).unwrap()],
         )
-            .unwrap()
-            .to_digest();
+        .unwrap()
+        .to_digest();
         let action_digest_2 = ActionReceipt::new(
             "eosebetbullj",
-             "b9243d8513e25705e89d7ccd0491f4a57d07b9866fd89d3446887af852cfed15",
-             1440226,
-             215,
-             503062767,
-             215,
+            "b9243d8513e25705e89d7ccd0491f4a57d07b9866fd89d3446887af852cfed15",
+            1440226,
+            215,
+            503062767,
+            215,
             vec![AuthSequence::new("eosebetbullj", 1440687).unwrap()],
         )
-            .unwrap()
-            .to_digest();
+        .unwrap()
+        .to_digest();
         let action_digest_3 = ActionReceipt::new(
-             "dvmh1tbb1him",
-             "4bd1d3e987cd13e3d108a9a0cd185bf022cb1a826f69f163fcd109db54ba799f",
-             804629,
-             2,
-             503062768,
-             1,
+            "dvmh1tbb1him",
+            "4bd1d3e987cd13e3d108a9a0cd185bf022cb1a826f69f163fcd109db54ba799f",
+            804629,
+            2,
+            503062768,
+            1,
             vec![AuthSequence::new("dvmh1tbb1him", 804649).unwrap()],
         )
-            .unwrap()
-            .to_digest();
-        let result = get_merkle_digest(vec![
-            action_digest_1,
-            action_digest_2,
-            action_digest_3,
-        ]);
+        .unwrap()
+        .to_digest();
+        let result = get_merkle_digest(vec![action_digest_1, action_digest_2, action_digest_3]);
         assert_eq!(hex::encode(result), expected_result);
     }
 
     #[test]
     fn should_get_action_mroot_when_action_has_gt_one_auth_sequence() {
         // NOTE: Test vector = https://jungle.bloks.io/block/58345436
-        let expected_result =
-            "f93a91688d12170c24807d4bd507cf52dcde962ae4a41a86fe55231dee4df348";
+        let expected_result = "f93a91688d12170c24807d4bd507cf52dcde962ae4a41a86fe55231dee4df348";
         let action_receipt_1 = ActionReceipt::new(
             "eosio",
             "2d5371b958af052629f3fb62ede1bfcd94703675bc734535bf87fb615284dba3",
@@ -579,13 +552,10 @@ mod tests {
             12,
             503124645,
             10,
-            vec![AuthSequence::new(
-                "eosio",
-                61303891
-            ).unwrap()],
+            vec![AuthSequence::new("eosio", 61303891).unwrap()],
         )
-            .unwrap()
-            .to_digest();
+        .unwrap()
+        .to_digest();
         let action_receipt_2 = ActionReceipt::new(
             "authsequence",
             "ae341469a7b3936c70e9684a42ef8fc1975f1bb2fe1f3b0b1105eda7d3a6276a",
@@ -595,23 +565,19 @@ mod tests {
             1,
             vec![
                 AuthSequence::new("othrsequence", 14).unwrap(),
-                AuthSequence::new("rick11111111", 268).unwrap()
-            ]
+                AuthSequence::new("rick11111111", 268).unwrap(),
+            ],
         )
-            .unwrap()
-            .to_digest();
-        let result = get_merkle_digest(vec![
-            action_receipt_1,
-            action_receipt_2,
-        ]);
+        .unwrap()
+        .to_digest();
+        let result = get_merkle_digest(vec![action_receipt_1, action_receipt_2]);
         assert_eq!(hex::encode(result), expected_result);
     }
 
     #[test]
     fn should_get_action_mroot_for_four_actions_correctly() {
         let digests = get_sample_action_digests();
-        let expected_result =
-            "8b4e5e5d3e7587065896d0076d65c72e03c11a9159d414eb3a2363b59108116a";
+        let expected_result = "8b4e5e5d3e7587065896d0076d65c72e03c11a9159d414eb3a2363b59108116a";
         let result = get_merkle_digest(digests);
         assert_eq!(hex::encode(result), expected_result);
     }
@@ -623,62 +589,35 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(_, i)| get_sample_eos_submission_material_n(i + 1))
-            .map(|submission_material|
-                 submission_material
-                    .action_proofs[0]
-                    .action_proof
-                    .clone()
-            )
+            .map(|submission_material| submission_material.action_proofs[0].action_proof.clone())
             .for_each(|merkle_proof| assert!(verify_merkle_proof(&merkle_proof).unwrap()));
     }
 
     #[test]
     fn should_get_incremerkle_root_from_interim_block_idss() {
-        let expected_incremerkle_root =
-            "1894edef851c070852f55a4dc8fc50ea8f2eafc67d8daad767e4f985dfe54071";
+        let expected_incremerkle_root = "1894edef851c070852f55a4dc8fc50ea8f2eafc67d8daad767e4f985dfe54071";
         let submission_material = get_sample_eos_submission_material_n(5);
-        let active_nodes = submission_material
-            .interim_block_ids
-            .clone();
-        let node_count: u64 = submission_material
-            .block_header
-            .block_num()
-            .into();
+        let active_nodes = submission_material.interim_block_ids.clone();
+        let node_count: u64 = submission_material.block_header.block_num().into();
         let incremerkle = Incremerkle::new(node_count, active_nodes);
-        let incremerkle_root = hex::encode(
-            &incremerkle
-                .get_root()
-                .to_bytes()
-        );
+        let incremerkle_root = hex::encode(&incremerkle.get_root().to_bytes());
         assert_eq!(incremerkle_root, expected_incremerkle_root);
     }
 
     #[test]
     fn should_convert_from_incremerkle_to_json_and_back() {
-        let expected_incremerkle_root =
-            "1894edef851c070852f55a4dc8fc50ea8f2eafc67d8daad767e4f985dfe54071";
+        let expected_incremerkle_root = "1894edef851c070852f55a4dc8fc50ea8f2eafc67d8daad767e4f985dfe54071";
         let submission_material = get_sample_eos_submission_material_n(5);
-        let active_nodes = submission_material
-            .interim_block_ids
-            .clone();
-        let node_count: u64 = submission_material
-            .block_header
-            .block_num()
-            .into();
+        let active_nodes = submission_material.interim_block_ids.clone();
+        let node_count: u64 = submission_material.block_header.block_num().into();
         let incremerkle = Incremerkle::new(node_count, active_nodes);
         let json = IncremerkleJson::from_incremerkle(&incremerkle);
         assert_eq!(json.node_count, incremerkle.node_count);
         assert_eq!(json.active_nodes.len(), incremerkle.active_nodes.len());
-        let result = json
-            .to_incremerkle()
-            .unwrap();
+        let result = json.to_incremerkle().unwrap();
         assert_eq!(result.node_count, incremerkle.node_count);
         assert_eq!(result.active_nodes.len(), incremerkle.active_nodes.len());
-        let result_root = hex::encode(
-            &incremerkle
-                .get_root()
-                .to_bytes()
-        );
+        let result_root = hex::encode(&incremerkle.get_root().to_bytes());
         assert_eq!(result_root, expected_incremerkle_root);
     }
 }

@@ -12,28 +12,25 @@
 #![allow(clippy::match_bool)]
 #![allow(clippy::too_many_arguments)]
 
-pub use types::{
-    Bytes,
-    Result
-};
 pub use errors::AppError;
 pub use traits::DatabaseInterface;
+pub use types::{Bytes, Result};
 
-pub mod types;
-pub mod traits;
-pub mod chains;
-pub mod errors;
-pub mod btc_on_eth;
 pub mod btc_on_eos;
+pub mod btc_on_eth;
+pub mod chains;
 pub mod erc20_on_eos;
+pub mod errors;
+pub mod traits;
+pub mod types;
 
-mod utils;
 mod base58;
+mod check_debug_mode;
 mod constants;
 mod crypto_utils;
 mod database_utils;
-mod check_debug_mode;
 mod debug_database_utils;
+mod utils;
 
 #[cfg(test)]
 mod test_utils;

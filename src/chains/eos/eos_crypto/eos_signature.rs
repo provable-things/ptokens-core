@@ -1,19 +1,6 @@
-use std::{
-    fmt,
-    str::FromStr,
-};
-use crate::{
-    base58,
-    types::Result,
-    errors::AppError,
-    chains::eos::eos_hash::ripemd160,
-};
-use secp256k1::{
-    recovery::{
-        RecoveryId,
-        RecoverableSignature,
-    },
-};
+use crate::{base58, chains::eos::eos_hash::ripemd160, errors::AppError, types::Result};
+use secp256k1::recovery::{RecoverableSignature, RecoveryId};
+use std::{fmt, str::FromStr};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct EosSignature(pub RecoverableSignature);
@@ -29,23 +16,16 @@ impl FromStr for EosSignature {
 
     fn from_str(string: &str) -> Result<EosSignature> {
         if !string.starts_with("SIG_K1_") {
-            return Err(AppError::CryptoError(
-                secp256k1::Error::InvalidSignature
-            ));
+            return Err(AppError::CryptoError(secp256k1::Error::InvalidSignature));
         }
         let string_hex = base58::from(&string[7..])?;
-        let recid = match RecoveryId::from_i32(
-            (string_hex[0] - 4 - 27) as i32
-        ) {
+        let recid = match RecoveryId::from_i32((string_hex[0] - 4 - 27) as i32) {
             Ok(recid) => recid,
             Err(err) => return Err(err.into()),
         };
         let data = &string_hex[1..65];
         let _checksum = &string_hex[65..];
-        let rec_sig = match RecoverableSignature::from_compact(
-            &data,
-            recid
-        ) {
+        let rec_sig = match RecoverableSignature::from_compact(&data, recid) {
             Err(err) => return Err(err.into()),
             Ok(rec_sig) => rec_sig,
         };
@@ -77,7 +57,8 @@ mod test {
 
     #[test]
     fn should_get_get_signature_from_string_with_prefix() {
-        let signature = "SIG_K1_KBJgSuRYtHZcrWThugi4ygFabto756zuQQo8XeEpyRtBXLb9kbJtNW3xDcS14Rc14E8iHqLrdx46nenG5T7R4426Bspyzk";
+        let signature =
+            "SIG_K1_KBJgSuRYtHZcrWThugi4ygFabto756zuQQo8XeEpyRtBXLb9kbJtNW3xDcS14Rc14E8iHqLrdx46nenG5T7R4426Bspyzk";
         if let Err(e) = EosSignature::from_str(signature) {
             panic!("Should not error converting string to signature! {}", e)
         }
@@ -85,7 +66,8 @@ mod test {
 
     #[test]
     fn should_error_gettin_signature_from_string_without_prefix() {
-        let signature = "KomV6FEHKdtZxGDwhwSubEAcJ7VhtUQpEt5P6iDz33ic936aSXx87B2L56C8JLQkqNpp1W8ZXjrKiLHUEB4LCGeXvbtVuR";
+        let signature =
+            "KomV6FEHKdtZxGDwhwSubEAcJ7VhtUQpEt5P6iDz33ic936aSXx87B2L56C8JLQkqNpp1W8ZXjrKiLHUEB4LCGeXvbtVuR";
         if EosSignature::from_str(signature).is_ok() {
             panic!("Should error converting string w/out prefix to sig!")
         }

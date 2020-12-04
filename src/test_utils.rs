@@ -1,12 +1,9 @@
-use rand::Rng;
-use std::{
-    sync::Mutex,
-    collections::HashMap,
-};
 use crate::{
     traits::DatabaseInterface,
-    types::{Bytes, Result, DataSensitivity},
+    types::{Bytes, DataSensitivity, Result},
 };
+use rand::Rng;
+use std::{collections::HashMap, sync::Mutex};
 
 pub static DB_LOCK_ERRROR: &str = "✘ Cannot get lock on DB!";
 
@@ -27,12 +24,7 @@ impl DatabaseInterface for TestDB {
         Ok(())
     }
 
-    fn put(
-        &self,
-        key: Bytes,
-        value: Bytes,
-        _sensitivity: DataSensitivity,
-    ) -> Result<()> {
+    fn put(&self, key: Bytes, value: Bytes, _sensitivity: DataSensitivity) -> Result<()> {
         self.0.lock().expect(DB_LOCK_ERRROR).insert(key, value);
         Ok(())
     }
@@ -45,7 +37,7 @@ impl DatabaseInterface for TestDB {
     fn get(&self, key: Bytes, _sensitivity: DataSensitivity) -> Result<Bytes> {
         match self.0.lock().expect(DB_LOCK_ERRROR).get(&key) {
             Some(value) => Ok(value.to_vec()),
-            None => Err("✘ Cannot find item in database!".into())
+            None => Err("✘ Cannot find item in database!".into()),
         }
     }
 }

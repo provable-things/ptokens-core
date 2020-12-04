@@ -1,14 +1,11 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::btc::{
-        btc_state::BtcState,
         btc_constants::BTC_ANCHOR_BLOCK_HASH_KEY,
-        btc_database_utils::{
-            key_exists_in_db,
-            put_btc_anchor_block_hash_in_db,
-        },
+        btc_database_utils::{key_exists_in_db, put_btc_anchor_block_hash_in_db},
+        btc_state::BtcState,
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
 
 pub fn is_btc_anchor_block_hash_set<D: DatabaseInterface>(db: &D) -> bool {
@@ -25,6 +22,6 @@ pub fn maybe_set_btc_anchor_block_hash<D: DatabaseInterface>(state: BtcState<D>)
         false => {
             info!("✔ Setting BTC anchor hash from block in state...");
             put_btc_anchor_block_hash_in_db(&state.db, &state.get_btc_block_and_id()?.id).and(Ok(state))
-        }
+        },
     }
 }

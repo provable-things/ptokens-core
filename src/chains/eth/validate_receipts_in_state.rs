@@ -1,15 +1,14 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::eth::eth_state::EthState,
-    constants::{
-        DEBUG_MODE,
-        CORE_IS_VALIDATING,
-        NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR,
-    },
+    constants::{CORE_IS_VALIDATING, DEBUG_MODE, NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR},
+    traits::DatabaseInterface,
+    types::Result,
 };
 
-pub fn validate_receipts_in_state<D>(state: EthState<D>) -> Result<EthState<D>> where D: DatabaseInterface {
+pub fn validate_receipts_in_state<D>(state: EthState<D>) -> Result<EthState<D>>
+where
+    D: DatabaseInterface,
+{
     if CORE_IS_VALIDATING {
         info!("✔ Validating receipts...");
         match state.get_eth_submission_material()?.receipts_are_valid()? {
@@ -17,12 +16,12 @@ pub fn validate_receipts_in_state<D>(state: EthState<D>) -> Result<EthState<D>> 
                 info!("✔ Receipts are valid!");
                 Ok(state)
             },
-            false => Err("✘ Not accepting ETH block - receipts root not valid!".into())
+            false => Err("✘ Not accepting ETH block - receipts root not valid!".into()),
         }
     } else {
         info!("✔ Skipping ETH receipts validation!");
         match DEBUG_MODE {
-            true =>  Ok(state),
+            true => Ok(state),
             false => Err(NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR.into()),
         }
     }
@@ -32,11 +31,11 @@ pub fn validate_receipts_in_state<D>(state: EthState<D>) -> Result<EthState<D>> 
 mod tests {
     use super::*;
     use crate::{
-        errors::AppError,
         btc_on_eth::eth::eth_test_utils::{
             get_valid_state_with_block_and_receipts,
             get_valid_state_with_invalid_block_and_receipts,
         },
+        errors::AppError,
     };
 
     #[test]
@@ -47,7 +46,7 @@ mod tests {
         }
     }
 
-    #[cfg(not(feature="non-validating"))]
+    #[cfg(not(feature = "non-validating"))]
     #[test]
     fn should_not_validate_invalid_receipts_in_state() {
         let expected_error = "✘ Not accepting ETH block - receipts root not valid!".to_string();

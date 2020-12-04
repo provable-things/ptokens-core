@@ -1,34 +1,22 @@
-use ethereum_types::H256;
-use rlp::{
-    Rlp,
-    RlpStream
-};
 use crate::{
-    types::{Bytes, Result},
     chains::eth::{
-        nibble_utils::Nibbles,
+        eth_constants::{BRANCH_NODE_STRING, EMPTY_NIBBLES, EXTENSION_NODE_STRING, LEAF_NODE_STRING},
         eth_crypto_utils::keccak_hash_bytes,
+        eth_types::{ChildNodes, TrieHashMap},
         get_trie_hash_map::get_thing_from_trie_hash_map,
-        eth_types::{
-            ChildNodes,
-            TrieHashMap,
-        },
-        eth_constants::{
-            EMPTY_NIBBLES,
-            LEAF_NODE_STRING,
-            BRANCH_NODE_STRING,
-            EXTENSION_NODE_STRING,
-        },
+        nibble_utils::Nibbles,
         path_codec::{
-            encode_leaf_path_from_nibbles,
-            encode_extension_path_from_nibbles,
             decode_path_to_nibbles_and_node_type,
+            encode_extension_path_from_nibbles,
+            encode_leaf_path_from_nibbles,
         },
     },
+    types::{Bytes, Result},
 };
+use ethereum_types::H256;
+use rlp::{Rlp, RlpStream};
 
-static NO_NODE_IN_STRUCT_ERR: &str =
-    "✘ No node present in struct to rlp-encode!";
+static NO_NODE_IN_STRUCT_ERR: &str = "✘ No node present in struct to rlp-encode!";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Node {
@@ -60,80 +48,59 @@ pub struct BranchNode {
 }
 
 impl Node {
-    pub fn new_leaf(
-        path_nibbles: Nibbles,
-        value: Bytes
-    ) -> Result<Node> {
-        let encoded_path = encode_leaf_path_from_nibbles(
-            path_nibbles.clone()
-        )?;
+    pub fn new_leaf(path_nibbles: Nibbles, value: Bytes) -> Result<Node> {
+        let encoded_path = encode_leaf_path_from_nibbles(path_nibbles.clone())?;
         let mut raw = encoded_path.clone();
         raw.append(&mut value.clone());
-        Ok(
-            Node {
-                branch: None,
-                extension: None,
-                leaf: Some(
-                    LeafNode { raw, value, path_nibbles, encoded_path }
-                )
-            }
-        )
+        Ok(Node {
+            branch: None,
+            extension: None,
+            leaf: Some(LeafNode {
+                raw,
+                value,
+                path_nibbles,
+                encoded_path,
+            }),
+        })
     }
 
-    pub fn new_extension(
-        path_nibbles: Nibbles,
-        value: Bytes
-    ) -> Result<Node> {
-        let encoded_path = encode_extension_path_from_nibbles(
-            path_nibbles.clone()
-        )?;
+    pub fn new_extension(path_nibbles: Nibbles, value: Bytes) -> Result<Node> {
+        let encoded_path = encode_extension_path_from_nibbles(path_nibbles.clone())?;
         let mut raw = encoded_path.clone();
         raw.append(&mut value.clone());
-        Ok(
-            Node {
-                leaf: None,
-                branch: None,
-                extension: Some(
-                    ExtensionNode { raw, value, path_nibbles, encoded_path }
-                )
-            }
-        )
+        Ok(Node {
+            leaf: None,
+            branch: None,
+            extension: Some(ExtensionNode {
+                raw,
+                value,
+                path_nibbles,
+                encoded_path,
+            }),
+        })
     }
 
     pub fn new_branch(value: Option<Bytes>) -> Result<Node> {
-        Ok(
-            Node {
-                leaf: None,
-                extension: None,
-                branch: Some(
-                    BranchNode { value, branches: get_empty_child_nodes() }
-                )
-            }
-        )
+        Ok(Node {
+            leaf: None,
+            extension: None,
+            branch: Some(BranchNode {
+                value,
+                branches: get_empty_child_nodes(),
+            }),
+        })
     }
 
-    pub fn update_branch_at_index(
-        self,
-        new_value: Option<Bytes>,
-        index: usize
-    ) -> Result<Self> {
+    pub fn update_branch_at_index(self, new_value: Option<Bytes>, index: usize) -> Result<Self> {
         if let Some(branch) = self.branch {
-            Ok(
-                Node {
-                    leaf: None,
-                    extension: None,
-                    branch: Some(
-                        BranchNode {
-                            value: branch.value,
-                            branches: update_child_nodes(
-                                branch.branches,
-                                new_value,
-                                index,
-                            )?
-                        }
-                    )
-                }
-            )
+            Ok(Node {
+                leaf: None,
+                extension: None,
+                branch: Some(BranchNode {
+                    value: branch.value,
+                    branches: update_child_nodes(branch.branches, new_value, index)?,
+                }),
+            })
         } else {
             Err("✘ Cannot update branches - not a branch node!".into())
         }
@@ -156,12 +123,12 @@ impl Node {
             for i in 0..branch.branches.len() {
                 match &branch.branches[i] {
                     None => rlp_stream.append_empty_data(),
-                    Some(thing) => rlp_stream.append(&thing.clone())
+                    Some(thing) => rlp_stream.append(&thing.clone()),
                 };
             }
             match &branch.value {
                 None => rlp_stream.append_empty_data(),
-                Some(value) => rlp_stream.append(&value.clone())
+                Some(value) => rlp_stream.append(&value.clone()),
             };
             Ok(rlp_stream.out())
         } else {
@@ -223,83 +190,54 @@ impl Node {
 pub fn rlp_decode_node(rlp_data: Bytes) -> Result<Node> {
     match Rlp::new(&rlp_data).as_list() {
         Err(err) => Err(err.into()),
-        Ok(list) => {
-            match list.len() {
-                2 => {
-                    let path: &Bytes = &list[0];
-                    let value = &list[1];
-                    let (
-                        path_nibbles,
-                        node_type
-                    ) = decode_path_to_nibbles_and_node_type(path.clone())?;
-                    match node_type == LEAF_NODE_STRING {
-                        true => Node::new_leaf(
-                            path_nibbles,
-                            value.to_vec(),
-                        ),
-                        false => Node::new_extension(
-                            path_nibbles,
-                            value.to_vec(),
-                        )
+        Ok(list) => match list.len() {
+            2 => {
+                let path: &Bytes = &list[0];
+                let value = &list[1];
+                let (path_nibbles, node_type) = decode_path_to_nibbles_and_node_type(path.clone())?;
+                match node_type == LEAF_NODE_STRING {
+                    true => Node::new_leaf(path_nibbles, value.to_vec()),
+                    false => Node::new_extension(path_nibbles, value.to_vec()),
+                }
+            },
+            17 => {
+                let value = &list[16];
+                let mut branches = get_empty_child_nodes();
+                for i in 0..16 {
+                    if !list[i].is_empty() {
+                        let value = &list[i];
+                        branches[i] = Some(value.to_vec())
                     }
-                },
-                17 => {
-                    let value = &list[16];
-                    let mut branches = get_empty_child_nodes();
-                    for i in 0..16 {
-                        if !list[i].is_empty() {
-                            let value = &list[i];
-                            branches[i] = Some(value.to_vec())
-                        }
-                    }
-                    Ok(
-                        Node {
-                            leaf: None,
-                            extension: None,
-                            branch: Some(
-                                BranchNode {
-                                    branches,
-                                    value: if !value.is_empty() {
-                                        Some(value.to_vec())
-                                     } else {
-                                         None
-                                     }
-                                }
-                            )
-                        }
-                    )
-                },
-                _ => Err("✘ Cannot decode node from rlp data!".into())
-            }
-        }
+                }
+                Ok(Node {
+                    leaf: None,
+                    extension: None,
+                    branch: Some(BranchNode {
+                        branches,
+                        value: if !value.is_empty() { Some(value.to_vec()) } else { None },
+                    }),
+                })
+            },
+            _ => Err("✘ Cannot decode node from rlp data!".into()),
+        },
     }
 }
 
 fn get_empty_child_nodes() -> ChildNodes {
     [
-        None, None, None, None,
-        None, None, None, None,
-        None, None, None, None,
-        None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     ]
 }
 
-fn update_child_nodes(
-    mut child_nodes: ChildNodes,
-    new_value: Option<Bytes>,
-    index: usize,
-) -> Result<ChildNodes> {
+fn update_child_nodes(mut child_nodes: ChildNodes, new_value: Option<Bytes>, index: usize) -> Result<ChildNodes> {
     child_nodes[index] = new_value;
     Ok(child_nodes)
 }
 
-pub fn get_node_from_trie_hash_map(
-    trie_hash_map: &TrieHashMap,
-    key: &H256
-) -> Result<Option<Node>> {
+pub fn get_node_from_trie_hash_map(trie_hash_map: &TrieHashMap, key: &H256) -> Result<Option<Node>> {
     match get_thing_from_trie_hash_map(trie_hash_map, key) {
         None => Ok(None),
-        Some(encoded_node) => Ok(Some(rlp_decode_node(encoded_node)?))
+        Some(encoded_node) => Ok(Some(rlp_decode_node(encoded_node)?)),
     }
 }
 
@@ -307,25 +245,13 @@ pub fn get_node_from_trie_hash_map(
 mod tests {
     use super::*;
     use crate::{
-        errors::AppError,
+        btc_on_eth::eth::eth_test_utils::{get_sample_branch_node, get_sample_extension_node, get_sample_leaf_node},
         chains::eth::{
             eth_utils::convert_hex_to_h256,
-            nibble_utils::{
-                get_length_in_nibbles,
-                get_nibbles_from_bytes,
-            },
-            get_trie_hash_map::{
-                get_new_trie_hash_map,
-                put_thing_in_trie_hash_map,
-            },
+            get_trie_hash_map::{get_new_trie_hash_map, put_thing_in_trie_hash_map},
+            nibble_utils::{get_length_in_nibbles, get_nibbles_from_bytes},
         },
-        btc_on_eth::{
-            eth::eth_test_utils::{
-                get_sample_leaf_node,
-                get_sample_branch_node,
-                get_sample_extension_node,
-            },
-        },
+        errors::AppError,
     };
 
     fn get_sample_leaf_node_expected_encoding() -> Bytes {
@@ -381,7 +307,7 @@ mod tests {
                 assert_eq!(leaf.path_nibbles, path_nibbles);
                 assert_eq!(leaf.encoded_path, expected_encoded_path);
                 assert_eq!(nibble_length, expected_nibble_length)
-            }
+            },
         }
     }
 
@@ -407,9 +333,8 @@ mod tests {
         let path_bytes = vec![0xc0, 0xff, 0xee];
         let expected_nibble_length = path_bytes.len() * 2;
         let path_nibbles = get_nibbles_from_bytes(path_bytes);
-        let value = hex::decode(
-            "4aad98246efabf243441508dc0f328d80e83e9522e43709abab1c0c9cf4416dc".to_string()
-        ).unwrap();
+        let value =
+            hex::decode("4aad98246efabf243441508dc0f328d80e83e9522e43709abab1c0c9cf4416dc".to_string()).unwrap();
         let expected_encoded_path = encode_extension_path_from_nibbles(path_nibbles.clone()).unwrap();
         let result = Node::new_extension(path_nibbles.clone(), value.clone()).unwrap();
         let node_type = result.get_type();
@@ -428,7 +353,7 @@ mod tests {
                 assert_eq!(extension.path_nibbles, path_nibbles);
                 assert_eq!(extension.encoded_path, expected_encoded_path);
                 assert_eq!(nibble_length, expected_nibble_length)
-            }
+            },
         }
     }
 
@@ -464,7 +389,7 @@ mod tests {
                     panic!("Branch should not have a value!")
                 };
                 assert_eq!(branch.branches, get_empty_child_nodes());
-            }
+            },
         }
     }
 
@@ -483,10 +408,10 @@ mod tests {
             Some(branch) => {
                 match branch.value {
                     Some(_value) => assert_eq!(_value, value),
-                    None => panic!("Branch should have a value!")
+                    None => panic!("Branch should have a value!"),
                 }
                 assert_eq!(branch.branches, get_empty_child_nodes());
-            }
+            },
         }
     }
 
@@ -497,7 +422,9 @@ mod tests {
         let branch_value = hex::decode("c0ffee").unwrap();
         let branch_node = Node::new_branch(value).unwrap();
         assert_eq!(branch_node.clone().branch.unwrap().branches[index], None);
-        let result = branch_node.update_branch_at_index(Some(branch_value.clone()), index).unwrap();
+        let result = branch_node
+            .update_branch_at_index(Some(branch_value.clone()), index)
+            .unwrap();
         assert_eq!(result.branch.unwrap().branches[index], Some(branch_value));
     }
 
@@ -507,7 +434,7 @@ mod tests {
         let non_branch_node = get_sample_leaf_node();
         match non_branch_node.update_branch_at_index(None, 4) {
             Err(AppError::Custom(e)) => assert_eq!(e, expected_error),
-            _ => panic!("Did not receive expected error!")
+            _ => panic!("Did not receive expected error!"),
         }
     }
 
@@ -563,9 +490,8 @@ mod tests {
     #[test]
     fn should_get_value_from_extension_node() {
         let node = get_sample_extension_node();
-        let expected_result = hex::decode(
-            "1d237c84432c78d82886cb7d6549c179ca51ebf3b324d2a3fa01af6a563a9377".to_string()
-        ).unwrap();
+        let expected_result =
+            hex::decode("1d237c84432c78d82886cb7d6549c179ca51ebf3b324d2a3fa01af6a563a9377".to_string()).unwrap();
         let result = node.get_value();
         assert_eq!(result, Some(expected_result));
     }
@@ -583,7 +509,7 @@ mod tests {
         let node = get_sample_leaf_node();
         let rlp_encoded_node = node.get_rlp_encoding().unwrap();
         let result = rlp_decode_node(rlp_encoded_node).unwrap();
-        assert_eq!(result, node );
+        assert_eq!(result, node);
     }
 
     #[test]
@@ -597,7 +523,7 @@ mod tests {
     #[test]
     fn should_rlp_decode_branch_node() {
         let node = get_sample_branch_node();
-        let rlp_encoded_node = node.get_rlp_encoding() .unwrap();
+        let rlp_encoded_node = node.get_rlp_encoding().unwrap();
         let result = rlp_decode_node(rlp_encoded_node).unwrap();
         assert_eq!(result, node);
     }

@@ -1,25 +1,14 @@
-use std::{
-    fmt,
-    str,
-    str::FromStr,
-};
 use crate::{
-    types::{
-        Byte,
-        Bytes,
-        Result,
-    },
     btc_on_eth::btc::minting_params::BtcOnEthMintingParamStruct,
+    types::{Byte, Bytes, Result},
 };
-use bitcoin::{
-    hashes::sha256d,
-    util::address::Address as BtcAddress,
-};
+use bitcoin::{hashes::sha256d, util::address::Address as BtcAddress};
+use std::{fmt, str, str::FromStr};
 
 #[cfg(test)]
-use bitcoin::hashes::Hash;
-#[cfg(test)]
 use crate::errors::AppError;
+#[cfg(test)]
+use bitcoin::hashes::Hash;
 
 #[cfg(test)]
 pub const MINIMUM_METADATA_BYTES: usize = 33;
@@ -40,9 +29,8 @@ impl EthMetadataVersion {
     pub fn from_byte(byte: &Byte) -> Result<Self> {
         match byte {
             1u8 => Ok(EthMetadataVersion::V1),
-            _ => Err(format!("✘ Unrecognized version byte for `EthMetadataVersion`: {:?}", byte).into())
+            _ => Err(format!("✘ Unrecognized version byte for `EthMetadataVersion`: {:?}", byte).into()),
         }
-
     }
 }
 
@@ -64,17 +52,14 @@ pub struct EthMetadataFromBtc {
 impl EthMetadataFromBtc {
     pub fn from_btc_minting_params(
         version: &EthMetadataVersion,
-        minting_param_struct: &BtcOnEthMintingParamStruct
+        minting_param_struct: &BtcOnEthMintingParamStruct,
     ) -> Self {
         match version {
-            EthMetadataVersion::V1 => {
-                EthMetadataFromBtc {
-                    version: version.clone(),
-                    originating_tx_hash: minting_param_struct.originating_tx_hash,
-                    originating_tx_address:
-                        Self::get_btc_address_from_str(&minting_param_struct.originating_tx_address),
-                }
-            }
+            EthMetadataVersion::V1 => EthMetadataFromBtc {
+                version: version.clone(),
+                originating_tx_hash: minting_param_struct.originating_tx_hash,
+                originating_tx_address: Self::get_btc_address_from_str(&minting_param_struct.originating_tx_address),
+            },
         }
     }
 
@@ -89,7 +74,7 @@ impl EthMetadataFromBtc {
     fn get_originating_address_bytes(&self) -> Result<Bytes> {
         match &self.originating_tx_address {
             None => Ok(vec![]),
-            Some(btc_address) => Ok(btc_address.to_string().as_bytes().to_vec())
+            Some(btc_address) => Ok(btc_address.to_string().as_bytes().to_vec()),
         }
     }
 
@@ -97,9 +82,12 @@ impl EthMetadataFromBtc {
         match BtcAddress::from_str(&btc_address_str) {
             Ok(btc_address) => Some(btc_address),
             Err(err) => {
-                info!("✘ Error creating  BTC address from str in `EthMetadataFromBtc`: {}", err);
+                info!(
+                    "✘ Error creating  BTC address from str in `EthMetadataFromBtc`: {}",
+                    err
+                );
                 None
-            }
+            },
         }
     }
 
@@ -115,24 +103,18 @@ impl EthMetadataFromBtc {
     fn get_sha_hash_from_bytes(bytes: &[Byte]) -> Result<sha256d::Hash> {
         match sha256d::Hash::from_slice(&Self::reverse_endianess_of_bytes(bytes)) {
             Ok(hash) => Ok(hash),
-            Err(err) => Err(format!(
-                "✘ Error extracting hash from bytes in `EthMetadataVersion`: {}",
-                err
-            ).into())
+            Err(err) => Err(format!("✘ Error extracting hash from bytes in `EthMetadataVersion`: {}", err).into()),
         }
     }
 
     pub fn serialize(&self) -> Result<Bytes> {
         match self.version {
-            EthMetadataVersion::V1 => {
-                Ok(
-                    vec![
-                        vec![self.get_version_byte()],
-                        self.get_originating_hash_bytes()?,
-                        self.get_originating_address_bytes()?
-                    ].concat()
-                )
-            }
+            EthMetadataVersion::V1 => Ok(vec![
+                vec![self.get_version_byte()],
+                self.get_originating_hash_bytes()?,
+                self.get_originating_address_bytes()?,
+            ]
+            .concat()),
         }
     }
 
@@ -142,25 +124,26 @@ impl EthMetadataFromBtc {
         if num_bytes < MINIMUM_METADATA_BYTES {
             return Err(format!(
                 "✘ Too few bytes to deserialize `EthMetadataFromBtc`! Got {}, need {}!",
-                num_bytes,
-                MINIMUM_METADATA_BYTES
-            ).into())
+                num_bytes, MINIMUM_METADATA_BYTES
+            )
+            .into());
         }
         let version = EthMetadataVersion::from_byte(&bytes[0])?;
         match version {
-            EthMetadataVersion::V1 => Ok(
-                EthMetadataFromBtc {
-                    version: EthMetadataVersion::from_byte(&bytes[0])?,
-                    originating_tx_hash: Self::get_sha_hash_from_bytes(&bytes[1..33])?,
-                    originating_tx_address: match str::from_utf8(&bytes[33..]) {
-                        Ok(address_string) => Self::get_btc_address_from_str(address_string),
-                        Err(err) => {
-                            info!("✘ Failed to convert bytes to utf8 when deserializing `EthMetadataFromBtc`: {}", err);
-                            None
-                        }
-                    }
-                }
-            )
+            EthMetadataVersion::V1 => Ok(EthMetadataFromBtc {
+                version: EthMetadataVersion::from_byte(&bytes[0])?,
+                originating_tx_hash: Self::get_sha_hash_from_bytes(&bytes[1..33])?,
+                originating_tx_address: match str::from_utf8(&bytes[33..]) {
+                    Ok(address_string) => Self::get_btc_address_from_str(address_string),
+                    Err(err) => {
+                        info!(
+                            "✘ Failed to convert bytes to utf8 when deserializing `EthMetadataFromBtc`: {}",
+                            err
+                        );
+                        None
+                    },
+                },
+            }),
         }
     }
 }
@@ -168,19 +151,21 @@ impl EthMetadataFromBtc {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{btc_on_eth::utils::convert_satoshis_to_ptoken, chains::btc::btc_constants::MINIMUM_REQUIRED_SATOSHIS};
     use bitcoin::hashes::Hash;
     use ethereum_types::Address as EthAddress;
-    use crate::{
-        chains::btc::btc_constants::MINIMUM_REQUIRED_SATOSHIS,
-        btc_on_eth::utils::convert_satoshis_to_ptoken,
-    };
 
     fn get_sample_minting_param_struct() -> BtcOnEthMintingParamStruct {
         let originating_tx_address = "moBSQbHn7N9BC9pdtAMnA7GBiALzNMQJyE".to_string();
         let eth_address = EthAddress::from_str(&"fEDFe2616EB3661CB8FEd2782F5F0cC91D59DCaC").unwrap();
         let amount = convert_satoshis_to_ptoken(MINIMUM_REQUIRED_SATOSHIS);
         let originating_tx_hash = sha256d::Hash::hash(b"something to hash");
-        BtcOnEthMintingParamStruct { amount, eth_address, originating_tx_hash, originating_tx_address }
+        BtcOnEthMintingParamStruct {
+            amount,
+            eth_address,
+            originating_tx_hash,
+            originating_tx_address,
+        }
     }
 
     fn get_sample_v1_metadata() -> EthMetadataFromBtc {
@@ -226,7 +211,10 @@ mod tests {
         assert_eq!(version, result.version);
         assert_eq!(btc_minting_params.originating_tx_hash, result.originating_tx_hash);
         assert!(result.originating_tx_address.is_some());
-        assert_eq!(btc_minting_params.originating_tx_address, result.originating_tx_address.unwrap().to_string());
+        assert_eq!(
+            btc_minting_params.originating_tx_address,
+            result.originating_tx_address.unwrap().to_string()
+        );
     }
 
     #[test]

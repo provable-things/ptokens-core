@@ -1,35 +1,25 @@
-use std::str::FromStr;
-use secp256k1::Message;
-use eos_primitives::{
-    PublicKey as EosProducerKey,
-    AccountName as EosAccountName,
-    BlockHeader as EosBlockHeaderV2,
-    ProducerKey as EosProducerKeyV1,
-    BlockHeaderV1 as EosBlockHeaderV1,
-    ProducerSchedule as EosProducerScheduleV1,
-    ProducerScheduleV2 as EosProducerScheduleV2,
-};
-use bitcoin_hashes::{
-    Hash,
-    sha256,
-};
 use crate::{
-    traits::DatabaseInterface,
-    types::{Byte, Bytes, Result},
     chains::eos::{
+        eos_crypto::{eos_public_key::EosPublicKey, eos_signature::EosSignature},
         eos_state::EosState,
         protocol_features::WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH,
-        eos_crypto::{
-            eos_signature::EosSignature,
-            eos_public_key::EosPublicKey,
-        },
     },
-    constants::{
-        DEBUG_MODE,
-        CORE_IS_VALIDATING,
-        NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR,
-    },
+    constants::{CORE_IS_VALIDATING, DEBUG_MODE, NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR},
+    traits::DatabaseInterface,
+    types::{Byte, Bytes, Result},
 };
+use bitcoin_hashes::{sha256, Hash};
+use eos_primitives::{
+    AccountName as EosAccountName,
+    BlockHeader as EosBlockHeaderV2,
+    BlockHeaderV1 as EosBlockHeaderV1,
+    ProducerKey as EosProducerKeyV1,
+    ProducerSchedule as EosProducerScheduleV1,
+    ProducerScheduleV2 as EosProducerScheduleV2,
+    PublicKey as EosProducerKey,
+};
+use secp256k1::Message;
+use std::str::FromStr;
 
 fn create_eos_signing_digest(block_mroot: &[Byte], schedule_hash: &[Byte], block_header_digest: &[Byte]) -> Bytes {
     let hash_1 = sha256::Hash::hash(&[&block_header_digest[..], &block_mroot[..]].concat());
@@ -45,14 +35,14 @@ fn get_block_digest(msig_enabled: bool, block_header: &EosBlockHeaderV2) -> Resu
                 convert_v2_schedule_block_header_to_v1_schedule_block_header(block_header)
                     .digest()?
                     .to_bytes()
-                    .to_vec()
+                    .to_vec(),
             )
-        }
+        },
     }
 }
 
 fn convert_v2_schedule_block_header_to_v1_schedule_block_header(
-    v2_block_header: &EosBlockHeaderV2
+    v2_block_header: &EosBlockHeaderV2,
 ) -> EosBlockHeaderV1 {
     EosBlockHeaderV1::new(
         v2_block_header.timestamp,
@@ -85,7 +75,7 @@ fn convert_v2_schedule_to_v1(v1_schedule: &EosProducerScheduleV2) -> EosProducer
 fn get_schedule_hash(msig_enabled: bool, v2_schedule: &EosProducerScheduleV2) -> Result<Bytes> {
     let hash = match msig_enabled {
         true => v2_schedule.schedule_hash()?,
-        false => convert_v2_schedule_to_v1(v2_schedule).schedule_hash()?
+        false => convert_v2_schedule_to_v1(v2_schedule).schedule_hash()?,
     };
     Ok(hash.to_bytes().to_vec())
 }
@@ -123,7 +113,7 @@ fn get_signing_key_from_active_schedule(
         .collect::<Vec<EosProducerKey>>();
     match &filtered_keys.len() {
         0 => Err("✘ Could not extract a signing key from active schedule!".into()),
-        _ => Ok(filtered_keys[0].clone()) // NOTE: Can this ever be > 1?
+        _ => Ok(filtered_keys[0].clone()), // NOTE: Can this ever be > 1?
     }
 }
 
@@ -135,8 +125,13 @@ fn recover_block_signer_public_key(
     v2_schedule: &EosProducerScheduleV2,
 ) -> Result<EosPublicKey> {
     EosPublicKey::recover_from_digest(
-        &Message::from_slice(&get_signing_digest(msig_enabled, &block_mroot, &block_header, &v2_schedule)?)?,
-        &EosSignature::from_str(producer_signature)?
+        &Message::from_slice(&get_signing_digest(
+            msig_enabled,
+            &block_mroot,
+            &block_header,
+            &v2_schedule,
+        )?)?,
+        &EosSignature::from_str(producer_signature)?,
     )
 }
 
@@ -148,31 +143,26 @@ pub fn check_block_signature_is_valid(
     v2_schedule: &EosProducerScheduleV2,
 ) -> Result<()> {
     let signing_key = get_signing_key_from_active_schedule(block_header.producer, v2_schedule)?.to_string();
-    let recovered_key = recover_block_signer_public_key(
-        msig_enabled,
-        block_mroot,
-        producer_signature,
-        block_header,
-        v2_schedule,
-    )?.to_string();
+    let recovered_key =
+        recover_block_signer_public_key(msig_enabled, block_mroot, producer_signature, block_header, v2_schedule)?
+            .to_string();
     debug!("     Producer: {}", block_header.producer);
     debug!("  Signing key: {}", signing_key);
     debug!("Recovered key: {}", recovered_key);
     match signing_key == recovered_key {
         true => Ok(()),
-        _ => Err("✘ Block signature not valid!".into())
+        _ => Err("✘ Block signature not valid!".into()),
     }
 }
 
-pub fn validate_block_header_signature<D>(
-    state: EosState<D>
-) -> Result<EosState<D>>
-    where D: DatabaseInterface
+pub fn validate_block_header_signature<D>(state: EosState<D>) -> Result<EosState<D>>
+where
+    D: DatabaseInterface,
 {
     if !CORE_IS_VALIDATING {
         info!("✔ Skipping EOS block header signature validation");
         match DEBUG_MODE {
-            true =>  Ok(state),
+            true => Ok(state),
             false => Err(NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR.into()),
         }
     } else if state.get_eos_block_header()?.new_producer_schedule.is_some() {
@@ -182,13 +172,15 @@ pub fn validate_block_header_signature<D>(
     } else {
         info!("✔ Validating EOS block header signature...");
         check_block_signature_is_valid(
-            state.enabled_protocol_features.is_enabled(&WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH.to_vec()),
+            state
+                .enabled_protocol_features
+                .is_enabled(&WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH.to_vec()),
             &state.incremerkle.get_root().to_bytes().to_vec(),
             &state.producer_signature,
             state.get_eos_block_header()?,
             state.get_active_schedule()?,
         )
-            .and(Ok(state))
+        .and(Ok(state))
     }
 }
 
@@ -196,31 +188,21 @@ pub fn validate_block_header_signature<D>(
 mod tests {
     use super::*;
 
-    use eos_primitives::Checksum256;
     use crate::{
-        chains::eos::{
-            eos_utils::convert_hex_to_checksum256,
-            eos_merkle_utils::Incremerkle,
+        btc_on_eos::eos::eos_test_utils::{
+            get_init_and_subsequent_blocks_json_n,
+            get_sample_eos_submission_material_json_n,
+            get_sample_eos_submission_material_n,
+            get_sample_j3_schedule_37,
+            get_sample_mainnet_schedule_1713,
+            get_sample_v2_schedule,
+            EosInitAndSubsequentBlocksJson,
         },
-        btc_on_eos::{
-            eos::{
-                eos_test_utils::{
-                    get_sample_v2_schedule,
-                    get_sample_j3_schedule_37,
-                    EosInitAndSubsequentBlocksJson,
-                    get_sample_mainnet_schedule_1713,
-                    get_sample_eos_submission_material_n,
-                    get_init_and_subsequent_blocks_json_n,
-                    get_sample_eos_submission_material_json_n,
-                },
-            },
-        },
+        chains::eos::{eos_merkle_utils::Incremerkle, eos_utils::convert_hex_to_checksum256},
     };
+    use eos_primitives::Checksum256;
 
-    fn validate_subsequent_block(
-        block_num: usize,
-        blocks_json: &EosInitAndSubsequentBlocksJson,
-    ) {
+    fn validate_subsequent_block(block_num: usize, blocks_json: &EosInitAndSubsequentBlocksJson) {
         println!("Checking subsequent block #{} is valid...", block_num);
         let msig_enabled = blocks_json.is_msig_enabled();
         let producer_signature = blocks_json.get_producer_signature_for_block_n(block_num).unwrap();
@@ -288,7 +270,7 @@ mod tests {
     #[ignore] // TODO: Fix this test
     #[test]
     fn should_validate_mainnet_block_with_new_producers() {
-        //simple_logger::init().unwrap();
+        // simple_logger::init().unwrap();
         let submission_material_num = 8;
         let submission_material = get_sample_eos_submission_material_n(submission_material_num);
         let submission_material_json = get_sample_eos_submission_material_json_n(submission_material_num);
@@ -311,12 +293,15 @@ mod tests {
             "13a8e892cdb0b99194176f09e742f137bc46b4fd5c83ef27921241e9a5d54740",
             "caa64b849f848f0122e5ad1f0fd6979c85572467e7061ffb371e5c1f0f51b2b1",
         ]
-            .iter()
-            .map(convert_hex_to_checksum256)
-            .collect::<Result<Vec<Checksum256>>>()
-            .unwrap();
+        .iter()
+        .map(convert_hex_to_checksum256)
+        .collect::<Result<Vec<Checksum256>>>()
+        .unwrap();
         let node_count = submission_material.block_header.block_num() - 1;
-        let block_mroot = Incremerkle::new(node_count.into(), blockroot_merkle).get_root().as_bytes().to_vec();
+        let block_mroot = Incremerkle::new(node_count.into(), blockroot_merkle)
+            .get_root()
+            .as_bytes()
+            .to_vec();
         let msig_enabled = false;
         let producer_signature = submission_material_json.block_header.producer_signature;
         let block_header = submission_material.block_header;
@@ -335,7 +320,7 @@ mod tests {
     #[ignore] // TODO: Fix this test
     #[test]
     fn should_validate_jungle_3_block_with_new_producers() {
-        //simple_logger::init().unwrap();
+        // simple_logger::init().unwrap();
         let submission_material_num = 9;
         let submission_material = get_sample_eos_submission_material_n(submission_material_num);
         let submission_material_json = get_sample_eos_submission_material_json_n(submission_material_num);
@@ -348,14 +333,17 @@ mod tests {
             "639c4ef56abde7efc67104f6fcc1b94379e3d51b1def8cd8fd16a02fae949226",
             "8ae24f840b2bbb7c217f1c23ef71d88d001aaf33763f05e02b237bd38680f647",
             "9292a3e4f9af07c619ba70ca31f8aef64bae7a31154369544f32874b416b2dad",
-            "1db45036e746ddde8051425bb462ea6639f4ec751ee0ef18abbe4d8ada53d0fc"
+            "1db45036e746ddde8051425bb462ea6639f4ec751ee0ef18abbe4d8ada53d0fc",
         ]
-            .iter()
-            .map(convert_hex_to_checksum256)
-            .collect::<Result<Vec<Checksum256>>>()
-            .unwrap();
+        .iter()
+        .map(convert_hex_to_checksum256)
+        .collect::<Result<Vec<Checksum256>>>()
+        .unwrap();
         let node_count = submission_material.block_header.block_num() - 1;
-        let block_mroot = Incremerkle::new(node_count.into(), blockroot_merkle).get_root().as_bytes().to_vec();
+        let block_mroot = Incremerkle::new(node_count.into(), blockroot_merkle)
+            .get_root()
+            .as_bytes()
+            .to_vec();
         let msig_enabled = true;
         let producer_signature = submission_material_json.block_header.producer_signature;
         let block_header = submission_material.block_header;

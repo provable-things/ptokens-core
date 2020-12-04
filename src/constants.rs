@@ -1,22 +1,22 @@
 use ethereum_types::Address as EthAddress;
 
-#[cfg(feature="debug")]
+#[cfg(feature = "debug")]
 pub const DEBUG_MODE: bool = true;
 
-#[cfg(not(feature="debug"))]
+#[cfg(not(feature = "debug"))]
 pub const DEBUG_MODE: bool = false;
 
-#[cfg(feature="non-validating")]
+#[cfg(feature = "non-validating")]
 pub const CORE_IS_VALIDATING: bool = false;
 
-#[cfg(not(feature="non-validating"))]
+#[cfg(not(feature = "non-validating"))]
 pub const CORE_IS_VALIDATING: bool = true;
 
 pub const NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR: &str =
     "✘ Not allowed to skip validation when core is not build in `DEBUG` mode!`";
 
 pub const U64_NUM_BYTES: usize = 8;
-pub const BTC_NUM_DECIMALS: usize  = 8;
+pub const BTC_NUM_DECIMALS: usize = 8;
 pub const ETH_HASH_LENGTH: usize = 32;
 pub const PTOKEN_ERC777_NUM_DECIMALS: u32 = 18;
 pub const SAFE_EOS_ADDRESS: &str = "safu.ptokens";
@@ -36,4 +36,3 @@ lazy_static! {
 lazy_static! {
     pub static ref SAFE_ETH_ADDRESS: EthAddress = EthAddress::from_slice(&hex::decode(SAFE_ETH_ADDRESS_HEX).unwrap());
 }
-

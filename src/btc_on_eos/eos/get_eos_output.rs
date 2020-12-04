@@ -1,25 +1,14 @@
-use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
-use std::time::{
-    SystemTime,
-    UNIX_EPOCH
-};
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
+    btc_on_eos::eos::redeem_info::{BtcOnEosRedeemInfo, BtcOnEosRedeemInfos},
     chains::{
+        btc::{btc_database_utils::get_btc_account_nonce_from_db, btc_utils::get_hex_tx_from_signed_btc_tx},
         eos::eos_state::EosState,
-        btc::{
-            btc_utils::get_hex_tx_from_signed_btc_tx,
-            btc_database_utils::get_btc_account_nonce_from_db,
-        },
     },
-    btc_on_eos::{
-        eos::redeem_info::{
-            BtcOnEosRedeemInfo,
-            BtcOnEosRedeemInfos,
-        },
-    },
+    traits::DatabaseInterface,
+    types::Result,
 };
+use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EosOutput {
@@ -40,18 +29,16 @@ pub struct BtcTxInfo {
 
 impl BtcTxInfo {
     pub fn new(btc_tx: &BtcTransaction, redeem_info: &BtcOnEosRedeemInfo, btc_account_nonce: u64) -> Result<BtcTxInfo> {
-        Ok(
-            BtcTxInfo {
-                btc_account_nonce,
-                btc_tx_amount: redeem_info.amount,
-                btc_tx_hash: btc_tx.txid().to_string(),
-                btc_tx_recipient: redeem_info.recipient.clone(),
-                btc_tx_hex: get_hex_tx_from_signed_btc_tx(&btc_tx),
-                originating_address: format!("{}", redeem_info.from),
-                originating_tx_hash: format!("{}", redeem_info.originating_tx_id),
-                signature_timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-            }
-        )
+        Ok(BtcTxInfo {
+            btc_account_nonce,
+            btc_tx_amount: redeem_info.amount,
+            btc_tx_hash: btc_tx.txid().to_string(),
+            btc_tx_recipient: redeem_info.recipient.clone(),
+            btc_tx_hex: get_hex_tx_from_signed_btc_tx(&btc_tx),
+            originating_address: format!("{}", redeem_info.from),
+            originating_tx_hash: format!("{}", redeem_info.originating_tx_id),
+            signature_timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+        })
     }
 }
 
@@ -69,20 +56,21 @@ pub fn get_btc_signed_tx_info_from_btc_txs(
         .collect()
 }
 
-pub fn get_eos_output<D>(state: EosState<D>) -> Result<String> where D: DatabaseInterface {
+pub fn get_eos_output<D>(state: EosState<D>) -> Result<String>
+where
+    D: DatabaseInterface,
+{
     info!("✔ Getting EOS output json...");
-    let output = serde_json::to_string(
-        &EosOutput {
-            btc_signed_transactions: match &state.btc_on_eos_signed_txs.len() {
-                0 => vec![],
-                _ => get_btc_signed_tx_info_from_btc_txs(
-                    get_btc_account_nonce_from_db(&state.db)?,
-                    &state.btc_on_eos_signed_txs,
-                    &state.btc_on_eos_redeem_infos,
-                )?,
-            }
-        }
-    )?;
+    let output = serde_json::to_string(&EosOutput {
+        btc_signed_transactions: match &state.btc_on_eos_signed_txs.len() {
+            0 => vec![],
+            _ => get_btc_signed_tx_info_from_btc_txs(
+                get_btc_account_nonce_from_db(&state.db)?,
+                &state.btc_on_eos_signed_txs,
+                &state.btc_on_eos_redeem_infos,
+            )?,
+        },
+    })?;
     info!("✔ EOS output: {}", output);
     Ok(output)
 }

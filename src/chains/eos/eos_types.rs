@@ -1,16 +1,11 @@
-use std::fmt;
-use serde_json::Value as JsonValue;
-pub use eos_primitives::Checksum256;
-use eos_primitives::{
-    ProducerKey as EosProducerKey,
-};
 use crate::{
-    types::{
-        Bytes,
-        Result,
-    },
     chains::eos::eos_utils::get_eos_schedule_db_key,
+    types::{Bytes, Result},
 };
+pub use eos_primitives::Checksum256;
+use eos_primitives::ProducerKey as EosProducerKey;
+use serde_json::Value as JsonValue;
+use std::fmt;
 
 pub type GlobalSequence = u64;
 pub type MerkleProof = Vec<String>;
@@ -52,7 +47,7 @@ impl EosKnownSchedulesJsons {
                 .0
                 .iter()
                 .map(|sched| EosKnownScheduleJson::from_schedule(sched))
-                .collect::<Vec<EosKnownScheduleJson>>()
+                .collect::<Vec<EosKnownScheduleJson>>(),
         )
     }
 }
@@ -117,12 +112,7 @@ pub struct EosSignedTransaction {
 }
 
 impl EosSignedTransaction {
-    pub fn new(
-        signature: String,
-        transaction: String,
-        recipient: String,
-        amount: String,
-    ) -> EosSignedTransaction {
+    pub fn new(signature: String, transaction: String, recipient: String, amount: String) -> EosSignedTransaction {
         EosSignedTransaction {
             signature,
             transaction,

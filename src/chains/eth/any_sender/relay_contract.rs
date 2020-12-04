@@ -52,18 +52,16 @@ mod tests {
         // Mainnet
         let relay_contract = RelayContract::from_eth_chain_id(1).unwrap();
         let relay_contract_address = relay_contract.address().unwrap();
-        let expected_contract_address = EthAddress::from_slice(
-            &hex::decode("9b4FA5A1D9f6812e2B56B36fBde62736Fa82c2a7").unwrap(),
-        );
+        let expected_contract_address =
+            EthAddress::from_slice(&hex::decode("9b4FA5A1D9f6812e2B56B36fBde62736Fa82c2a7").unwrap());
 
         assert_eq!(relay_contract_address, expected_contract_address);
 
         // Ropsten
         let relay_contract = RelayContract::from_eth_chain_id(3).unwrap();
         let relay_contract_address = relay_contract.address().unwrap();
-        let expected_contract_address = EthAddress::from_slice(
-            &hex::decode("9b4FA5A1D9f6812e2B56B36fBde62736Fa82c2a7").unwrap(),
-        );
+        let expected_contract_address =
+            EthAddress::from_slice(&hex::decode("9b4FA5A1D9f6812e2B56B36fBde62736Fa82c2a7").unwrap());
 
         assert_eq!(relay_contract_address, expected_contract_address);
     }

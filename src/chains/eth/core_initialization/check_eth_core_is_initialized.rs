@@ -1,20 +1,19 @@
-use crate::{
-    traits::DatabaseInterface,
-    chains::eth::eth_database_utils::get_public_eth_address_from_db,
-};
+use crate::{chains::eth::eth_database_utils::get_public_eth_address_from_db, traits::DatabaseInterface};
 
-
-pub fn is_eth_core_initialized<D>(db: &D) -> bool where D: DatabaseInterface {
+pub fn is_eth_core_initialized<D>(db: &D) -> bool
+where
+    D: DatabaseInterface,
+{
     trace!("✔ Checking if ETH enclave has been initialized...");
     match get_public_eth_address_from_db(db) {
-        Ok(_)=> {
+        Ok(_) => {
             debug!("✔ ETH enclave *HAS* been initialized!");
             true
-        }
+        },
         _ => {
             debug!("✔ ETH enclave has *NOT* been initialized!");
             false
-        }
+        },
     }
 }
 
@@ -22,9 +21,9 @@ pub fn is_eth_core_initialized<D>(db: &D) -> bool where D: DatabaseInterface {
 mod tests {
     use super::*;
     use crate::{
-        test_utils::get_test_database,
         btc_on_eth::eth::eth_test_utils::get_sample_eth_address,
         chains::eth::eth_database_utils::put_public_eth_address_in_db,
+        test_utils::get_test_database,
     };
 
     #[test]

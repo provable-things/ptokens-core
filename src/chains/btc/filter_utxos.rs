@@ -1,44 +1,38 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::btc::{
-        btc_state::BtcState,
         btc_constants::MINIMUM_REQUIRED_SATOSHIS,
+        btc_state::BtcState,
         utxo_manager::{
+            utxo_types::{BtcUtxoAndValue, BtcUtxosAndValues},
             utxo_utils::utxos_exist_in_db,
-            utxo_types::{
-                BtcUtxoAndValue,
-                BtcUtxosAndValues,
-            },
         },
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
 
-pub fn filter_out_utxos_extant_in_db<D>(
-    db: &D,
-    utxos: &BtcUtxosAndValues
-) -> Result<BtcUtxosAndValues>
-    where D: DatabaseInterface
+pub fn filter_out_utxos_extant_in_db<D>(db: &D, utxos: &BtcUtxosAndValues) -> Result<BtcUtxosAndValues>
+where
+    D: DatabaseInterface,
 {
-    utxos_exist_in_db(db, utxos)
-        .map(|bool_arr| BtcUtxosAndValues::new(
+    utxos_exist_in_db(db, utxos).map(|bool_arr| {
+        BtcUtxosAndValues::new(
             utxos
                 .0
                 .iter()
                 .enumerate()
-                .filter(|(i, _)| {
-                    match !bool_arr[*i] {
-                        true => true,
-                        false => {
-                            info!("✔ Filtering out UTXO because it's already in the db: {:?}", utxos.0[*i]);
-                            false
-                        }
-                    }
+                .filter(|(i, _)| match !bool_arr[*i] {
+                    true => true,
+                    false => {
+                        info!("✔ Filtering out UTXO because it's already in the db: {:?}", utxos.0[*i]);
+                        false
+                    },
                 })
                 .map(|(_, utxo)| utxo)
                 .cloned()
-                .collect::<Vec<BtcUtxoAndValue>>()
-        ))
+                .collect::<Vec<BtcUtxoAndValue>>(),
+        )
+    })
 }
 
 pub fn filter_out_utxos_whose_value_is_too_low(utxos: &BtcUtxosAndValues) -> Result<BtcUtxosAndValues> {
@@ -46,17 +40,15 @@ pub fn filter_out_utxos_whose_value_is_too_low(utxos: &BtcUtxosAndValues) -> Res
         utxos
             .0
             .iter()
-            .filter(|utxo| {
-                match utxo.value >= MINIMUM_REQUIRED_SATOSHIS {
-                    true => true,
-                    false => {
-                        info!("✘ Filtering UTXO ∵ value too low: {:?}", utxo);
-                        false
-                    }
-                }
+            .filter(|utxo| match utxo.value >= MINIMUM_REQUIRED_SATOSHIS {
+                true => true,
+                false => {
+                    info!("✘ Filtering UTXO ∵ value too low: {:?}", utxo);
+                    false
+                },
             })
             .cloned()
-            .collect::<Vec<BtcUtxoAndValue>>()
+            .collect::<Vec<BtcUtxoAndValue>>(),
     ))
 }
 
@@ -80,10 +72,7 @@ mod tests {
             btc_test_utils::get_sample_utxo_and_values,
             utxo_manager::utxo_database_utils::save_utxos_to_db,
         },
-        test_utils::{
-            get_test_database,
-            get_random_num_between,
-        },
+        test_utils::{get_random_num_between, get_test_database},
     };
 
     #[test]

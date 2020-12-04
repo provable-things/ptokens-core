@@ -1,10 +1,7 @@
 use crate::{
-    types::Result,
+    chains::{btc::btc_state::BtcState, eth::eth_database_utils::increment_any_sender_nonce_in_db},
     traits::DatabaseInterface,
-    chains::{
-        btc::btc_state::BtcState,
-        eth::eth_database_utils::increment_any_sender_nonce_in_db,
-    },
+    types::Result,
 };
 
 pub fn maybe_increment_any_sender_nonce_in_db<D: DatabaseInterface>(state: BtcState<D>) -> Result<BtcState<D>> {
@@ -16,13 +13,10 @@ pub fn maybe_increment_any_sender_nonce_in_db<D: DatabaseInterface>(state: BtcSt
         Err(_) => {
             info!("✔ Not incrementing AnySender nonce - no signatures made!");
             Ok(state)
-        }
+        },
         Ok(signed_txs) => {
             info!("✔ Incrementing AnySender nonce by {}", signed_txs.len());
-            increment_any_sender_nonce_in_db(
-                &state.db,
-                signed_txs.len() as u64,
-            ).map(|_| state)
-        }
+            increment_any_sender_nonce_in_db(&state.db, signed_txs.len() as u64).map(|_| state)
+        },
     }
 }

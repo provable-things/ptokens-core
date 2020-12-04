@@ -7,7 +7,7 @@ use crate::{
         eth_constants::{ETH_MAINNET_CHAIN_ID, ETH_ROPSTEN_CHAIN_ID},
         eth_contracts::erc777_proxy::encode_mint_by_proxy_tx_data,
         eth_crypto::eth_private_key::EthPrivateKey,
-        eth_traits::EthTxInfoCompatible
+        eth_traits::EthTxInfoCompatible,
     },
     types::{Byte, Bytes, Result},
 };
@@ -139,9 +139,7 @@ impl RelayTransaction {
             return Err("✘ AnySender is not available on chain with the id provided!".into());
         }
 
-        info!(
-            "✔ AnySender transaction constraints are satisfied. Returning unsigned transaction..."
-        );
+        info!("✔ AnySender transaction constraints are satisfied. Returning unsigned transaction...");
 
         Ok(RelayTransaction {
             chain_id,
@@ -190,12 +188,7 @@ impl RelayTransaction {
         Ok(RelayTransaction::new_unsigned(
             chain_id,
             from,
-            encode_mint_by_proxy_tx_data(
-                eth_private_key,
-                token_recipient,
-                token_amount,
-                any_sender_nonce,
-            )?,
+            encode_mint_by_proxy_tx_data(eth_private_key, token_recipient, token_amount, any_sender_nonce)?,
             ANY_SENDER_DEFAULT_DEADLINE,
             ANY_SENDER_GAS_LIMIT,
             ANY_SENDER_MAX_COMPENSATION_WEI,
@@ -253,21 +246,17 @@ mod tests {
         let gas_limit = 100000;
         let compensation = 500000000;
         let relay_contract_address = RelayContract::Ropsten.address().unwrap();
-        let to = EthAddress::from_slice(
-            &hex::decode("FDE83bd51bddAA39F15c1Bf50E222a7AE5831D83").unwrap(),
-        );
+        let to = EthAddress::from_slice(&hex::decode("FDE83bd51bddAA39F15c1Bf50E222a7AE5831D83").unwrap());
 
         let expected_data = hex::decode("f15da729000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000047465737400000000000000000000000000000000000000000000000000000000").unwrap();
 
         // private key without recovery param
         let eth_private_key = EthPrivateKey::from_slice([
-            132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234,
-            47, 186, 237, 88, 161, 200, 177, 24, 142, 207, 242, 168, 221,
+            132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234, 47, 186, 237, 88,
+            161, 200, 177, 24, 142, 207, 242, 168, 221,
         ])
         .unwrap();
-        let from = EthAddress::from_slice(
-            &hex::decode("736661736533BcfC9cc35649e6324aceFb7D32c1").unwrap(),
-        );
+        let from = EthAddress::from_slice(&hex::decode("736661736533BcfC9cc35649e6324aceFb7D32c1").unwrap());
 
         let relay_transaction = RelayTransaction::new(
             from,
@@ -301,13 +290,11 @@ mod tests {
 
         // private key with recovery param
         let eth_private_key = EthPrivateKey::from_slice([
-            6, 55, 162, 221, 254, 198, 108, 20, 103, 12, 93, 123, 226, 232, 71, 70, 139, 212, 41,
-            54, 65, 132, 18, 158, 202, 14, 137, 226, 174, 63, 11, 45,
+            6, 55, 162, 221, 254, 198, 108, 20, 103, 12, 93, 123, 226, 232, 71, 70, 139, 212, 41, 54, 65, 132, 18, 158,
+            202, 14, 137, 226, 174, 63, 11, 45,
         ])
         .unwrap();
-        let from = EthAddress::from_slice(
-            &hex::decode("1a96829d85bdf719b58b2593e2853d4ae5a0f50b").unwrap(),
-        );
+        let from = EthAddress::from_slice(&hex::decode("1a96829d85bdf719b58b2593e2853d4ae5a0f50b").unwrap());
 
         let relay_transaction = RelayTransaction::new(
             from,
@@ -345,13 +332,11 @@ mod tests {
         let eth_transaction = get_sample_unsigned_eth_transaction();
         let chain_id = 3;
         let eth_private_key = EthPrivateKey::from_slice([
-            132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234,
-            47, 186, 237, 88, 161, 200, 177, 24, 142, 207, 242, 168, 221,
+            132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234, 47, 186, 237, 88,
+            161, 200, 177, 24, 142, 207, 242, 168, 221,
         ])
         .unwrap();
-        let from = EthAddress::from_slice(
-            &hex::decode("736661736533BcfC9cc35649e6324aceFb7D32c1").unwrap(),
-        );
+        let from = EthAddress::from_slice(&hex::decode("736661736533BcfC9cc35649e6324aceFb7D32c1").unwrap());
         let any_sender_nonce = 0;
         let amount = U256::from(1337);
 
@@ -405,20 +390,16 @@ mod tests {
 
         let chain_id = 3;
         let eth_private_key = EthPrivateKey::from_slice([
-            132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234,
-            47, 186, 237, 88, 161, 200, 177, 24, 142, 207, 242, 168, 221,
+            132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234, 47, 186, 237, 88,
+            161, 200, 177, 24, 142, 207, 242, 168, 221,
         ])
         .unwrap();
-        let from = EthAddress::from_slice(
-            &hex::decode("736661736533BcfC9cc35649e6324aceFb7D32c1").unwrap(),
-        );
+        let from = EthAddress::from_slice(&hex::decode("736661736533BcfC9cc35649e6324aceFb7D32c1").unwrap());
         let data = hex::decode("f15da729000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000047465737400000000000000000000000000000000000000000000000000000000").unwrap();
         let deadline = Some(0);
         let gas_limit = 100000;
         let compensation = 500000000;
-        let to = EthAddress::from_slice(
-            &hex::decode("FDE83bd51bddAA39F15c1Bf50E222a7AE5831D83").unwrap(),
-        );
+        let to = EthAddress::from_slice(&hex::decode("FDE83bd51bddAA39F15c1Bf50E222a7AE5831D83").unwrap());
 
         let expected_relay_transaction = RelayTransaction::new(
             from,
@@ -444,38 +425,32 @@ mod tests {
     #[test]
     fn should_serialize_relay_tx_to_bytes() {
         let expected_result = vec![
-            248, 243, 148, 253, 232, 59, 213, 27, 221, 170, 57, 241, 92, 27, 245, 14, 34, 42, 122,
-            229, 131, 29, 131, 148, 115, 102, 97, 115, 101, 51, 188, 252, 156, 195, 86, 73, 230,
-            50, 74, 206, 251, 125, 50, 193, 184, 100, 241, 93, 167, 41, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 116, 101,
-            115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 128, 132, 29, 205, 101, 0, 131, 1, 134, 160, 3, 148, 155, 79, 165, 161, 217, 246,
-            129, 46, 43, 86, 179, 111, 189, 230, 39, 54, 250, 130, 194, 167, 184, 65, 90, 161, 74,
-            133, 36, 57, 217, 245, 170, 123, 34, 198, 58, 34, 141, 121, 198, 130, 44, 246, 68, 186,
-            220, 154, 99, 17, 125, 215, 136, 13, 154, 76, 99, 158, 204, 212, 174, 238, 233, 30,
-            174, 166, 62, 54, 100, 13, 21, 27, 231, 19, 70, 215, 133, 210, 189, 39, 79, 184, 35,
-            81, 198, 187, 44, 16, 27,
+            248, 243, 148, 253, 232, 59, 213, 27, 221, 170, 57, 241, 92, 27, 245, 14, 34, 42, 122, 229, 131, 29, 131,
+            148, 115, 102, 97, 115, 101, 51, 188, 252, 156, 195, 86, 73, 230, 50, 74, 206, 251, 125, 50, 193, 184, 100,
+            241, 93, 167, 41, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 116,
+            101, 115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128,
+            132, 29, 205, 101, 0, 131, 1, 134, 160, 3, 148, 155, 79, 165, 161, 217, 246, 129, 46, 43, 86, 179, 111,
+            189, 230, 39, 54, 250, 130, 194, 167, 184, 65, 90, 161, 74, 133, 36, 57, 217, 245, 170, 123, 34, 198, 58,
+            34, 141, 121, 198, 130, 44, 246, 68, 186, 220, 154, 99, 17, 125, 215, 136, 13, 154, 76, 99, 158, 204, 212,
+            174, 238, 233, 30, 174, 166, 62, 54, 100, 13, 21, 27, 231, 19, 70, 215, 133, 210, 189, 39, 79, 184, 35, 81,
+            198, 187, 44, 16, 27,
         ];
         let expected_tx_hash = "e93eab63e9b863d4c93007b0a641c749af840c8c19602ea18f6546a308431cc4";
         let expected_tx_hex = "f8f394fde83bd51bddaa39f15c1bf50e222a7ae5831d8394736661736533bcfc9cc35649e6324acefb7d32c1b864f15da72900000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004746573740000000000000000000000000000000000000000000000000000000080841dcd6500830186a003949b4fa5a1d9f6812e2b56b36fbde62736fa82c2a7b8415aa14a852439d9f5aa7b22c63a228d79c6822cf644badc9a63117dd7880d9a4c639eccd4aeeee91eaea63e36640d151be71346d785d2bd274fb82351c6bb2c101b";
 
         let chain_id = 3;
         let eth_private_key = EthPrivateKey::from_slice([
-            132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234,
-            47, 186, 237, 88, 161, 200, 177, 24, 142, 207, 242, 168, 221,
+            132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234, 47, 186, 237, 88,
+            161, 200, 177, 24, 142, 207, 242, 168, 221,
         ])
         .unwrap();
-        let from = EthAddress::from_slice(
-            &hex::decode("736661736533BcfC9cc35649e6324aceFb7D32c1").unwrap(),
-        );
+        let from = EthAddress::from_slice(&hex::decode("736661736533BcfC9cc35649e6324aceFb7D32c1").unwrap());
         let data = hex::decode("f15da729000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000047465737400000000000000000000000000000000000000000000000000000000").unwrap();
         let deadline = Some(0);
         let gas_limit = 100000;
         let compensation = 500000000;
-        let to = EthAddress::from_slice(
-            &hex::decode("FDE83bd51bddAA39F15c1Bf50E222a7AE5831D83").unwrap(),
-        );
+        let to = EthAddress::from_slice(&hex::decode("FDE83bd51bddAA39F15c1Bf50E222a7AE5831D83").unwrap());
 
         let relay_transaction = RelayTransaction::new(
             from,

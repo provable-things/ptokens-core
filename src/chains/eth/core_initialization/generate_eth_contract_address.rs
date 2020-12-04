@@ -1,18 +1,18 @@
-use rlp::RlpStream;
-use tiny_keccak::keccak256;
-use ethereum_types::Address as EthAddress;
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::eth::{
-        eth_state::EthState,
         eth_database_utils::{
             get_public_eth_address_from_db,
             put_btc_on_eth_smart_contract_address_in_db,
             put_erc20_on_eos_smart_contract_address_in_db,
         },
+        eth_state::EthState,
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
+use ethereum_types::Address as EthAddress;
+use rlp::RlpStream;
+use tiny_keccak::keccak256;
 
 const INITIAL_NONCE: usize = 0;
 
@@ -26,18 +26,19 @@ fn calculate_contract_address(eth_address: EthAddress, nonce: usize) -> EthAddre
     EthAddress::from_slice(&hashed[12..])
 }
 
-fn get_eth_contract_address<D>(db: &D) -> Result<EthAddress> where D: DatabaseInterface {
-    get_public_eth_address_from_db(db)
-        .map(|eth_address| {
-            info!("✔ Calculating pBTC contract address...");
-            calculate_contract_address(eth_address, INITIAL_NONCE)
-        })
+fn get_eth_contract_address<D>(db: &D) -> Result<EthAddress>
+where
+    D: DatabaseInterface,
+{
+    get_public_eth_address_from_db(db).map(|eth_address| {
+        info!("✔ Calculating pBTC contract address...");
+        calculate_contract_address(eth_address, INITIAL_NONCE)
+    })
 }
 
-pub fn generate_and_store_btc_on_eth_contract_address<D>(
-    state: EthState<D>
-) -> Result<EthState<D>>
-    where D: DatabaseInterface
+pub fn generate_and_store_btc_on_eth_contract_address<D>(state: EthState<D>) -> Result<EthState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Calculating `pBTC-on-ETH` contract address...");
     get_eth_contract_address(&state.db)
@@ -48,10 +49,9 @@ pub fn generate_and_store_btc_on_eth_contract_address<D>(
         .and(Ok(state))
 }
 
-pub fn generate_and_store_erc20_on_eos_contract_address<D>(
-    state: EthState<D>
-) -> Result<EthState<D>>
-    where D: DatabaseInterface
+pub fn generate_and_store_erc20_on_eos_contract_address<D>(state: EthState<D>) -> Result<EthState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Calculating `pERC20-on-EOS` contract address...");
     get_eth_contract_address(&state.db)
@@ -63,7 +63,7 @@ pub fn generate_and_store_erc20_on_eos_contract_address<D>(
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
     use crate::btc_on_eth::eth::eth_test_utils::get_sample_eth_address;
 
@@ -73,9 +73,7 @@ mod tests{
         let eth_address = get_sample_eth_address();
         // NOTE: The actual contract deployed @ this nonce by this test address:
         // https://rinkeby.etherscan.io/address/0xc63b099efb18c8db573981fb64564f1564af4f30
-        let expected_result = EthAddress::from_slice(
-            &hex::decode("c63b099efB18c8db573981fB64564f1564af4f30").unwrap()
-        );
+        let expected_result = EthAddress::from_slice(&hex::decode("c63b099efB18c8db573981fB64564f1564af4f30").unwrap());
         let result = calculate_contract_address(eth_address, nonce);
         assert_eq!(result, expected_result);
     }

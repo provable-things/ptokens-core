@@ -1,15 +1,15 @@
-use tiny_keccak::keccak256;
 use crate::{
-    constants::DEBUG_OUTPUT_MARKER,
+    constants::{DB_KEY_PREFIX, DEBUG_OUTPUT_MARKER, U64_NUM_BYTES},
     types::{Byte, Bytes, Result},
-    constants::{
-        U64_NUM_BYTES,
-        DB_KEY_PREFIX,
-    },
 };
+use tiny_keccak::keccak256;
 
 pub fn right_pad_or_truncate(s: &str, width: usize) -> String {
-    if s.len() >= width { truncate_str(&s, width).to_string() } else { right_pad_with_zeroes(&s, width) }
+    if s.len() >= width {
+        truncate_str(&s, width).to_string()
+    } else {
+        right_pad_with_zeroes(&s, width)
+    }
 }
 
 pub fn truncate_str(s: &str, num_chars: usize) -> &str {
@@ -31,7 +31,7 @@ pub fn convert_bytes_to_u64(bytes: &[Byte]) -> Result<u64> {
             let bytes = &bytes[..U64_NUM_BYTES];
             arr.copy_from_slice(bytes);
             Ok(u64::from_le_bytes(arr))
-        }
+        },
         _ => Err("✘ Too many bytes to convert to u64 without overflowing!".into()),
     }
 }
@@ -52,17 +52,18 @@ pub fn maybe_strip_hex_prefix(hex: &str) -> Result<&str> {
     let lowercase_hex_prefix = "0x";
     let uppercase_hex_prefix = "0X";
     match hex.starts_with(lowercase_hex_prefix) || hex.starts_with(uppercase_hex_prefix) {
-        true => Ok(hex.trim_start_matches(lowercase_hex_prefix).trim_start_matches(uppercase_hex_prefix)),
+        true => Ok(hex
+            .trim_start_matches(lowercase_hex_prefix)
+            .trim_start_matches(uppercase_hex_prefix)),
         false => Ok(hex),
     }
 }
 
-pub fn strip_hex_prefix(hex : &str) -> Result<String> {
-    maybe_strip_hex_prefix(hex)
-        .and_then(|hex_no_prefix| match hex_no_prefix.len() % 2 {
-            0 => Ok(hex_no_prefix.to_string()),
-            _ => left_pad_with_zero(&hex_no_prefix),
-        })
+pub fn strip_hex_prefix(hex: &str) -> Result<String> {
+    maybe_strip_hex_prefix(hex).and_then(|hex_no_prefix| match hex_no_prefix.len() % 2 {
+        0 => Ok(hex_no_prefix.to_string()),
+        _ => left_pad_with_zero(&hex_no_prefix),
+    })
 }
 
 pub fn decode_hex_with_err_msg(hex: &str, err_msg: &str) -> Result<Bytes> {
@@ -88,11 +89,11 @@ pub fn prepend_debug_output_marker_to_string(string_to_prepend: String) -> Strin
 }
 
 pub fn get_not_in_state_err(substring: &str) -> String {
-    format!("✘ No {} in state!" , substring)
+    format!("✘ No {} in state!", substring)
 }
 
 pub fn get_no_overwrite_state_err(substring: &str) -> String {
-    format!("✘ Cannot overwrite {} in state!" , substring)
+    format!("✘ Cannot overwrite {} in state!", substring)
 }
 
 #[cfg(test)]
@@ -111,17 +112,16 @@ mod tests {
     #[test]
     fn should_convert_u64_to_bytes() {
         let u_64 = u64::max_value();
-        let expected_result = [255,255,255,255,255,255,255,255];
+        let expected_result = [255, 255, 255, 255, 255, 255, 255, 255];
         let result = convert_u64_to_bytes(u_64);
         assert_eq!(result, expected_result);
     }
 
     #[test]
     fn should_convert_bytes_to_u64() {
-        let bytes = vec![255,255,255,255,255,255,255,255];
+        let bytes = vec![255, 255, 255, 255, 255, 255, 255, 255];
         let expected_result = u64::max_value();
-        let result = convert_bytes_to_u64(&bytes)
-            .unwrap();
+        let result = convert_bytes_to_u64(&bytes).unwrap();
         assert_eq!(result, expected_result);
     }
 
@@ -129,8 +129,7 @@ mod tests {
     fn should_not_strip_missing_hex_prefix_correctly() {
         let dummy_hex = "c0ffee";
         let expected_result = "c0ffee".to_string();
-        let result = strip_hex_prefix(dummy_hex)
-            .unwrap();
+        let result = strip_hex_prefix(dummy_hex).unwrap();
         assert_eq!(result, expected_result)
     }
 
@@ -138,8 +137,7 @@ mod tests {
     fn should_left_pad_string_with_zero_correctly() {
         let dummy_hex = "0xc0ffee";
         let expected_result = "00xc0ffee".to_string();
-        let result = left_pad_with_zero(dummy_hex)
-            .unwrap();
+        let result = left_pad_with_zero(dummy_hex).unwrap();
         assert_eq!(result, expected_result);
     }
 
@@ -147,8 +145,7 @@ mod tests {
     fn should_strip_lower_hex_prefix_correctly() {
         let dummy_hex = "0xc0ffee";
         let expected_result = "c0ffee".to_string();
-        let result = strip_hex_prefix(dummy_hex)
-            .unwrap();
+        let result = strip_hex_prefix(dummy_hex).unwrap();
         assert_eq!(result, expected_result)
     }
 
@@ -156,8 +153,7 @@ mod tests {
     fn should_strip_upper_case_hex_prefix_correctly() {
         let dummy_hex = "0Xc0ffee";
         let expected_result = "c0ffee".to_string();
-        let result = strip_hex_prefix(dummy_hex)
-            .unwrap();
+        let result = strip_hex_prefix(dummy_hex).unwrap();
         assert_eq!(result, expected_result)
     }
 

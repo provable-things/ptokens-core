@@ -1,29 +1,23 @@
-use bitcoin::{
-    hashes::sha256d,
-    blockdata::{
-        transaction::{
-            TxIn as BtcUtxo,
-            TxOut as BtcTxOut,
-            Transaction as BtcTransaction,
-        },
-    }
-};
 use crate::{
-    types::{Bytes, Result},
     chains::btc::{
-        btc_types::BtcRecipientsAndAmounts,
-        deposit_address_info::DepositAddressInfo,
         btc_crypto::btc_private_key::BtcPrivateKey,
-        utxo_manager::utxo_types::BtcUtxosAndValues,
+        btc_types::BtcRecipientsAndAmounts,
         btc_utils::{
-            get_script_sig,
             calculate_btc_tx_fee,
+            create_new_pay_to_pub_key_hash_output,
             create_new_tx_output,
             get_p2sh_redeem_script_sig,
-            create_new_pay_to_pub_key_hash_output,
             get_p2sh_script_sig_from_redeem_script,
+            get_script_sig,
         },
+        deposit_address_info::DepositAddressInfo,
+        utxo_manager::utxo_types::BtcUtxosAndValues,
     },
+    types::{Bytes, Result},
+};
+use bitcoin::{
+    blockdata::transaction::{Transaction as BtcTransaction, TxIn as BtcUtxo, TxOut as BtcTxOut},
+    hashes::sha256d,
 };
 
 // NOTE: Current tx constants. Could make generic in future if needed.
@@ -42,20 +36,29 @@ pub fn create_signed_raw_btc_tx_for_n_input_n_outputs(
         .iter()
         .map(|recipient_and_amount| recipient_and_amount.amount)
         .sum();
-    let fee = calculate_btc_tx_fee(utxos_and_values.len(), recipient_addresses_and_amounts.len(), sats_per_byte);
-    let utxo_total = utxos_and_values.iter().fold(0, |acc, utxo_and_value| acc + utxo_and_value.value);
+    let fee = calculate_btc_tx_fee(
+        utxos_and_values.len(),
+        recipient_addresses_and_amounts.len(),
+        sats_per_byte,
+    );
+    let utxo_total = utxos_and_values
+        .iter()
+        .fold(0, |acc, utxo_and_value| acc + utxo_and_value.value);
     info!("✔ UTXO(s) total:  {}", utxo_total);
     info!("✔ Outgoing total: {}", total_to_spend);
     info!("✔ Change amount:  {}", utxo_total - (total_to_spend + fee));
     info!("✔ Tx fee:         {}", fee);
     if total_to_spend + fee > utxo_total {
-        return Err("✘ Not enough UTXO value to make transaction!".into())
+        return Err("✘ Not enough UTXO value to make transaction!".into());
     };
     let mut outputs = recipient_addresses_and_amounts
         .iter()
-        .map(|recipient_and_amount|
-            create_new_tx_output(recipient_and_amount.amount, recipient_and_amount.recipient.script_pubkey())
-         )
+        .map(|recipient_and_amount| {
+            create_new_tx_output(
+                recipient_and_amount.amount,
+                recipient_and_amount.recipient.script_pubkey(),
+            )
+        })
         .flatten()
         .collect::<Vec<BtcTxOut>>();
     let change = utxo_total - total_to_spend - fee;
@@ -78,26 +81,26 @@ pub fn create_signed_raw_btc_tx_for_n_input_n_outputs(
         .map(|utxo_and_value| utxo_and_value.get_utxo())
         .enumerate()
         .map(|(i, utxo)| {
-            let script = match utxos_and_values.0[i].clone()
-                .maybe_deposit_info_json {
+            let script = match utxos_and_values.0[i].clone().maybe_deposit_info_json {
                 None => {
                     info!("✔ Signing a `p2pkh` UTXO!");
                     utxo?.script_sig
-                }
+                },
                 Some(deposit_info_json) => {
                     info!("✔ Signing a `p2sh` UTXO!");
                     get_p2sh_redeem_script_sig(
                         &btc_private_key.to_public_key_slice(),
                         &DepositAddressInfo::from_json(&deposit_info_json)?.commitment_hash,
                     )
-                }
+                },
             };
             Ok(tx.signature_hash(i, &script, SIGN_ALL_HASH_TYPE as u32))
         })
         .map(|hash: Result<sha256d::Hash>| Ok(hash?.to_vec()))
-        .map(|tx_hash_to_sign: Result<Bytes>|
-            Ok(btc_private_key.sign_hash_and_append_btc_hash_type(tx_hash_to_sign?.to_vec(), SIGN_ALL_HASH_TYPE as u8)?)
-        )
+        .map(|tx_hash_to_sign: Result<Bytes>| {
+            Ok(btc_private_key
+                .sign_hash_and_append_btc_hash_type(tx_hash_to_sign?.to_vec(), SIGN_ALL_HASH_TYPE as u8)?)
+        })
         .collect::<Result<Vec<Bytes>>>()?;
     let utxos_with_signatures = utxos_and_values
         .0
@@ -106,63 +109,50 @@ pub fn create_signed_raw_btc_tx_for_n_input_n_outputs(
         .enumerate()
         .map(|(i, maybe_utxo)| {
             let utxo = maybe_utxo?;
-            let script_sig = match utxos_and_values.0[i].clone()
-                .maybe_deposit_info_json {
-                    None => {
-                        info!("✔ Spending a `p2pkh` UTXO!");
-                        get_script_sig(
-                            &signatures[i],
+            let script_sig = match utxos_and_values.0[i].clone().maybe_deposit_info_json {
+                None => {
+                    info!("✔ Spending a `p2pkh` UTXO!");
+                    get_script_sig(&signatures[i], &btc_private_key.to_public_key_slice())
+                },
+                Some(deposit_info_json) => {
+                    info!("✔ Spending a `p2sh` UTXO!");
+                    get_p2sh_script_sig_from_redeem_script(
+                        &signatures[i],
+                        &get_p2sh_redeem_script_sig(
                             &btc_private_key.to_public_key_slice(),
-                        )
-                    }
-                    Some(deposit_info_json) => {
-                        info!("✔ Spending a `p2sh` UTXO!");
-                        get_p2sh_script_sig_from_redeem_script(
-                            &signatures[i],
-                            &get_p2sh_redeem_script_sig(
-                                &btc_private_key.to_public_key_slice(),
-                                &DepositAddressInfo::from_json(&deposit_info_json)?.commitment_hash,
-                            )
-                        )
-                    }
+                            &DepositAddressInfo::from_json(&deposit_info_json)?.commitment_hash,
+                        ),
+                    )
+                },
             };
-            Ok(
-                BtcUtxo {
-                    script_sig,
-                    sequence: utxo.sequence,
-                    witness: utxo.witness.clone(),
-                    previous_output: utxo.previous_output,
-                }
-            )
+            Ok(BtcUtxo {
+                script_sig,
+                sequence: utxo.sequence,
+                witness: utxo.witness.clone(),
+                previous_output: utxo.previous_output,
+            })
         })
         .collect::<Result<Vec<BtcUtxo>>>()?;
-    Ok(
-        BtcTransaction {
-            output: tx.output,
-            version: tx.version,
-            lock_time: tx.lock_time,
-            input: utxos_with_signatures,
-        }
-    )
+    Ok(BtcTransaction {
+        output: tx.output,
+        version: tx.version,
+        lock_time: tx.lock_time,
+        input: utxos_with_signatures,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        chains::btc::{
-            btc_types::BtcRecipientAndAmount,
-            btc_utils::{
-                get_tx_id_from_signed_btc_tx,
-                get_hex_tx_from_signed_btc_tx,
-            },
-            btc_test_utils::{
-                SAMPLE_TARGET_BTC_ADDRESS,
-                get_sample_btc_private_key,
-                get_sample_op_return_utxo_and_value,
-                get_sample_op_return_utxo_and_value_n,
-            },
+    use crate::chains::btc::{
+        btc_test_utils::{
+            get_sample_btc_private_key,
+            get_sample_op_return_utxo_and_value,
+            get_sample_op_return_utxo_and_value_n,
+            SAMPLE_TARGET_BTC_ADDRESS,
         },
+        btc_types::BtcRecipientAndAmount,
+        btc_utils::{get_hex_tx_from_signed_btc_tx, get_tx_id_from_signed_btc_tx},
     };
 
     #[test]
@@ -171,12 +161,8 @@ mod tests {
         let expected_tx_id = "ce1d7929ed6039485c3ef4040732fb7908174759831a0bbf5acb8d255036a12c";
         let expected_serialized_tx = "01000000010e8d588f88d5624148070a8cd79508da8cb76625e4fcdb19a5fc996aa843bf04000000006b483045022100967d2fb7f4595102dc85a8f90996b8b46fd51d808ab47311b49e6f1ecdfa333502201ba9bebcacef5a66cb1e207148e368bfc4b7c6a65e241a01564a3062304d8b49012103d2a5e3b162eb580fe2ce023cd5e0dddbb6286923acde77e3e5468314dc9373f7ffffffff0133023300000000001976a9149ae6e42c56f1ea319cfc704ad50db0683015029b88ac00000000";
         let sats_per_byte = 23;
-        let recipient_addresses_and_amounts = vec![
-            BtcRecipientAndAmount::new(
-                "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM",
-                3342899
-            ).unwrap()
-        ];
+        let recipient_addresses_and_amounts =
+            vec![BtcRecipientAndAmount::new("mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM", 3342899).unwrap()];
         let btc_private_key = get_sample_btc_private_key();
         let remainder_btc_address = SAMPLE_TARGET_BTC_ADDRESS;
         let utxos_and_values = BtcUtxosAndValues::new(vec![get_sample_op_return_utxo_and_value()]);
@@ -186,7 +172,8 @@ mod tests {
             remainder_btc_address,
             btc_private_key,
             utxos_and_values,
-        ).unwrap();
+        )
+        .unwrap();
         let tx_id = get_tx_id_from_signed_btc_tx(&final_signed_tx);
         let result_hex = get_hex_tx_from_signed_btc_tx(&final_signed_tx);
         assert_eq!(result_hex, expected_serialized_tx);
@@ -200,12 +187,8 @@ mod tests {
         let expected_serialized_tx = "0100000001b5f75f17e28fa0edaa8148bc6e255797975e1529d9ad97d790914f7c6be26bb5020000006b483045022100d7f563a7523408d4dd04fc272e98ab8aea900cf0dc872f98eac30873e720bb09022063812e1e45b9bc87f5eca162822082712cd5b3e3aa8ee7fcbe1e729f5a9b9775012103d2a5e3b162eb580fe2ce023cd5e0dddbb6286923acde77e3e5468314dc9373f7ffffffff0239050000000000001976a9149ae6e42c56f1ea319cfc704ad50db0683015029b88ac0fa60e00000000001976a91454102783c8640c5144d039cea53eb7dbb470081488ac00000000";
         let utxos_and_values = BtcUtxosAndValues::new(vec![get_sample_op_return_utxo_and_value_n(2).unwrap()]);
         let sats_per_byte = 23;
-        let recipient_addresses_and_amounts = vec![
-            BtcRecipientAndAmount::new(
-                "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM",
-                1337
-            ).unwrap(),
-        ];
+        let recipient_addresses_and_amounts =
+            vec![BtcRecipientAndAmount::new("mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM", 1337).unwrap()];
         let remainder_btc_address = SAMPLE_TARGET_BTC_ADDRESS;
         let btc_private_key = get_sample_btc_private_key();
         let final_signed_tx = create_signed_raw_btc_tx_for_n_input_n_outputs(
@@ -214,7 +197,8 @@ mod tests {
             remainder_btc_address,
             btc_private_key,
             utxos_and_values,
-        ).unwrap();
+        )
+        .unwrap();
         let tx_id = get_tx_id_from_signed_btc_tx(&final_signed_tx);
         let result_hex = get_hex_tx_from_signed_btc_tx(&final_signed_tx);
         assert_eq!(result_hex, expected_serialized_tx);
@@ -234,14 +218,8 @@ mod tests {
         let btc_private_key = get_sample_btc_private_key();
         let remainder_btc_address = SAMPLE_TARGET_BTC_ADDRESS;
         let recipient_addresses_and_amounts = vec![
-            BtcRecipientAndAmount::new(
-                "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM",
-                666
-            ).unwrap(),
-            BtcRecipientAndAmount::new(
-                "mu1FFNnoiMytR5tKGXp6M1XhUZFQd3Mc8n",
-                1337
-            ).unwrap(),
+            BtcRecipientAndAmount::new("mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM", 666).unwrap(),
+            BtcRecipientAndAmount::new("mu1FFNnoiMytR5tKGXp6M1XhUZFQd3Mc8n", 1337).unwrap(),
         ];
         let final_signed_tx = create_signed_raw_btc_tx_for_n_input_n_outputs(
             sats_per_byte,
@@ -249,7 +227,8 @@ mod tests {
             remainder_btc_address,
             btc_private_key,
             utxos_and_values,
-        ).unwrap();
+        )
+        .unwrap();
         let tx_id = get_tx_id_from_signed_btc_tx(&final_signed_tx);
         let result_hex = get_hex_tx_from_signed_btc_tx(&final_signed_tx);
         assert_eq!(result_hex, expected_result);

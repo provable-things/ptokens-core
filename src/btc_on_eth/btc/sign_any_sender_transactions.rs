@@ -1,21 +1,15 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     btc_on_eth::btc::minting_params::BtcOnEthMintingParamStruct,
     chains::{
-        btc::{
-            btc_state::BtcState,
-            btc_database_utils::get_btc_canon_block_from_db,
-        },
+        btc::{btc_database_utils::get_btc_canon_block_from_db, btc_state::BtcState},
         eth::{
             any_sender::relay_transaction::RelayTransaction,
             eth_database_utils::get_any_sender_signing_params_from_db,
-            eth_types::{
-                RelayTransactions,
-                AnySenderSigningParams,
-            },
+            eth_types::{AnySenderSigningParams, RelayTransactions},
         },
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
 
 pub fn get_any_sender_signed_txs(
@@ -47,9 +41,7 @@ pub fn get_any_sender_signed_txs(
         .collect::<Result<RelayTransactions>>()
 }
 
-pub fn maybe_sign_any_sender_canon_block_txs_and_add_to_state<D>(
-    state: BtcState<D>,
-) -> Result<BtcState<D>>
+pub fn maybe_sign_any_sender_canon_block_txs_and_add_to_state<D>(state: BtcState<D>) -> Result<BtcState<D>>
 where
     D: DatabaseInterface,
 {
@@ -77,24 +69,15 @@ where
 mod tests {
     use super::*;
     use crate::{
-        chains::{
-            eth::eth_types::EthAddress,
-            btc::btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
-        },
         btc_on_eth::{
-            utils::convert_satoshis_to_ptoken,
             btc::minting_params::BtcOnEthMintingParamStruct,
-            eth::eth_test_utils::{
-                get_sample_eth_address,
-                get_sample_eth_private_key
-            },
-        }
+            eth::eth_test_utils::{get_sample_eth_address, get_sample_eth_private_key},
+            utils::convert_satoshis_to_ptoken,
+        },
+        chains::{btc::btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS, eth::eth_types::EthAddress},
     };
     use bitcoin::util::address::Address as BtcAddress;
-    use bitcoin_hashes::{
-        sha256d,
-        Hash
-    };
+    use bitcoin_hashes::{sha256d, Hash};
     use std::str::FromStr;
 
     #[test]
@@ -107,12 +90,8 @@ mod tests {
             erc777_proxy_address: get_sample_eth_address(),
         };
         let originating_address = BtcAddress::from_str(SAMPLE_TARGET_BTC_ADDRESS).unwrap();
-        let recipient_1 = EthAddress::from_slice(
-            &hex::decode("789e39e46117DFaF50A1B53A98C7ab64750f9Ba3").unwrap(),
-        );
-        let recipient_2 = EthAddress::from_slice(
-            &hex::decode("9360a5C047e8Eb44647f17672638c3bB8e2B8a53").unwrap(),
-        );
+        let recipient_1 = EthAddress::from_slice(&hex::decode("789e39e46117DFaF50A1B53A98C7ab64750f9Ba3").unwrap());
+        let recipient_2 = EthAddress::from_slice(&hex::decode("9360a5C047e8Eb44647f17672638c3bB8e2B8a53").unwrap());
         let minting_params = vec![
             BtcOnEthMintingParamStruct::new(
                 convert_satoshis_to_ptoken(1337),

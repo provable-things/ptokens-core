@@ -1,29 +1,16 @@
-use ethereum_types::{
-    U256,
-    Address as EthAddress,
-};
-use derive_more::{
-    Deref,
-    Constructor,
-};
-use eos_primitives::{
-    Checksum256,
-    AccountName as EosAccountName,
-};
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::eos::{
-        eos_state::EosState,
         eos_action_proofs::EosActionProof,
         eos_erc20_dictionary::EosErc20Dictionary,
-        eos_types::{
-            ProcessedTxIds,
-            GlobalSequence,
-            GlobalSequences,
-        },
+        eos_state::EosState,
+        eos_types::{GlobalSequence, GlobalSequences, ProcessedTxIds},
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
+use derive_more::{Constructor, Deref};
+use eos_primitives::{AccountName as EosAccountName, Checksum256};
+use ethereum_types::{Address as EthAddress, U256};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Constructor)]
 pub struct Erc20OnEosRedeemInfo {
@@ -53,40 +40,40 @@ impl Erc20OnEosRedeemInfos {
             action_proofs
                 .iter()
                 .map(|action_proof| action_proof.to_erc20_on_eos_redeem_info(dictionary))
-                .collect::<Result<Vec<Erc20OnEosRedeemInfo>>>()?
+                .collect::<Result<Vec<Erc20OnEosRedeemInfo>>>()?,
         ))
     }
 
     pub fn filter_out_already_processed_txs(&self, processed_tx_ids: &ProcessedTxIds) -> Result<Self> {
         Ok(Erc20OnEosRedeemInfos::new(
-            self
-                .iter()
+            self.iter()
                 .filter(|info| !processed_tx_ids.contains(&info.global_sequence))
                 .cloned()
-                .collect::<Vec<Erc20OnEosRedeemInfo>>()
+                .collect::<Vec<Erc20OnEosRedeemInfo>>(),
         ))
     }
 }
 
-pub fn maybe_parse_redeem_infos_and_put_in_state<D>(
-    state: EosState<D>
-) -> Result<EosState<D>>
-    where D: DatabaseInterface
+pub fn maybe_parse_redeem_infos_and_put_in_state<D>(state: EosState<D>) -> Result<EosState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Parsing redeem params from actions data...");
-    Erc20OnEosRedeemInfos::from_action_proofs(&state.action_proofs, state.get_eos_erc20_dictionary()?)
-        .and_then(|redeem_infos| {
+    Erc20OnEosRedeemInfos::from_action_proofs(&state.action_proofs, state.get_eos_erc20_dictionary()?).and_then(
+        |redeem_infos| {
             info!("✔ Parsed {} sets of redeem info!", redeem_infos.len());
             state.add_erc20_on_eos_redeem_infos(redeem_infos)
-        })
+        },
+    )
 }
 
-pub fn maybe_filter_out_already_processed_tx_ids_from_state<D>(
-    state: EosState<D>
-) -> Result<EosState<D>>
-    where D: DatabaseInterface
+pub fn maybe_filter_out_already_processed_tx_ids_from_state<D>(state: EosState<D>) -> Result<EosState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Filtering out already processed tx IDs...");
-    state.erc20_on_eos_redeem_infos.filter_out_already_processed_txs(&state.processed_tx_ids)
+    state
+        .erc20_on_eos_redeem_infos
+        .filter_out_already_processed_txs(&state.processed_tx_ids)
         .and_then(|filtered| state.add_erc20_on_eos_redeem_infos(filtered))
 }

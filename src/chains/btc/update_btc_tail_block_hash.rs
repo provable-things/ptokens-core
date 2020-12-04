@@ -1,37 +1,31 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::btc::{
-        btc_state::BtcState,
         btc_block::BtcBlockInDbFormat,
         btc_constants::BTC_TAIL_LENGTH,
         btc_database_utils::{
-            get_btc_tail_block_from_db,
-            get_btc_latest_block_from_db,
-            put_btc_tail_block_hash_in_db,
             get_btc_canon_to_tip_length_from_db,
+            get_btc_latest_block_from_db,
+            get_btc_tail_block_from_db,
             maybe_get_nth_ancestor_btc_block_and_id,
+            put_btc_tail_block_hash_in_db,
         },
+        btc_state::BtcState,
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
 
-fn does_tail_block_require_updating<D>(
-    db: &D,
-    calculated_tail_block: &BtcBlockInDbFormat,
-) -> Result<bool>
-    where D: DatabaseInterface
+fn does_tail_block_require_updating<D>(db: &D, calculated_tail_block: &BtcBlockInDbFormat) -> Result<bool>
+where
+    D: DatabaseInterface,
 {
     trace!("✔ Checking if BTC tail block needs updating...");
-    get_btc_tail_block_from_db(db)
-        .map(|db_tail_block|
-            db_tail_block.height < calculated_tail_block.height
-        )
+    get_btc_tail_block_from_db(db).map(|db_tail_block| db_tail_block.height < calculated_tail_block.height)
 }
 
-pub fn maybe_update_btc_tail_block_hash<D>(
-    state: BtcState<D>
-) -> Result<BtcState<D>>
-    where D: DatabaseInterface
+pub fn maybe_update_btc_tail_block_hash<D>(state: BtcState<D>) -> Result<BtcState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Maybe updating BTC tail block hash...");
     let canon_to_tip_length = get_btc_canon_to_tip_length_from_db(&state.db)?;
@@ -47,38 +41,26 @@ pub fn maybe_update_btc_tail_block_hash<D>(
                 canon_to_tip_length + BTC_TAIL_LENGTH,
             )
         })
-        .and_then(|maybe_ancester_block_and_id|
-            match maybe_ancester_block_and_id {
-                None => {
-                    info!(
-                        "✔ No {}th ancestor block in db yet ∴ {}",
-                        canon_to_tip_length,
-                        "not updating tail block hash!",
-                    );
-                    Ok(state)
+        .and_then(|maybe_ancester_block_and_id| match maybe_ancester_block_and_id {
+            None => {
+                info!(
+                    "✔ No {}th ancestor block in db yet ∴ {}",
+                    canon_to_tip_length, "not updating tail block hash!",
+                );
+                Ok(state)
+            },
+            Some(ancestor_block) => {
+                info!("✔ {}th ancestor block found...", canon_to_tip_length + BTC_TAIL_LENGTH,);
+                match does_tail_block_require_updating(&state.db, &ancestor_block)? {
+                    false => {
+                        info!("✔ BTC tail block does not require updating");
+                        Ok(state)
+                    },
+                    true => {
+                        info!("✔ Updating BTC tail block...");
+                        put_btc_tail_block_hash_in_db(&state.db, &ancestor_block.id).map(|_| state)
+                    },
                 }
-                Some(ancestor_block) => {
-                    info!(
-                        "✔ {}th ancestor block found...",
-                        canon_to_tip_length + BTC_TAIL_LENGTH,
-                    );
-                    match does_tail_block_require_updating(
-                        &state.db,
-                        &ancestor_block
-                    )? {
-                        false => {
-                            info!("✔ BTC tail block does not require updating");
-                            Ok(state)
-                        }
-                        true => {
-                            info!("✔ Updating BTC tail block...");
-                            put_btc_tail_block_hash_in_db(
-                                &state.db,
-                                &ancestor_block.id
-                            ).map(|_| state)
-                        }
-                    }
-                }
-            }
-        )
+            },
+        })
 }

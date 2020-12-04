@@ -1,35 +1,19 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     btc_on_eos::btc::minting_params::BtcOnEosMintingParams,
     chains::{
-        btc::{
-            btc_state::BtcState,
-            btc_database_utils::get_btc_canon_block_from_db,
-        },
+        btc::{btc_database_utils::get_btc_canon_block_from_db, btc_state::BtcState},
         eos::{
+            eos_constants::{EOS_MAX_EXPIRATION_SECS, MEMO, PEOS_ACCOUNT_PERMISSION_LEVEL},
             eos_crypto::{
                 eos_private_key::EosPrivateKey,
-                eos_transaction::{
-                    sign_peos_transaction,
-                    get_unsigned_eos_minting_tx,
-                },
+                eos_transaction::{get_unsigned_eos_minting_tx, sign_peos_transaction},
             },
-            eos_database_utils::{
-                get_eos_chain_id_from_db,
-                get_eos_account_name_string_from_db,
-            },
-            eos_constants::{
-                MEMO,
-                EOS_MAX_EXPIRATION_SECS,
-                PEOS_ACCOUNT_PERMISSION_LEVEL,
-            },
-            eos_types::{
-                EosSignedTransaction,
-                EosSignedTransactions,
-            },
+            eos_database_utils::{get_eos_account_name_string_from_db, get_eos_chain_id_from_db},
+            eos_types::{EosSignedTransaction, EosSignedTransactions},
         },
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
 
 fn get_signed_tx(
@@ -53,7 +37,7 @@ fn get_signed_tx(
         EOS_MAX_EXPIRATION_SECS,
         PEOS_ACCOUNT_PERMISSION_LEVEL,
     )
-        .and_then(|unsigned_tx| sign_peos_transaction(to, amount, chain_id, private_key, &unsigned_tx))
+    .and_then(|unsigned_tx| sign_peos_transaction(to, amount, chain_id, private_key, &unsigned_tx))
 }
 
 pub fn get_signed_txs(
@@ -67,7 +51,17 @@ pub fn get_signed_txs(
     info!("✔ Signing {} txs...", minting_params.len());
     minting_params
         .iter()
-        .map(|params| get_signed_tx(ref_block_num, ref_block_prefix, &params.to, &params.amount, chain_id, pk, account))
+        .map(|params| {
+            get_signed_tx(
+                ref_block_num,
+                ref_block_prefix,
+                &params.to,
+                &params.amount,
+                chain_id,
+                pk,
+                account,
+            )
+        })
         .collect()
 }
 
@@ -81,5 +75,5 @@ pub fn maybe_sign_canon_block_txs_and_add_to_state<D: DatabaseInterface>(state: 
         &get_eos_account_name_string_from_db(&state.db)?,
         &get_btc_canon_block_from_db(&state.db)?.get_eos_minting_params(),
     )
-        .and_then(|signed_txs| state.add_signed_txs(signed_txs))
+    .and_then(|signed_txs| state.add_signed_txs(signed_txs))
 }

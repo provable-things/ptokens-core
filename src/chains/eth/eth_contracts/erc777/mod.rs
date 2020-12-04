@@ -1,28 +1,21 @@
-use ethabi::Token;
-use ethereum_types::{
-    U256,
-    Address as EthAddress,
-};
 use crate::{
-    types::{
-        Byte,
-        Bytes,
-        Result,
-    },
-    traits::DatabaseInterface,
     chains::eth::{
         eth_contracts::encode_fxn_call,
         eth_crypto::eth_transaction::EthTransaction,
         eth_database_utils::{
+            get_erc777_contract_address_from_db,
+            get_eth_account_nonce_from_db,
             get_eth_chain_id_from_db,
             get_eth_gas_price_from_db,
             get_eth_private_key_from_db,
-            get_eth_account_nonce_from_db,
             increment_eth_account_nonce_in_db,
-            get_erc777_contract_address_from_db,
         },
     },
+    traits::DatabaseInterface,
+    types::{Byte, Bytes, Result},
 };
+use ethabi::Token;
+use ethereum_types::{Address as EthAddress, U256};
 
 pub const EMPTY_DATA: Bytes = vec![];
 pub const ERC777_CHANGE_PNETWORK_GAS_LIMIT: usize = 30_000;
@@ -33,15 +26,18 @@ pub const ERC777_MINT_WITH_NO_DATA_ABI: &str = "[{\"constant\":false,\"inputs\":
 
 pub const ERC777_MINT_WITH_DATA_ABI: &str = "[{\"constant\":false,\"inputs\":[{\"name\":\"recipient\",\"type\":\"address\"},{\"name\":\"value\",\"type\":\"uint256\"},{\"name\":\"userData\",\"type\":\"bytes\"},{\"name\":\"operatorData\",\"type\":\"bytes\"}],\"name\":\"mint\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]";
 
-pub fn encode_erc777_change_pnetwork_fxn_data(new_ptoken_address: EthAddress) -> Result<Bytes> { // TODO Take a reference!
-    encode_fxn_call(ERC777_CHANGE_PNETWORK_ABI, "changePNetwork", &[Token::Address(new_ptoken_address)])
+pub fn encode_erc777_change_pnetwork_fxn_data(new_ptoken_address: EthAddress) -> Result<Bytes> {
+    // TODO Take a reference!
+    encode_fxn_call(ERC777_CHANGE_PNETWORK_ABI, "changePNetwork", &[Token::Address(
+        new_ptoken_address,
+    )])
 }
 
-fn encode_erc777_mint_with_no_data_fxn(
-    recipient: &EthAddress,
-    value: &U256,
-) -> Result<Bytes> {
-    encode_fxn_call(ERC777_MINT_WITH_NO_DATA_ABI, "mint", &[Token::Address(*recipient), Token::Uint(*value)])
+fn encode_erc777_mint_with_no_data_fxn(recipient: &EthAddress, value: &U256) -> Result<Bytes> {
+    encode_fxn_call(ERC777_MINT_WITH_NO_DATA_ABI, "mint", &[
+        Token::Address(*recipient),
+        Token::Uint(*value),
+    ])
 }
 
 fn encode_erc777_mint_with_data_fxn(
@@ -50,16 +46,12 @@ fn encode_erc777_mint_with_data_fxn(
     user_data: &[Byte],
     operator_data: &[Byte],
 ) -> Result<Bytes> {
-    encode_fxn_call(
-        ERC777_MINT_WITH_DATA_ABI,
-        "mint",
-        &[
-            Token::Address(*recipient),
-            Token::Uint(*value),
-            Token::Bytes(operator_data.to_vec()),
-            Token::Bytes(user_data.to_vec()),
-        ]
-    )
+    encode_fxn_call(ERC777_MINT_WITH_DATA_ABI, "mint", &[
+        Token::Address(*recipient),
+        Token::Uint(*value),
+        Token::Bytes(operator_data.to_vec()),
+        Token::Bytes(user_data.to_vec()),
+    ])
 }
 
 fn get_eth_calldata_from_maybe_data(maybe_data: Option<&[Byte]>) -> Bytes {
@@ -79,7 +71,7 @@ pub fn encode_erc777_mint_fxn_maybe_with_data(
             value,
             &get_eth_calldata_from_maybe_data(user_data),
             &get_eth_calldata_from_maybe_data(operator_data),
-        )
+        ),
     }
 }
 
@@ -89,20 +81,17 @@ where
 {
     const ZERO_ETH_VALUE: usize = 0;
     let nonce_before_incrementing = get_eth_account_nonce_from_db(db)?;
-    increment_eth_account_nonce_in_db(db, 1)
-        .and(
-            Ok(EthTransaction::new_unsigned(
-                encode_erc777_change_pnetwork_fxn_data(new_address)?,
-                nonce_before_incrementing,
-                ZERO_ETH_VALUE,
-                get_erc777_contract_address_from_db(db)?,
-                get_eth_chain_id_from_db(db)?,
-                ERC777_CHANGE_PNETWORK_GAS_LIMIT,
-                get_eth_gas_price_from_db(db)?,
-            )
-            .sign(get_eth_private_key_from_db(db)?)?
-            .serialize_hex())
-        )
+    increment_eth_account_nonce_in_db(db, 1).and(Ok(EthTransaction::new_unsigned(
+        encode_erc777_change_pnetwork_fxn_data(new_address)?,
+        nonce_before_incrementing,
+        ZERO_ETH_VALUE,
+        get_erc777_contract_address_from_db(db)?,
+        get_eth_chain_id_from_db(db)?,
+        ERC777_CHANGE_PNETWORK_GAS_LIMIT,
+        get_eth_gas_price_from_db(db)?,
+    )
+    .sign(get_eth_private_key_from_db(db)?)?
+    .serialize_hex()))
 }
 
 #[cfg(test)]
@@ -118,7 +107,7 @@ mod tests {
     }
 
     #[test]
-    fn should_encode_erc777_mint_with_no_data_fxn () {
+    fn should_encode_erc777_mint_with_no_data_fxn() {
         let expected_result = "40c10f190000000000000000000000001739624f5cd969885a224da84418d12b8570d61a0000000000000000000000000000000000000000000000000000000000000001";
         let recipient = EthAddress::from_slice(&hex::decode("1739624f5cd969885a224da84418d12b8570d61a").unwrap());
         let amount = U256::from_dec_str("1").unwrap();
