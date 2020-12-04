@@ -1,35 +1,24 @@
-use bitcoin::{
-    network::constants::Network as BtcNetwork,
-    blockdata::transaction::Transaction as BtcTransaction,
-};
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
-    btc_on_eos::{
-        eos::redeem_info::BtcOnEosRedeemInfos,
-    },
+    btc_on_eos::eos::redeem_info::BtcOnEosRedeemInfos,
     chains::{
-        eos::eos_state::EosState,
         btc::{
-            btc_utils::calculate_btc_tx_fee,
-            btc_transaction::create_signed_raw_btc_tx_for_n_input_n_outputs,
-            btc_types::{
-                BtcRecipientAndAmount,
-                BtcRecipientsAndAmounts,
-            },
             btc_database_utils::{
+                get_btc_address_from_db,
                 get_btc_fee_from_db,
                 get_btc_network_from_db,
-                get_btc_address_from_db,
                 get_btc_private_key_from_db,
             },
-            utxo_manager::{
-                utxo_types::BtcUtxosAndValues,
-                utxo_database_utils::get_first_utxo_and_value,
-            },
+            btc_transaction::create_signed_raw_btc_tx_for_n_input_n_outputs,
+            btc_types::{BtcRecipientAndAmount, BtcRecipientsAndAmounts},
+            btc_utils::calculate_btc_tx_fee,
+            utxo_manager::{utxo_database_utils::get_first_utxo_and_value, utxo_types::BtcUtxosAndValues},
         },
+        eos::eos_state::EosState,
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
+use bitcoin::{blockdata::transaction::Transaction as BtcTransaction, network::constants::Network as BtcNetwork};
 
 fn get_enough_utxos_to_cover_total<D>(
     db: &D,
@@ -38,34 +27,41 @@ fn get_enough_utxos_to_cover_total<D>(
     sats_per_byte: u64,
     inputs: BtcUtxosAndValues,
 ) -> Result<BtcUtxosAndValues>
-    where D: DatabaseInterface
+where
+    D: DatabaseInterface,
 {
     info!("✔ Getting UTXO from db...");
-    get_first_utxo_and_value(db)
-        .and_then(|utxo_and_value| {
-            debug!("✔ Retrieved UTXO of value: {}", utxo_and_value.value);
-            let fee = calculate_btc_tx_fee(inputs.len() + 1, num_outputs, sats_per_byte);
-            let total_cost = fee + required_btc_amount;
-            let updated_inputs = {
-                let mut v = inputs.clone();
-                v.push(utxo_and_value); // FIXME - can we make more efficient?
-                v
-            };
-            let total_utxo_value = updated_inputs.iter().fold(0, |acc, utxo_and_value| acc + utxo_and_value.value);
-            debug!("✔ Calculated fee for {} input(s) & {} output(s): {} Sats", updated_inputs.len(), num_outputs, fee);
-            debug!("✔ Fee + required value of tx: {} Satoshis", total_cost);
-            debug!("✔ Current total UTXO value: {} Satoshis", total_utxo_value);
-            match total_cost > total_utxo_value {
-                true => {
-                    trace!("✔ UTXOs do not cover fee + amount, need another!");
-                    get_enough_utxos_to_cover_total(db, required_btc_amount, num_outputs, sats_per_byte, updated_inputs)
-                }
-                false => {
-                    trace!("✔ UTXO(s) covers fee and required amount!");
-                    Ok(updated_inputs)
-                }
-            }
-        })
+    get_first_utxo_and_value(db).and_then(|utxo_and_value| {
+        debug!("✔ Retrieved UTXO of value: {}", utxo_and_value.value);
+        let fee = calculate_btc_tx_fee(inputs.len() + 1, num_outputs, sats_per_byte);
+        let total_cost = fee + required_btc_amount;
+        let updated_inputs = {
+            let mut v = inputs.clone();
+            v.push(utxo_and_value); // FIXME - can we make more efficient?
+            v
+        };
+        let total_utxo_value = updated_inputs
+            .iter()
+            .fold(0, |acc, utxo_and_value| acc + utxo_and_value.value);
+        debug!(
+            "✔ Calculated fee for {} input(s) & {} output(s): {} Sats",
+            updated_inputs.len(),
+            num_outputs,
+            fee
+        );
+        debug!("✔ Fee + required value of tx: {} Satoshis", total_cost);
+        debug!("✔ Current total UTXO value: {} Satoshis", total_utxo_value);
+        match total_cost > total_utxo_value {
+            true => {
+                trace!("✔ UTXOs do not cover fee + amount, need another!");
+                get_enough_utxos_to_cover_total(db, required_btc_amount, num_outputs, sats_per_byte, updated_inputs)
+            },
+            false => {
+                trace!("✔ UTXO(s) covers fee and required amount!");
+                Ok(updated_inputs)
+            },
+        }
+    })
 }
 
 fn get_address_and_amounts_from_redeem_infos(redeem_infos: &BtcOnEosRedeemInfos) -> Result<BtcRecipientsAndAmounts> {
@@ -75,9 +71,12 @@ fn get_address_and_amounts_from_redeem_infos(redeem_infos: &BtcOnEosRedeemInfos)
         .iter()
         .map(|params| {
             let recipient_and_amount = BtcRecipientAndAmount::new(&params.recipient[..], params.amount);
-            info!("✔ Recipients & amount retrieved from redeem: {:?}", recipient_and_amount);
+            info!(
+                "✔ Recipients & amount retrieved from redeem: {:?}",
+                recipient_and_amount
+            );
             recipient_and_amount
-         })
+        })
         .collect()
 }
 
@@ -87,18 +86,14 @@ fn sign_txs_from_redeem_infos<D>(
     btc_network: BtcNetwork,
     redeem_infos: &BtcOnEosRedeemInfos,
 ) -> Result<BtcTransaction>
-    where D: DatabaseInterface
+where
+    D: DatabaseInterface,
 {
     info!("✔ Getting correct amount of UTXOs...");
     debug!("✔ Network: {}", btc_network);
     debug!("✔ Satoshis per byte: {}", sats_per_byte);
-    let utxos_and_values = get_enough_utxos_to_cover_total(
-        db,
-        redeem_infos.sum(),
-        redeem_infos.len(),
-        sats_per_byte,
-        vec![].into(),
-    )?;
+    let utxos_and_values =
+        get_enough_utxos_to_cover_total(db, redeem_infos.sum(), redeem_infos.len(), sats_per_byte, vec![].into())?;
     debug!("✔ Retrieved {} UTXOs!", utxos_and_values.len());
     info!("✔ Signing transaction...");
     create_signed_raw_btc_tx_for_n_input_n_outputs(
@@ -116,7 +111,7 @@ pub fn maybe_sign_txs_and_add_to_state<D: DatabaseInterface>(state: EosState<D>)
         0 => {
             info!("✔ No redeem params in state ∴ not signing txs!");
             Ok(state)
-        }
+        },
         _ => {
             info!("✔ Redeem params in state ∴ signing txs...");
             sign_txs_from_redeem_infos(
@@ -125,10 +120,13 @@ pub fn maybe_sign_txs_and_add_to_state<D: DatabaseInterface>(state: EosState<D>)
                 get_btc_network_from_db(&state.db)?,
                 &state.btc_on_eos_redeem_infos,
             )
-                .and_then(|signed_tx| {
-                    #[cfg(feature="debug")] { debug!("✔ Signed transaction: {:?}", signed_tx); }
-                    state.add_btc_on_eos_signed_txs(vec![signed_tx])
-                })
+            .and_then(|signed_tx| {
+                #[cfg(feature = "debug")]
+                {
+                    debug!("✔ Signed transaction: {:?}", signed_tx);
+                }
+                state.add_btc_on_eos_signed_txs(vec![signed_tx])
+            })
         },
     }
 }
@@ -136,28 +134,22 @@ pub fn maybe_sign_txs_and_add_to_state<D: DatabaseInterface>(state: EosState<D>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitcoin::network::constants::Network as BtcNetwork;
     use crate::{
-        test_utils::get_test_database,
         btc_on_eos::eos::eos_test_utils::get_sample_eos_submission_material_json_n,
         chains::{
-            eos::eos_action_proofs::EosActionProof,
             btc::{
                 btc_constants::BTC_PRIVATE_KEY_DB_KEY,
-                btc_utils::get_hex_tx_from_signed_btc_tx,
                 btc_crypto::btc_private_key::BtcPrivateKey,
+                btc_database_utils::{put_btc_address_in_db, put_btc_network_in_db},
+                btc_test_utils::{get_sample_p2sh_utxo_and_value_2, get_sample_p2sh_utxo_and_value_3},
+                btc_utils::get_hex_tx_from_signed_btc_tx,
                 utxo_manager::utxo_database_utils::save_utxos_to_db,
-                btc_database_utils::{
-                    put_btc_network_in_db,
-                    put_btc_address_in_db,
-                },
-                btc_test_utils::{
-                    get_sample_p2sh_utxo_and_value_2,
-                    get_sample_p2sh_utxo_and_value_3,
-                },
             },
+            eos::eos_action_proofs::EosActionProof,
         },
+        test_utils::get_test_database,
     };
+    use bitcoin::network::constants::Network as BtcNetwork;
 
     #[test]
     fn should_get_correct_signed_btc_tx_3() {
@@ -173,7 +165,8 @@ mod tests {
         let pk = BtcPrivateKey::from_slice(
             &hex::decode("2cc48e2f9066a0452e73cc7874f3fa8ba5ef705067d64bef627c686baa514336").unwrap(),
             btc_network,
-        ).unwrap();
+        )
+        .unwrap();
         pk.write_to_db(&db, &BTC_PRIVATE_KEY_DB_KEY.to_vec()).unwrap();
         put_btc_network_in_db(&db, btc_network).unwrap();
         put_btc_address_in_db(&db, &btc_address).unwrap();
@@ -197,7 +190,8 @@ mod tests {
         let pk = BtcPrivateKey::from_slice(
             &hex::decode("040cc91d329860197e118a1ea26b7ed7042de8f991d0600df9e482c367bb1c45").unwrap(),
             btc_network,
-        ).unwrap();
+        )
+        .unwrap();
         pk.write_to_db(&db, &BTC_PRIVATE_KEY_DB_KEY.to_vec()).unwrap();
         put_btc_network_in_db(&db, btc_network).unwrap();
         put_btc_address_in_db(&db, &btc_address).unwrap();

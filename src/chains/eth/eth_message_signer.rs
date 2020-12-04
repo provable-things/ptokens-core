@@ -1,15 +1,9 @@
-use serde_json::{
-    json,
-    Value as JsonValue,
-};
 use crate::{
-    types::Result,
+    chains::eth::{eth_database_utils::get_eth_private_key_from_db, eth_types::EthSignature},
     traits::DatabaseInterface,
-    chains::eth::{
-        eth_types::EthSignature,
-        eth_database_utils::get_eth_private_key_from_db,
-    },
+    types::Result,
 };
+use serde_json::{json, Value as JsonValue};
 
 fn encode_eth_signed_message_as_json(message: &str, signature: &EthSignature) -> Result<JsonValue> {
     info!("✔ Encoding eth signed message as json...");
@@ -37,9 +31,9 @@ where
 mod tests {
     use super::*;
     use crate::{
-        test_utils::get_test_database,
-        chains::eth::eth_database_utils::put_eth_private_key_in_db,
         btc_on_eth::eth::eth_test_utils::get_sample_eth_private_key,
+        chains::eth::eth_database_utils::put_eth_private_key_in_db,
+        test_utils::get_test_database,
     };
 
     #[test]

@@ -1,15 +1,12 @@
-use derive_more::Constructor;
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::btc::{
+        btc_database_utils::{get_btc_address_from_db, get_latest_btc_block_number},
         btc_state::BtcState,
-        btc_database_utils::{
-            get_btc_address_from_db,
-            get_latest_btc_block_number,
-        },
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
+use derive_more::Constructor;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Constructor)]
 pub struct BtcInitializationOutput {
@@ -20,7 +17,7 @@ pub struct BtcInitializationOutput {
 fn json_stringify(output: BtcInitializationOutput) -> Result<String> {
     match serde_json::to_string(&output) {
         Ok(res) => Ok(res),
-        Err(err) => Err(err.into())
+        Err(err) => Err(err.into()),
     }
 }
 

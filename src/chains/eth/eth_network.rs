@@ -1,5 +1,5 @@
-use std::fmt;
 use crate::types::{Byte, Result};
+use std::fmt;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum EthNetwork {
@@ -18,7 +18,7 @@ impl EthNetwork {
             4 => Ok(EthNetwork::Rinkeby),
             5 => Ok(EthNetwork::Goerli),
             42 => Ok(EthNetwork::Kovan),
-            _ => Err(format!("✘ Unrecognised chain id: '{}'!", chain_id).into())
+            _ => Err(format!("✘ Unrecognised chain id: '{}'!", chain_id).into()),
         }
     }
 
@@ -39,11 +39,11 @@ impl EthNetwork {
     pub fn from_str(network_str: &str) -> Result<Self> {
         let lowercase_network_str: &str = &network_str.to_lowercase();
         match lowercase_network_str {
-            "mainnet" | "1"  => EthNetwork::from_chain_id(&1),
-            "ropsten" | "3"  => EthNetwork::from_chain_id(&3),
-            "rinkeby" | "4"  => EthNetwork::from_chain_id(&4),
-            "goerli"  | "5"  => EthNetwork::from_chain_id(&5),
-            "kovan"   | "42" => EthNetwork::from_chain_id(&42),
+            "mainnet" | "1" => EthNetwork::from_chain_id(&1),
+            "ropsten" | "3" => EthNetwork::from_chain_id(&3),
+            "rinkeby" | "4" => EthNetwork::from_chain_id(&4),
+            "goerli" | "5" => EthNetwork::from_chain_id(&5),
+            "kovan" | "42" => EthNetwork::from_chain_id(&42),
             _ => Err(format!("✘ Unrecognized ethereum network: '{}'!", network_str).into()),
         }
     }

@@ -1,136 +1,105 @@
-use serde_json::json;
-use ethereum_types::Address as EthAddress;
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
-    check_debug_mode::check_debug_mode,
-    utils::{
-        strip_hex_prefix,
-        decode_hex_with_err_msg,
-        prepend_debug_output_marker_to_string,
-    },
-    constants::{
-        DB_KEY_PREFIX,
-        PRIVATE_KEY_DATA_SENSITIVITY_LEVEL,
+    btc_on_eth::{
+        btc::{
+            filter_op_return_deposit_txs::filter_op_return_deposit_txs_and_add_to_state,
+            get_btc_output_json::get_eth_signed_tx_info_from_eth_txs,
+            minting_params::{
+                parse_minting_params_from_op_return_deposits_and_add_to_state,
+                parse_minting_params_from_p2sh_deposits_and_add_to_state,
+            },
+            sign_normal_eth_transactions::get_eth_signed_txs,
+        },
+        check_core_is_initialized::{
+            check_core_is_initialized,
+            check_core_is_initialized_and_return_btc_state,
+            check_core_is_initialized_and_return_eth_state,
+        },
+        eth::{
+            create_btc_transactions::maybe_create_btc_txs_and_add_to_state,
+            extract_utxos_from_btc_txs::maybe_extract_btc_utxo_from_btc_tx_in_state,
+            get_eth_output_json::{get_btc_signed_tx_info_from_btc_txs, EthOutput},
+            increment_btc_nonce::maybe_increment_btc_nonce_in_db_and_return_state,
+            save_btc_utxos_to_db::maybe_save_btc_utxos_to_db_and_return_state,
+        },
     },
     chains::{
+        btc::{
+            btc_block::parse_btc_block_and_id_and_put_in_state,
+            btc_constants::{get_btc_constants_db_keys, BTC_PRIVATE_KEY_DB_KEY as BTC_KEY},
+            btc_database_utils::{end_btc_db_transaction, get_btc_account_nonce_from_db, start_btc_db_transaction},
+            btc_state::BtcState,
+            btc_submission_material::parse_btc_submission_json_and_put_in_state,
+            extract_utxos_from_op_return_txs::maybe_extract_utxos_from_op_return_txs_and_put_in_state,
+            extract_utxos_from_p2sh_txs::maybe_extract_utxos_from_p2sh_txs_and_put_in_state,
+            filter_minting_params::maybe_filter_out_value_too_low_btc_on_eth_minting_params_in_state,
+            filter_p2sh_deposit_txs::filter_p2sh_deposit_txs_and_add_to_state,
+            filter_utxos::{filter_out_utxos_extant_in_db_from_state, filter_out_value_too_low_utxos_from_state},
+            get_deposit_info_hash_map::get_deposit_info_hash_map_and_put_in_state,
+            increment_eth_nonce::maybe_increment_eth_nonce_in_db,
+            save_utxos_to_db::maybe_save_utxos_to_db,
+            set_flags::set_any_sender_flag_in_state,
+            utxo_manager::{
+                debug_utxo_utils::{clear_all_utxos, consolidate_utxos, get_child_pays_for_parent_btc_tx, remove_utxo},
+                utxo_constants::get_utxo_constants_db_keys,
+                utxo_utils::get_all_utxos_as_json_string,
+            },
+            validate_btc_block_header::validate_btc_block_header_in_state,
+            validate_btc_merkle_root::validate_btc_merkle_root,
+            validate_btc_proof_of_work::validate_proof_of_work_of_btc_block_in_state,
+        },
         eth::{
-            validate_block_in_state::validate_block_in_state,
-            filter_receipts_in_state::filter_receipts_for_btc_on_eth_redeem_events_in_state,
+            eth_constants::{get_eth_constants_db_keys, ETH_PRIVATE_KEY_DB_KEY as ETH_KEY},
+            eth_contracts::{
+                erc777::get_signed_erc777_change_pnetwork_tx,
+                erc777_proxy::{
+                    get_signed_erc777_proxy_change_pnetwork_by_proxy_tx,
+                    get_signed_erc777_proxy_change_pnetwork_tx,
+                },
+            },
+            eth_crypto::eth_transaction::get_signed_minting_tx,
             eth_database_transactions::{
                 end_eth_db_transaction_and_return_state,
                 start_eth_db_transaction_and_return_state,
             },
-            eth_state::EthState,
-            eth_network::EthNetwork,
-            eth_crypto::eth_transaction::get_signed_minting_tx,
-            eth_submission_material::parse_eth_submission_material_and_put_in_state,
-            eth_contracts::{
-                erc777::get_signed_erc777_change_pnetwork_tx,
-                erc777_proxy::{
-                    get_signed_erc777_proxy_change_pnetwork_tx,
-                    get_signed_erc777_proxy_change_pnetwork_by_proxy_tx,
-                },
-            },
-            eth_constants::{
-                get_eth_constants_db_keys,
-                ETH_PRIVATE_KEY_DB_KEY as ETH_KEY,
-            },
             eth_database_utils::{
-                get_signing_params_from_db,
-                get_latest_eth_block_number,
-                get_eth_private_key_from_db,
                 get_any_sender_nonce_from_db,
-                get_eth_account_nonce_from_db,
                 get_erc777_contract_address_from_db,
                 get_erc777_proxy_contract_address_from_db,
+                get_eth_account_nonce_from_db,
+                get_eth_private_key_from_db,
+                get_latest_eth_block_number,
+                get_signing_params_from_db,
             },
-        },
-        btc::{
-            btc_state::BtcState,
-            set_flags::set_any_sender_flag_in_state,
-            save_utxos_to_db::maybe_save_utxos_to_db,
-            btc_block::parse_btc_block_and_id_and_put_in_state,
-            validate_btc_merkle_root::validate_btc_merkle_root,
-            increment_eth_nonce::maybe_increment_eth_nonce_in_db,
-            validate_btc_block_header::validate_btc_block_header_in_state,
-            filter_p2sh_deposit_txs::filter_p2sh_deposit_txs_and_add_to_state,
-            btc_submission_material::parse_btc_submission_json_and_put_in_state,
-            get_deposit_info_hash_map::get_deposit_info_hash_map_and_put_in_state,
-            validate_btc_proof_of_work::validate_proof_of_work_of_btc_block_in_state,
-            extract_utxos_from_p2sh_txs::maybe_extract_utxos_from_p2sh_txs_and_put_in_state,
-            filter_minting_params::maybe_filter_out_value_too_low_btc_on_eth_minting_params_in_state,
-            extract_utxos_from_op_return_txs::maybe_extract_utxos_from_op_return_txs_and_put_in_state,
-            btc_constants::{
-                get_btc_constants_db_keys,
-                BTC_PRIVATE_KEY_DB_KEY as BTC_KEY,
-            },
-            btc_database_utils::{
-                end_btc_db_transaction,
-                start_btc_db_transaction,
-                get_btc_account_nonce_from_db,
-            },
-            filter_utxos::{
-                filter_out_utxos_extant_in_db_from_state,
-                filter_out_value_too_low_utxos_from_state,
-            },
-            utxo_manager::{
-                utxo_utils::get_all_utxos_as_json_string,
-                utxo_constants::get_utxo_constants_db_keys,
-                debug_utxo_utils::{
-                    remove_utxo,
-                    clear_all_utxos,
-                    consolidate_utxos,
-                    get_child_pays_for_parent_btc_tx,
-                },
-            },
+            eth_network::EthNetwork,
+            eth_state::EthState,
+            eth_submission_material::parse_eth_submission_material_and_put_in_state,
+            filter_receipts_in_state::filter_receipts_for_btc_on_eth_redeem_events_in_state,
+            validate_block_in_state::validate_block_in_state,
         },
     },
-    debug_database_utils::{
-        get_key_from_db,
-        set_key_in_db_to_value,
-    },
-    btc_on_eth::{
-        check_core_is_initialized::{
-            check_core_is_initialized,
-            check_core_is_initialized_and_return_eth_state,
-            check_core_is_initialized_and_return_btc_state,
-        },
-        btc::{
-            sign_normal_eth_transactions::get_eth_signed_txs,
-            get_btc_output_json::get_eth_signed_tx_info_from_eth_txs,
-            filter_op_return_deposit_txs::filter_op_return_deposit_txs_and_add_to_state,
-            minting_params::{
-                parse_minting_params_from_p2sh_deposits_and_add_to_state,
-                parse_minting_params_from_op_return_deposits_and_add_to_state,
-            },
-        },
-        eth::{
-            create_btc_transactions::maybe_create_btc_txs_and_add_to_state,
-            save_btc_utxos_to_db::maybe_save_btc_utxos_to_db_and_return_state,
-            increment_btc_nonce::maybe_increment_btc_nonce_in_db_and_return_state,
-            extract_utxos_from_btc_txs::maybe_extract_btc_utxo_from_btc_tx_in_state,
-            get_eth_output_json::{
-                EthOutput,
-                get_btc_signed_tx_info_from_btc_txs,
-            },
-        },
-    },
+    check_debug_mode::check_debug_mode,
+    constants::{DB_KEY_PREFIX, PRIVATE_KEY_DATA_SENSITIVITY_LEVEL},
+    debug_database_utils::{get_key_from_db, set_key_in_db_to_value},
+    traits::DatabaseInterface,
+    types::Result,
+    utils::{decode_hex_with_err_msg, prepend_debug_output_marker_to_string, strip_hex_prefix},
 };
+use ethereum_types::Address as EthAddress;
+use serde_json::json;
 
 /// # Debug Get All Db Keys
 ///
 /// This function will return a JSON formatted list of all the database keys used in the encrypted database.
 pub fn debug_get_all_db_keys() -> Result<String> {
-    check_debug_mode()
-        .map(|_|
-            json!({
-                "btc": get_btc_constants_db_keys(),
-                "eth": get_eth_constants_db_keys(),
-                "db-key-prefix": DB_KEY_PREFIX.to_string(),
-                "utxo-manager": get_utxo_constants_db_keys(),
-            }).to_string()
-        )
+    check_debug_mode().map(|_| {
+        json!({
+            "btc": get_btc_constants_db_keys(),
+            "eth": get_eth_constants_db_keys(),
+            "db-key-prefix": DB_KEY_PREFIX.to_string(),
+            "utxo-manager": get_utxo_constants_db_keys(),
+        })
+        .to_string()
+    })
 }
 
 /// # Debug Clear All UTXOS
@@ -183,34 +152,32 @@ pub fn debug_reprocess_btc_block<D: DatabaseInterface>(db: D, btc_submission_mat
         .and_then(maybe_save_utxos_to_db)
         .and_then(maybe_filter_out_value_too_low_btc_on_eth_minting_params_in_state)
         .and_then(|state| {
-            get_eth_signed_txs(&get_signing_params_from_db(&state.db)?, &state.btc_on_eth_minting_params)
-                .and_then(|signed_txs| state.add_eth_signed_txs(signed_txs))
+            get_eth_signed_txs(
+                &get_signing_params_from_db(&state.db)?,
+                &state.btc_on_eth_minting_params,
+            )
+            .and_then(|signed_txs| state.add_eth_signed_txs(signed_txs))
         })
         .and_then(maybe_increment_eth_nonce_in_db)
         .and_then(|state| {
-            let signatures = serde_json::to_string(
-                &match &state.eth_signed_txs {
-                    None => Ok(vec![]),
-                    Some(txs) =>
-                        get_eth_signed_tx_info_from_eth_txs(
-                            txs,
-                            &state.btc_on_eth_minting_params,
-                            get_eth_account_nonce_from_db(&state.db)?,
-                            state.use_any_sender_tx_type(),
-                            get_any_sender_nonce_from_db(&state.db)?,
-                        )
-                }?
-            )?;
+            let signatures = serde_json::to_string(&match &state.eth_signed_txs {
+                None => Ok(vec![]),
+                Some(txs) => get_eth_signed_tx_info_from_eth_txs(
+                    txs,
+                    &state.btc_on_eth_minting_params,
+                    get_eth_account_nonce_from_db(&state.db)?,
+                    state.use_any_sender_tx_type(),
+                    get_any_sender_nonce_from_db(&state.db)?,
+                ),
+            }?)?;
             info!("✔ BTC signatures: {}", signatures);
             state.add_output_json_string(signatures)
         })
         .and_then(end_btc_db_transaction)
-        .map(|state|
-            match state.output_json_string {
-                None => "✘ No signatures signed ∴ no output!".to_string(),
-                Some(output) => output
-            }
-        )
+        .map(|state| match state.output_json_string {
+            None => "✘ No signatures signed ∴ no output!".to_string(),
+            Some(output) => output,
+        })
         .map(prepend_debug_output_marker_to_string)
 }
 
@@ -246,19 +213,17 @@ pub fn debug_reprocess_eth_block<D: DatabaseInterface>(db: D, eth_block_json: &s
         .and_then(end_eth_db_transaction_and_return_state)
         .and_then(|state| {
             info!("✔ Getting ETH output json...");
-            let output = serde_json::to_string(
-                &EthOutput {
-                    eth_latest_block_number: get_latest_eth_block_number(&state.db)?,
-                    btc_signed_transactions: match state.btc_transactions {
-                        Some(txs) => get_btc_signed_tx_info_from_btc_txs(
-                            get_btc_account_nonce_from_db(&state.db)?,
-                            txs,
-                            &state.btc_on_eth_redeem_infos
-                        )?,
-                        None => vec![],
-                    }
-                }
-            )?;
+            let output = serde_json::to_string(&EthOutput {
+                eth_latest_block_number: get_latest_eth_block_number(&state.db)?,
+                btc_signed_transactions: match state.btc_transactions {
+                    Some(txs) => get_btc_signed_tx_info_from_btc_txs(
+                        get_btc_account_nonce_from_db(&state.db)?,
+                        txs,
+                        &state.btc_on_eth_redeem_infos,
+                    )?,
+                    None => vec![],
+                },
+            })?;
             info!("✔ ETH Output: {}", output);
             Ok(output)
         })
@@ -304,7 +269,9 @@ pub fn debug_get_key_from_db<D: DatabaseInterface>(db: D, key: &str) -> Result<S
 ///
 /// This function will return a JSON containing all the UTXOs the encrypted database currently has.
 pub fn debug_get_all_utxos<D: DatabaseInterface>(db: D) -> Result<String> {
-    check_debug_mode().and_then(|_| check_core_is_initialized(&db)).and_then(|_| get_all_utxos_as_json_string(&db))
+    check_debug_mode()
+        .and_then(|_| check_core_is_initialized(&db))
+        .and_then(|_| get_all_utxos_as_json_string(&db))
 }
 
 /// # Debug Get Signed ERC777 change pNetwork Tx
@@ -319,11 +286,9 @@ pub fn debug_get_all_utxos<D: DatabaseInterface>(db: D) -> Result<String> {
 /// ### BEWARE:
 /// If you don't broadcast the transaction outputted from this function, future ETH transactions will
 /// fail due to the nonce being too high!
-pub fn debug_get_signed_erc777_change_pnetwork_tx<D>(
-    db: D,
-    new_address: &str
-) -> Result<String>
-    where D: DatabaseInterface
+pub fn debug_get_signed_erc777_change_pnetwork_tx<D>(db: D, new_address: &str) -> Result<String>
+where
+    D: DatabaseInterface,
 {
     check_core_is_initialized(&db)
         .and_then(|_| check_debug_mode())
@@ -340,12 +305,10 @@ fn check_erc777_proxy_address_is_set<D: DatabaseInterface>(db: &D) -> Result<()>
     info!("✔ Checking if the ERC777 proxy address is set...");
     check_debug_mode()
         .and_then(|_| get_erc777_proxy_contract_address_from_db(db))
-        .and_then(|address|
-            match address.is_zero() {
-                true => Err("✘ No ERC777 proxy address set in db - not signing tx!".into()),
-                false => Ok(()),
-            }
-        )
+        .and_then(|address| match address.is_zero() {
+            true => Err("✘ No ERC777 proxy address set in db - not signing tx!".into()),
+            false => Ok(()),
+        })
 }
 
 /// # Debug Get Signed ERC777 change pNetwork Tx
@@ -360,19 +323,17 @@ fn check_erc777_proxy_address_is_set<D: DatabaseInterface>(db: &D) -> Result<()>
 /// ### BEWARE:
 /// If you don't broadcast the transaction outputted from this function, future ETH transactions will
 /// fail due to the nonce being too high!
-pub fn debug_get_signed_erc777_proxy_change_pnetwork_tx<D>(
-    db: D,
-    new_address: &str
-) -> Result<String>
-    where D: DatabaseInterface
+pub fn debug_get_signed_erc777_proxy_change_pnetwork_tx<D>(db: D, new_address: &str) -> Result<String>
+where
+    D: DatabaseInterface,
 {
     check_core_is_initialized(&db)
         .and_then(|_| check_debug_mode())
         .and_then(|_| check_erc777_proxy_address_is_set(&db))
         .and_then(|_| db.start_transaction())
-        .and_then(|_|
+        .and_then(|_| {
             get_signed_erc777_proxy_change_pnetwork_tx(&db, EthAddress::from_slice(&hex::decode(new_address)?))
-        )
+        })
         .and_then(|signed_tx_hex| {
             db.end_transaction()?;
             Ok(format!("{{signed_tx:{}}}", signed_tx_hex))
@@ -392,19 +353,17 @@ pub fn debug_get_signed_erc777_proxy_change_pnetwork_tx<D>(
 /// ### BEWARE:
 /// If you don't broadcast the transaction outputted from this function, future ETH transactions will
 /// fail due to the nonce being too high!
-pub fn debug_get_signed_erc777_proxy_change_pnetwork_by_proxy_tx<D>(
-    db: D,
-    new_address: &str
-) -> Result<String>
-    where D: DatabaseInterface
+pub fn debug_get_signed_erc777_proxy_change_pnetwork_by_proxy_tx<D>(db: D, new_address: &str) -> Result<String>
+where
+    D: DatabaseInterface,
 {
     check_core_is_initialized(&db)
         .and_then(|_| check_debug_mode())
         .and_then(|_| check_erc777_proxy_address_is_set(&db))
         .and_then(|_| db.start_transaction())
-        .and_then(|_|
+        .and_then(|_| {
             get_signed_erc777_proxy_change_pnetwork_by_proxy_tx(&db, EthAddress::from_slice(&hex::decode(new_address)?))
-        )
+        })
         .and_then(|signed_tx_hex| {
             db.end_transaction()?;
             Ok(format!("{{signed_tx:{}}}", signed_tx_hex))
@@ -421,11 +380,9 @@ pub fn debug_get_signed_erc777_proxy_change_pnetwork_by_proxy_tx<D>(
 ///
 /// ### NOTE:
 /// The core won't accept UTXOs it already has in its encrypted database.
-pub fn debug_maybe_add_utxo_to_db<D>(
-    db: D,
-    btc_submission_material_json: &str,
-) -> Result<String>
-    where D: DatabaseInterface,
+pub fn debug_maybe_add_utxo_to_db<D>(db: D, btc_submission_material_json: &str) -> Result<String>
+where
+    D: DatabaseInterface,
 {
     check_debug_mode()
         .and_then(|_| parse_btc_submission_json_and_put_in_state(btc_submission_material_json, BtcState::init(db)))
@@ -473,11 +430,14 @@ pub fn debug_mint_pbtc<D: DatabaseInterface>(
     check_core_is_initialized(&db)
         .and_then(|_| check_debug_mode())
         .and_then(|_| strip_hex_prefix(&recipient))
-        .and_then(|hex_no_prefix|
-            decode_hex_with_err_msg(&hex_no_prefix, "Could not decode hex for recipient in `debug_mint_pbtc` fxn!")
-        )
+        .and_then(|hex_no_prefix| {
+            decode_hex_with_err_msg(
+                &hex_no_prefix,
+                "Could not decode hex for recipient in `debug_mint_pbtc` fxn!",
+            )
+        })
         .map(|recipient_bytes| EthAddress::from_slice(&recipient_bytes))
-        .and_then(|recipient_eth_address|
+        .and_then(|recipient_eth_address| {
             get_signed_minting_tx(
                 &amount.into(),
                 nonce,
@@ -489,17 +449,18 @@ pub fn debug_mint_pbtc<D: DatabaseInterface>(
                 None,
                 None,
             )
-        )
-        .map(|signed_tx|
-             json!({
-                 "nonce": nonce,
-                 "amount": amount,
-                 "gas_price": gas_price,
-                 "recipient": recipient,
-                 "eth_network": eth_network,
-                 "signed_tx": signed_tx.serialize_hex(),
-             }).to_string()
-         )
+        })
+        .map(|signed_tx| {
+            json!({
+                "nonce": nonce,
+                "amount": amount,
+                "gas_price": gas_price,
+                "recipient": recipient,
+                "eth_network": eth_network,
+                "signed_tx": signed_tx.serialize_hex(),
+            })
+            .to_string()
+        })
         .map(prepend_debug_output_marker_to_string)
 }
 

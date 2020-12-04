@@ -1,36 +1,30 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::eth::{
+        eth_database_utils::{eth_block_exists_in_db, put_eth_submission_material_in_db},
         eth_state::EthState,
         eth_submission_material::EthSubmissionMaterial,
-        eth_database_utils::{
-            eth_block_exists_in_db,
-            put_eth_submission_material_in_db,
-        },
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
 
-pub fn add_block_and_receipts_to_db_if_not_extant<D>(
-    db: &D,
-    block_and_receipts: &EthSubmissionMaterial,
-) -> Result<()>
-    where D: DatabaseInterface
+pub fn add_block_and_receipts_to_db_if_not_extant<D>(db: &D, block_and_receipts: &EthSubmissionMaterial) -> Result<()>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Adding ETH block and receipts if not already in db...");
     match eth_block_exists_in_db(db, &block_and_receipts.get_block_hash()?) {
         false => {
             info!("✔ Block & receipts not in db, adding them now...");
             put_eth_submission_material_in_db(db, block_and_receipts)
-        }
-        true => Err("✘ Block Rejected - it's already in the db!".into())
+        },
+        true => Err("✘ Block Rejected - it's already in the db!".into()),
     }
 }
 
-pub fn maybe_add_block_and_receipts_to_db_and_return_state<D>(
-    state: EthState<D>
-) -> Result<EthState<D>>
-    where D: DatabaseInterface
+pub fn maybe_add_block_and_receipts_to_db_and_return_state<D>(state: EthState<D>) -> Result<EthState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Maybe adding ETH block and receipts if not in db...");
     add_block_and_receipts_to_db_if_not_extant(&state.db, state.get_eth_submission_material()?).and(Ok(state))
@@ -39,11 +33,7 @@ pub fn maybe_add_block_and_receipts_to_db_and_return_state<D>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        test_utils::get_test_database,
-        btc_on_eth::eth::eth_test_utils::get_sample_eth_submission_material_n,
-    };
-
+    use crate::{btc_on_eth::eth::eth_test_utils::get_sample_eth_submission_material_n, test_utils::get_test_database};
 
     #[test]
     fn should_maybe_add_block_and_receipts_to_db() {

@@ -1,26 +1,19 @@
-use serde_json::Value as JsonValue;
-use ethereum_types::{
-    U256,
-    H256,
-    Address as EthAddress
-};
 use crate::{
-    utils::decode_hex_with_no_padding_with_err_msg,
+    constants::{ETH_HASH_LENGTH, SAFE_ETH_ADDRESS, U64_NUM_BYTES},
     types::{Byte, Bytes, NoneError, Result},
-    constants::{
-        U64_NUM_BYTES,
-        ETH_HASH_LENGTH,
-        SAFE_ETH_ADDRESS,
-    },
+    utils::decode_hex_with_no_padding_with_err_msg,
 };
+use ethereum_types::{Address as EthAddress, H256, U256};
+use serde_json::Value as JsonValue;
 
 pub fn get_eth_address_from_str(eth_address_str: &str) -> Result<EthAddress> {
     info!("✔ Getting ETH address from str...");
-    decode_hex_with_no_padding_with_err_msg(eth_address_str, "ETH address is not valid hex!")
-        .and_then(|bytes| match bytes.len() {
+    decode_hex_with_no_padding_with_err_msg(eth_address_str, "ETH address is not valid hex!").and_then(|bytes| {
+        match bytes.len() {
             20 => Ok(EthAddress::from_slice(&bytes)),
             _ => Err("Incorrect number of bytes for ETH address!".into()),
-        })
+        }
+    })
 }
 
 pub fn convert_h256_to_bytes(hash: H256) -> Bytes {
@@ -30,16 +23,20 @@ pub fn convert_h256_to_bytes(hash: H256) -> Bytes {
 pub fn convert_bytes_to_h256(bytes: &[Byte]) -> Result<H256> {
     match bytes.len() {
         32 => Ok(H256::from_slice(&bytes[..])),
-        _ => Err("✘ Not enough bytes to convert to h256!".into())
+        _ => Err("✘ Not enough bytes to convert to h256!".into()),
     }
 }
 
 pub fn convert_hex_to_h256(hex: &str) -> Result<H256> {
-    decode_prefixed_hex(hex)
-        .and_then(|bytes| match bytes.len() {
-            ETH_HASH_LENGTH => Ok(H256::from_slice(&bytes)),
-            _ => Err(format!("✘ {} bytes required to create h256 type, {} provided!", ETH_HASH_LENGTH, bytes.len()).into())
-        })
+    decode_prefixed_hex(hex).and_then(|bytes| match bytes.len() {
+        ETH_HASH_LENGTH => Ok(H256::from_slice(&bytes)),
+        _ => Err(format!(
+            "✘ {} bytes required to create h256 type, {} provided!",
+            ETH_HASH_LENGTH,
+            bytes.len()
+        )
+        .into()),
+    })
 }
 
 pub fn convert_hex_strings_to_h256s(hex_strings: Vec<&str>) -> Result<Vec<H256>> {
@@ -55,7 +52,7 @@ pub fn convert_hex_to_bytes(hex: &str) -> Result<Bytes> {
     Ok(hex::decode(strip_hex_prefix(&hex)?)?)
 }
 
-pub fn strip_hex_prefix(prefixed_hex : &str) -> Result<String> {
+pub fn strip_hex_prefix(prefixed_hex: &str) -> Result<String> {
     let res = str::replace(prefixed_hex, "0x", "");
     match res.len() % 2 {
         0 => Ok(res),
@@ -79,7 +76,7 @@ pub fn convert_bytes_to_u64(bytes: &[Byte]) -> Result<u64> {
             let bytes = &bytes[..U64_NUM_BYTES];
             arr.copy_from_slice(bytes);
             Ok(u64::from_le_bytes(arr))
-        }
+        },
         _ => Err("✘ Too many bytes to convert to u64 without overflowing!".into()),
     }
 }
@@ -95,12 +92,15 @@ pub fn strip_new_line_chars(string: String) -> String {
 pub fn convert_dec_str_to_u256(dec_str: &str) -> Result<U256> {
     match U256::from_dec_str(dec_str) {
         Ok(u256) => Ok(u256),
-        Err(err) => Err(format!("✘ Error converting decimal string to u256:\n{:?}", err).into())
+        Err(err) => Err(format!("✘ Error converting decimal string to u256:\n{:?}", err).into()),
     }
 }
 
 pub fn convert_json_value_to_string(value: &JsonValue) -> Result<String> {
-    Ok(value.as_str().ok_or(NoneError("Could not unwrap. JSON value isn't a String!"))?.to_string())
+    Ok(value
+        .as_str()
+        .ok_or(NoneError("Could not unwrap. JSON value isn't a String!"))?
+        .to_string())
 }
 
 fn left_pad_with_zero(string: &str) -> Result<String> {
@@ -112,32 +112,28 @@ pub fn safely_convert_hex_to_eth_address(hex: &str) -> Result<EthAddress> {
         Ok(address) => Ok(address),
         Err(_) => {
             info!("✔ Could not parse hex: '{}'!", hex);
-            info!("✔ Defaulting to safe eth address: 0x{}", hex::encode(SAFE_ETH_ADDRESS.as_bytes()));
+            info!(
+                "✔ Defaulting to safe eth address: 0x{}",
+                hex::encode(SAFE_ETH_ADDRESS.as_bytes())
+            );
             Ok(*SAFE_ETH_ADDRESS)
-        }
+        },
     }
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
+        btc_on_eth::eth::eth_test_utils::{HASH_HEX_CHARS, HEX_PREFIX_LENGTH},
         errors::AppError,
-        btc_on_eth::eth::eth_test_utils::{
-            HASH_HEX_CHARS,
-            HEX_PREFIX_LENGTH,
-        },
     };
 
     #[test]
     fn should_convert_h256_to_bytes() {
         let hash = H256::zero();
         let expected_result = vec![
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
         let result = convert_h256_to_bytes(hash);
         assert_eq!(expected_result, result);
@@ -168,7 +164,7 @@ mod tests {
         let str2 = "0x08075826de57b85238fe1728a37b366ab755b95c65c59faec7b0f1054fca1654";
         let expected_result1 = convert_hex_to_h256(str1).unwrap();
         let expected_result2 = convert_hex_to_h256(str2).unwrap();
-        let hex_strings: Vec<&str> = vec!(str1, str2);
+        let hex_strings: Vec<&str> = vec![str1, str2];
         let results: Vec<H256> = convert_hex_strings_to_h256s(hex_strings).unwrap();
         assert_eq!(results[0], expected_result1);
         assert_eq!(results[1], expected_result2);
@@ -193,7 +189,7 @@ mod tests {
     #[test]
     fn should_convert_unprefixed_hex_to_bytes_correctly() {
         let hex = "c0ffee";
-        let expected_result = [ 192, 255, 238 ];
+        let expected_result = [192, 255, 238];
         let result = convert_hex_to_bytes(hex).unwrap();
         assert_eq!(result, expected_result)
     }
@@ -201,7 +197,7 @@ mod tests {
     #[test]
     fn should_convert_prefixed_hex_to_bytes_correctly() {
         let hex = "0xc0ffee";
-        let expected_result = [ 192, 255, 238 ];
+        let expected_result = [192, 255, 238];
         let result = convert_hex_to_bytes(hex).unwrap();
         assert_eq!(result, expected_result)
     }
@@ -277,7 +273,7 @@ mod tests {
         assert!(short_hash.len() < HASH_HEX_CHARS + HEX_PREFIX_LENGTH);
         match convert_hex_to_h256(short_hash) {
             Err(AppError::Custom(e)) => assert_eq!(e, expected_error),
-            _ => panic!("Should have errored ∵ of short hash!")
+            _ => panic!("Should have errored ∵ of short hash!"),
         }
     }
 
@@ -292,7 +288,7 @@ mod tests {
         assert!(long_hash.len() > HASH_HEX_CHARS + HEX_PREFIX_LENGTH);
         match convert_hex_to_h256(long_hash) {
             Err(AppError::Custom(e)) => assert_eq!(e, expected_error),
-            _ => panic!("Should have errored ∵ of short hash!")
+            _ => panic!("Should have errored ∵ of short hash!"),
         }
     }
 
@@ -304,7 +300,7 @@ mod tests {
         match convert_hex_to_h256(long_hash) {
             Err(AppError::HexError(e)) => assert!(e.to_string().contains("Invalid")),
             Err(AppError::Custom(_)) => panic!("Should be hex error!"),
-            _ => panic!("Should have errored ∵ of invalid hash!")
+            _ => panic!("Should have errored ∵ of invalid hash!"),
         }
     }
 
@@ -322,7 +318,7 @@ mod tests {
         let dec_str = "abcd";
         match convert_dec_str_to_u256(dec_str) {
             Err(AppError::Custom(e)) => assert!(e.contains(expected_error)),
-            _ => panic!("Should not have converted non decimal string!")
+            _ => panic!("Should not have converted non decimal string!"),
         }
     }
 
@@ -342,14 +338,14 @@ mod tests {
     #[test]
     fn should_convert_u64_to_bytes() {
         let u_64 = u64::max_value();
-        let expected_result = [255,255,255,255,255,255,255,255];
+        let expected_result = [255, 255, 255, 255, 255, 255, 255, 255];
         let result = convert_u64_to_bytes(u_64);
         assert_eq!(result, expected_result);
     }
 
     #[test]
     fn should_convert_bytes_to_u64() {
-        let bytes = vec![255,255,255,255,255,255,255,255];
+        let bytes = vec![255, 255, 255, 255, 255, 255, 255, 255];
         let expected_result = u64::max_value();
         let result = convert_bytes_to_u64(&bytes).unwrap();
         assert_eq!(result, expected_result);
@@ -358,9 +354,9 @@ mod tests {
     #[test]
     fn should_error_converting_too_few_bytes_to_u64() {
         let expected_error = "✘ Not enough bytes to convert to u64!".to_string();
-        let bytes = vec![255,255,255,255,255,255,255];
+        let bytes = vec![255, 255, 255, 255, 255, 255, 255];
         assert!(bytes.len() < U64_NUM_BYTES);
-        match  convert_bytes_to_u64(&bytes) {
+        match convert_bytes_to_u64(&bytes) {
             Err(AppError::Custom(e)) => assert_eq!(e, expected_error),
             Ok(_) => panic!("Shouldn't work!"),
             _ => panic!("Wrong error!"),
@@ -370,9 +366,9 @@ mod tests {
     #[test]
     fn should_error_converting_too_many_bytes_to_u64() {
         let expected_error = "✘ Too many bytes to convert to u64 without overflowing!".to_string();
-        let bytes = vec![255,255,255,255,255,255,255,255,255];
+        let bytes = vec![255, 255, 255, 255, 255, 255, 255, 255, 255];
         assert!(bytes.len() > U64_NUM_BYTES);
-        match  convert_bytes_to_u64(&bytes) {
+        match convert_bytes_to_u64(&bytes) {
             Err(AppError::Custom(e)) => assert_eq!(e, expected_error),
             Ok(_) => panic!("Shouldn't work!"),
             _ => panic!("Wrong error!"),

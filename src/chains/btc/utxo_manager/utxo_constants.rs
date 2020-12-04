@@ -1,8 +1,5 @@
-pub use serde_json::{
-    json,
-    Value as JsonValue,
-};
 use crate::utils::get_prefixed_db_key;
+pub use serde_json::{json, Value as JsonValue};
 
 pub fn get_utxo_constants_db_keys() -> JsonValue {
     json!({

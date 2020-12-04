@@ -1,12 +1,6 @@
 #![cfg(test)]
+use crate::chains::eos::eos_erc20_dictionary::{EosErc20Dictionary, EosErc20DictionaryEntry, EosErc20DictionaryJson};
 use ethereum_types::Address as EthAddress;
-use crate::{
-    chains::eos::eos_erc20_dictionary::{
-        EosErc20Dictionary,
-        EosErc20DictionaryJson,
-        EosErc20DictionaryEntry,
-    },
-};
 
 pub fn get_sample_eos_erc20_dictionary_entry_1() -> EosErc20DictionaryEntry {
     let token_address_hex = "9f57CB2a4F462a5258a49E88B4331068a391DE66".to_string();
@@ -33,7 +27,10 @@ pub fn get_sample_eos_erc20_dictionary_entry_2() -> EosErc20DictionaryEntry {
 }
 
 pub fn get_sample_eos_erc20_dictionary() -> EosErc20Dictionary {
-    EosErc20Dictionary::new(vec![get_sample_eos_erc20_dictionary_entry_1(), get_sample_eos_erc20_dictionary_entry_2()])
+    EosErc20Dictionary::new(vec![
+        get_sample_eos_erc20_dictionary_entry_1(),
+        get_sample_eos_erc20_dictionary_entry_2(),
+    ])
 }
 
 pub fn get_sample_eos_erc20_dictionary_json() -> EosErc20DictionaryJson {

@@ -1,34 +1,22 @@
-use std::time::{
-    SystemTime,
-    UNIX_EPOCH
-};
 use crate::{
-    traits::DatabaseInterface,
-    types::{
-        Result,
-        NoneError,
-    },
-    erc20_on_eos::eos::redeem_info::{
-        Erc20OnEosRedeemInfo,
-        Erc20OnEosRedeemInfos,
-    },
     chains::{
-        eos::{
-            eos_state::EosState,
-            eos_database_utils::get_latest_eos_block_number,
-        },
+        eos::{eos_database_utils::get_latest_eos_block_number, eos_state::EosState},
         eth::{
-            eth_traits::EthTxInfoCompatible,
-            eth_crypto::eth_transaction::EthTransaction,
             any_sender::relay_transaction::RelayTransaction,
+            eth_crypto::eth_transaction::EthTransaction,
             eth_database_utils::{
-                get_latest_eth_block_number,
                 get_any_sender_nonce_from_db,
                 get_eth_account_nonce_from_db,
+                get_latest_eth_block_number,
             },
+            eth_traits::EthTxInfoCompatible,
         },
     },
+    erc20_on_eos::eos::redeem_info::{Erc20OnEosRedeemInfo, Erc20OnEosRedeemInfos},
+    traits::DatabaseInterface,
+    types::{NoneError, Result},
 };
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EosOutput {
@@ -108,31 +96,38 @@ pub fn get_eth_signed_tx_info_from_eth_txs(
         info!("✔ Getting ETH tx info from ETH txs...");
         eth_account_nonce - txs.len() as u64
     };
-    txs
-        .iter()
+    txs.iter()
         .enumerate()
-        .map(|(i, tx)| EthTxInfo::new(tx, &redeem_info[i], Some(start_nonce + i as u64), eth_latest_block_number))
+        .map(|(i, tx)| {
+            EthTxInfo::new(
+                tx,
+                &redeem_info[i],
+                Some(start_nonce + i as u64),
+                eth_latest_block_number,
+            )
+        })
         .collect::<Result<Vec<EthTxInfo>>>()
 }
 
-pub fn get_eos_output<D>(state: EosState<D>) -> Result<String> where D: DatabaseInterface {
+pub fn get_eos_output<D>(state: EosState<D>) -> Result<String>
+where
+    D: DatabaseInterface,
+{
     info!("✔ Getting EOS output json...");
-    let output = serde_json::to_string(
-        &EosOutput {
-            eos_latest_block_number: get_latest_eos_block_number(&state.db)?,
-            eth_signed_transactions: match &state.erc20_on_eos_signed_txs.len() {
-                0 => vec![],
-                _ => get_eth_signed_tx_info_from_eth_txs(
-                    &state.erc20_on_eos_signed_txs,
-                    &state.erc20_on_eos_redeem_infos,
-                    get_eth_account_nonce_from_db(&state.db)?,
-                    false, // TODO Get this from state submission material when/if we support AnySender
-                    get_any_sender_nonce_from_db(&state.db)?,
-                    get_latest_eth_block_number(&state.db)?,
-                )?,
-            }
-        }
-    )?;
+    let output = serde_json::to_string(&EosOutput {
+        eos_latest_block_number: get_latest_eos_block_number(&state.db)?,
+        eth_signed_transactions: match &state.erc20_on_eos_signed_txs.len() {
+            0 => vec![],
+            _ => get_eth_signed_tx_info_from_eth_txs(
+                &state.erc20_on_eos_signed_txs,
+                &state.erc20_on_eos_redeem_infos,
+                get_eth_account_nonce_from_db(&state.db)?,
+                false, // TODO Get this from state submission material when/if we support AnySender
+                get_any_sender_nonce_from_db(&state.db)?,
+                get_latest_eth_block_number(&state.db)?,
+            )?,
+        },
+    })?;
     info!("✔ EOS output: {}", output);
     Ok(output)
 }

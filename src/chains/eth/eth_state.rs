@@ -1,25 +1,16 @@
-use ethereum_types::H256 as EthHash;
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
-    utils::{
-        get_not_in_state_err,
-        get_no_overwrite_state_err,
-    },
     btc_on_eth::eth::redeem_info::BtcOnEthRedeemInfos,
-    erc20_on_eos::eth::peg_in_info::Erc20OnEosPegInInfos,
     chains::{
+        btc::{btc_types::BtcTransactions, utxo_manager::utxo_types::BtcUtxosAndValues},
+        eos::{eos_erc20_dictionary::EosErc20Dictionary, eos_types::EosSignedTransactions},
         eth::eth_submission_material::EthSubmissionMaterial,
-        btc::{
-            btc_types::BtcTransactions,
-            utxo_manager::utxo_types::BtcUtxosAndValues,
-        },
-        eos::{
-            eos_types::EosSignedTransactions,
-            eos_erc20_dictionary::EosErc20Dictionary,
-        },
     },
+    erc20_on_eos::eth::peg_in_info::Erc20OnEosPegInInfos,
+    traits::DatabaseInterface,
+    types::Result,
+    utils::{get_no_overwrite_state_err, get_not_in_state_err},
 };
+use ethereum_types::H256 as EthHash;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct EthState<D: DatabaseInterface> {
@@ -34,7 +25,10 @@ pub struct EthState<D: DatabaseInterface> {
     pub eth_submission_material: Option<EthSubmissionMaterial>,
 }
 
-impl<D> EthState<D> where D: DatabaseInterface {
+impl<D> EthState<D>
+where
+    D: DatabaseInterface,
+{
     pub fn init(db: D) -> EthState<D> {
         EthState {
             db,
@@ -49,13 +43,16 @@ impl<D> EthState<D> where D: DatabaseInterface {
         }
     }
 
-    pub fn add_eth_submission_material(mut self, eth_submission_material: EthSubmissionMaterial) -> Result<EthState<D>> {
+    pub fn add_eth_submission_material(
+        mut self,
+        eth_submission_material: EthSubmissionMaterial,
+    ) -> Result<EthState<D>> {
         match self.eth_submission_material {
             Some(_) => Err(get_no_overwrite_state_err("eth_submission_material").into()),
             None => {
                 self.eth_submission_material = Some(eth_submission_material);
                 Ok(self)
-            }
+            },
         }
     }
 
@@ -87,7 +84,7 @@ impl<D> EthState<D> where D: DatabaseInterface {
             None => {
                 self.misc = Some(misc_string);
                 Ok(self)
-            }
+            },
         }
     }
 
@@ -97,7 +94,7 @@ impl<D> EthState<D> where D: DatabaseInterface {
             None => {
                 self.btc_transactions = Some(btc_transactions);
                 Ok(self)
-            }
+            },
         }
     }
 
@@ -107,7 +104,7 @@ impl<D> EthState<D> where D: DatabaseInterface {
             None => {
                 self.eos_transactions = Some(eos_transactions);
                 Ok(self)
-            }
+            },
         }
     }
 
@@ -117,13 +114,13 @@ impl<D> EthState<D> where D: DatabaseInterface {
             None => {
                 self.btc_utxos_and_values = Some(btc_utxos_and_values);
                 Ok(self)
-            }
+            },
         }
     }
 
     pub fn update_eth_submission_material(
         mut self,
-        new_eth_submission_material: EthSubmissionMaterial
+        new_eth_submission_material: EthSubmissionMaterial,
     ) -> Result<EthState<D>> {
         self.eth_submission_material = Some(new_eth_submission_material);
         Ok(self)
@@ -132,7 +129,7 @@ impl<D> EthState<D> where D: DatabaseInterface {
     pub fn get_eth_submission_material(&self) -> Result<&EthSubmissionMaterial> {
         match self.eth_submission_material {
             Some(ref eth_submission_material) => Ok(&eth_submission_material),
-            None => Err(get_not_in_state_err("eth_submission_material").into())
+            None => Err(get_not_in_state_err("eth_submission_material").into()),
         }
     }
 
@@ -157,14 +154,14 @@ impl<D> EthState<D> where D: DatabaseInterface {
             None => {
                 self.eos_erc20_dictionary = Some(dictionary);
                 Ok(self)
-            }
+            },
         }
     }
 
     pub fn get_eos_erc20_dictionary(&self) -> Result<&EosErc20Dictionary> {
         match self.eos_erc20_dictionary {
             Some(ref dictionary) => Ok(dictionary),
-            None => Err(get_not_in_state_err("eos_erc20_dictionary").into())
+            None => Err(get_not_in_state_err("eos_erc20_dictionary").into()),
         }
     }
 }
@@ -173,19 +170,17 @@ impl<D> EthState<D> where D: DatabaseInterface {
 mod tests {
     use super::*;
     use crate::{
-        errors::AppError,
-        test_utils::get_test_database,
-        chains::eth::eth_test_utils::{
-            get_sample_erc20_on_eos_peg_in_infos
-        },
         btc_on_eth::eth::eth_test_utils::{
             get_expected_block,
             get_expected_receipt,
-            SAMPLE_RECEIPT_INDEX,
             get_sample_eth_submission_material,
             get_sample_eth_submission_material_n,
             get_valid_state_with_block_and_receipts,
+            SAMPLE_RECEIPT_INDEX,
         },
+        chains::eth::eth_test_utils::get_sample_erc20_on_eos_peg_in_infos,
+        errors::AppError,
+        test_utils::get_test_database,
     };
 
     #[test]
@@ -195,7 +190,7 @@ mod tests {
         match initial_state.get_eth_submission_material() {
             Err(AppError::Custom(e)) => assert_eq!(e, expected_error),
             Ok(_) => panic!("Eth block should not be in state yet!"),
-            _ => panic!("Wrong error received!")
+            _ => panic!("Wrong error received!"),
         };
     }
 
@@ -207,9 +202,11 @@ mod tests {
         match initial_state.get_eth_submission_material() {
             Err(AppError::Custom(e)) => assert_eq!(e, expected_error),
             Ok(_) => panic!("Eth block should not be in state yet!"),
-            _ => panic!("Wrong error received!")
+            _ => panic!("Wrong error received!"),
         };
-        let updated_state = initial_state.add_eth_submission_material(eth_submission_material).unwrap();
+        let updated_state = initial_state
+            .add_eth_submission_material(eth_submission_material)
+            .unwrap();
         let submission_material = updated_state.get_eth_submission_material().unwrap();
         let block = submission_material.get_block().unwrap();
         let receipt = submission_material.receipts.0[SAMPLE_RECEIPT_INDEX].clone();
@@ -224,11 +221,13 @@ mod tests {
         let expected_error = get_no_overwrite_state_err("eth_submission_material");
         let eth_submission_material = get_sample_eth_submission_material();
         let initial_state = EthState::init(get_test_database());
-        let updated_state = initial_state.add_eth_submission_material(eth_submission_material.clone()).unwrap();
+        let updated_state = initial_state
+            .add_eth_submission_material(eth_submission_material.clone())
+            .unwrap();
         match updated_state.add_eth_submission_material(eth_submission_material) {
             Ok(_) => panic!("Overwriting state should not have succeeded!"),
             Err(AppError::Custom(e)) => assert_eq!(e, expected_error),
-            _ => panic!("Wrong error recieved!")
+            _ => panic!("Wrong error recieved!"),
         }
     }
 
@@ -237,10 +236,22 @@ mod tests {
         let eth_submission_material_1 = get_sample_eth_submission_material_n(0).unwrap();
         let eth_submission_material_2 = get_sample_eth_submission_material_n(1).unwrap();
         let initial_state = EthState::init(get_test_database());
-        let updated_state = initial_state.add_eth_submission_material(eth_submission_material_1).unwrap();
-        let initial_state_block_num = updated_state.get_eth_submission_material().unwrap().get_block_number().unwrap();
-        let final_state = updated_state.update_eth_submission_material(eth_submission_material_2).unwrap();
-        let final_state_block_number = final_state.get_eth_submission_material().unwrap().get_block_number().unwrap();
+        let updated_state = initial_state
+            .add_eth_submission_material(eth_submission_material_1)
+            .unwrap();
+        let initial_state_block_num = updated_state
+            .get_eth_submission_material()
+            .unwrap()
+            .get_block_number()
+            .unwrap();
+        let final_state = updated_state
+            .update_eth_submission_material(eth_submission_material_2)
+            .unwrap();
+        let final_state_block_number = final_state
+            .get_eth_submission_material()
+            .unwrap()
+            .get_block_number()
+            .unwrap();
         assert_ne!(final_state_block_number, initial_state_block_num);
     }
 
@@ -262,6 +273,5 @@ mod tests {
         let final_state = new_state.add_erc20_on_eos_peg_in_infos(info).unwrap();
         len = final_state.erc20_on_eos_peg_in_infos.len();
         assert_eq!(len, 2);
-
     }
 }

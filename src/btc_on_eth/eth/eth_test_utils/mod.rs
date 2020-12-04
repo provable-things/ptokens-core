@@ -1,87 +1,44 @@
 #![cfg(test)]
-use ethereum_types::{
-    H256,
-    U256,
-    Address,
-};
-use std::{
-    path::Path,
-    fs::read_to_string,
-};
 use crate::{
-    errors::AppError,
-    traits::DatabaseInterface,
-    types::{
-        Bytes,
-        Result,
-    },
-    test_utils::{
-        TestDB,
-        get_test_database,
-    },
     chains::eth::{
-        eth_state::EthState,
+        eth_block::{EthBlock, EthBlockJson},
+        eth_crypto::{eth_private_key::EthPrivateKey, eth_public_key::EthPublicKey, eth_transaction::EthTransaction},
+        eth_database_utils::{get_special_eth_hash_from_db, put_special_eth_block_in_db},
+        eth_log::{EthLog, EthLogs},
         eth_receipt::EthReceipt,
-        eth_submission_material::{
-            EthSubmissionMaterial,
-            EthSubmissionMaterialJson,
-        },
-        eth_log::{
-            EthLog,
-            EthLogs,
-        },
-        eth_block::{
-            EthBlock,
-            EthBlockJson,
-        },
-        eth_types::{
-            EthHash,
-            EthAddress,
-            TrieHashMap,
-        },
-        eth_crypto::{
-            eth_public_key::EthPublicKey,
-            eth_private_key::EthPrivateKey,
-            eth_transaction::EthTransaction,
-        },
+        eth_state::EthState,
+        eth_submission_material::{EthSubmissionMaterial, EthSubmissionMaterialJson},
+        eth_types::{EthAddress, EthHash, TrieHashMap},
+        nibble_utils::{get_nibbles_from_bytes, get_nibbles_from_offset_bytes, Nibbles},
         trie_nodes::Node,
-        nibble_utils::{
-            Nibbles,
-            get_nibbles_from_bytes,
-            get_nibbles_from_offset_bytes,
-        },
-        eth_database_utils::{
-            put_special_eth_block_in_db,
-            get_special_eth_hash_from_db,
-        },
     },
+    errors::AppError,
+    test_utils::{get_test_database, TestDB},
+    traits::DatabaseInterface,
+    types::{Bytes, Result},
 };
+use ethereum_types::{Address, H256, U256};
+use std::{fs::read_to_string, path::Path};
 
-pub const HASH_HEX_CHARS: usize  = 64;
+pub const HASH_HEX_CHARS: usize = 64;
 pub const HEX_PREFIX_LENGTH: usize = 2;
 pub const SAMPLE_RECEIPT_INDEX: usize = 2;
 pub const SEQUENTIAL_BLOCKS_FIRST_NUMBER: usize = 8065750;
 
-pub const ETH_SMART_CONTRACT_BYTECODE_PATH: &str =
-    "./src/btc_on_eth/eth/eth_test_utils/ptoken-erc777-bytecode";
+pub const ETH_SMART_CONTRACT_BYTECODE_PATH: &str = "./src/btc_on_eth/eth/eth_test_utils/ptoken-erc777-bytecode";
 
-pub const SAMPLE_BLOCK_JSON_PATH: &str =
-    "src/btc_on_eth/eth/eth_test_utils/sample-block-json";
+pub const SAMPLE_BLOCK_JSON_PATH: &str = "src/btc_on_eth/eth/eth_test_utils/sample-block-json";
 
-pub const SAMPLE_RECEIPT_JSON_PATH: &str =
-    "src/btc_on_eth/eth/eth_test_utils/sample-receipt-json";
+pub const SAMPLE_RECEIPT_JSON_PATH: &str = "src/btc_on_eth/eth/eth_test_utils/sample-receipt-json";
 
-pub const SAMPLE_PTOKEN_CONTRACT_ADDRESS: &str =
-    "60a640e2d10e020fee94217707bfa9543c8b59e0";
+pub const SAMPLE_PTOKEN_CONTRACT_ADDRESS: &str = "60a640e2d10e020fee94217707bfa9543c8b59e0";
 
-pub const SAMPLE_BLOCK_AND_RECEIPT_JSON: &str =
-    "src/btc_on_eth/eth/eth_test_utils/sample-eth-block-and-receipts-json";
+pub const SAMPLE_BLOCK_AND_RECEIPT_JSON: &str = "src/btc_on_eth/eth/eth_test_utils/sample-eth-block-and-receipts-json";
 
 pub const SAMPLE_INVALID_BLOCK_AND_RECEIPT_JSON: &str =
     "src/btc_on_eth/eth/eth_test_utils/sample-invalid-eth-block-and-receipts-json";
 // ERC20: Transfer(address,address,uint256)
-pub const TEMPORARY_CONTRACT_TOPIC: &str =
-    "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+pub const TEMPORARY_CONTRACT_TOPIC: &str = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
 pub const SAMPLE_SEQUENTIAL_BLOCK_AND_RECEIPT_JSONS_PATH_PREFIX: &str =
     "src/btc_on_eth/eth/eth_test_utils/sequential_block_and_receipts_jsons/eth_block_and_receipts_num_";
@@ -111,58 +68,55 @@ pub const RECEIPT_INDEX_OF_LOG_WITH_SAMPLE_TOPIC: usize = 2;
 pub const RECEIPT_INDEX_OF_LOG_WITH_SAMPLE_ADDRESS: usize = 2;
 pub const RECEIPT_INDEX_OF_LOG_WITHOUT_SAMPLE_TOPIC: usize = 9;
 
-pub fn put_eth_latest_block_in_db<D>(
-    db: &D,
-    eth_submission_material: &EthSubmissionMaterial,
-) -> Result<()>
-    where D: DatabaseInterface
+pub fn put_eth_latest_block_in_db<D>(db: &D, eth_submission_material: &EthSubmissionMaterial) -> Result<()>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Putting ETH latest block in db...");
     put_special_eth_block_in_db(db, eth_submission_material, "latest")
 }
 
-pub fn put_eth_anchor_block_in_db<D>(
-    db: &D,
-    eth_submission_material: &EthSubmissionMaterial,
-) -> Result<()>
-    where D: DatabaseInterface
+pub fn put_eth_anchor_block_in_db<D>(db: &D, eth_submission_material: &EthSubmissionMaterial) -> Result<()>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Putting ETH anchor block in db...");
     put_special_eth_block_in_db(db, eth_submission_material, "anchor")
 }
 
-pub fn put_eth_tail_block_in_db<D>(
-    db: &D,
-    eth_submission_material: &EthSubmissionMaterial,
-) -> Result<()>
-    where D: DatabaseInterface
+pub fn put_eth_tail_block_in_db<D>(db: &D, eth_submission_material: &EthSubmissionMaterial) -> Result<()>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Putting ETH tail block in db...");
     put_special_eth_block_in_db(db, eth_submission_material, "tail")
 }
 
 pub fn get_eth_latest_block_hash_from_db<D>(db: &D) -> Result<EthHash>
-    where D: DatabaseInterface
+where
+    D: DatabaseInterface,
 {
     info!("✔ Getting ETH latest block hash from db...");
     get_special_eth_hash_from_db(db, "latest")
 }
 
 pub fn get_eth_canon_block_hash_from_db<D>(db: &D) -> Result<EthHash>
-    where D: DatabaseInterface
+where
+    D: DatabaseInterface,
 {
     info!("✔ Getting ETH canon block hash from db...");
     get_special_eth_hash_from_db(db, "canon")
 }
 
 pub fn get_eth_linker_hash_from_db<D>(db: &D) -> Result<EthHash>
-    where D: DatabaseInterface
+where
+    D: DatabaseInterface,
 {
     info!("✔ Getting ETH linker hash from db...");
     get_special_eth_hash_from_db(db, "linker")
 }
 
-pub fn convert_h256_to_prefixed_hex(hash: H256) -> Result <String> {
+pub fn convert_h256_to_prefixed_hex(hash: H256) -> Result<String> {
     Ok(format!("0x{}", hex::encode(hash)))
 }
 
@@ -175,11 +129,11 @@ pub fn get_sample_eth_submission_material_string(num: usize) -> Result<String> {
         4 => Ok(SAMPLE_BLOCK_AND_RECEIPT_JSON_4),
         5 => Ok(SAMPLE_BLOCK_AND_RECEIPT_JSON_5),
         6 => Ok(SAMPLE_BLOCK_AND_RECEIPT_JSON_6),
-        _ => Err(AppError::Custom(format!("Cannot find sample block num: {}", num)))
+        _ => Err(AppError::Custom(format!("Cannot find sample block num: {}", num))),
     }?;
     match Path::new(&path).exists() {
         true => Ok(read_to_string(path)?),
-        false => Err("✘ Cannot find sample-eth-block-and-receipts-json file!".into())
+        false => Err("✘ Cannot find sample-eth-block-and-receipts-json file!".into()),
     }
 }
 
@@ -187,58 +141,39 @@ pub fn get_sample_eth_submission_material_n(num: usize) -> Result<EthSubmissionM
     get_sample_eth_submission_material_string(num).and_then(|string| EthSubmissionMaterial::from_str(&string))
 }
 
-pub fn get_sample_receipt_n(
-    sample_block_num: usize,
-    receipt_index: usize,
-) -> Result<EthReceipt> {
-    get_sample_eth_submission_material_n(sample_block_num)
-        .map(|block| block.receipts.0[receipt_index].clone())
+pub fn get_sample_receipt_n(sample_block_num: usize, receipt_index: usize) -> Result<EthReceipt> {
+    get_sample_eth_submission_material_n(sample_block_num).map(|block| block.receipts.0[receipt_index].clone())
 }
 
-pub fn get_sample_log_n(
-    sample_block_num: usize,
-    receipt_index: usize,
-    log_index: usize,
-) -> Result<EthLog> {
-    get_sample_receipt_n(sample_block_num, receipt_index)
-        .map(|receipt| receipt.logs.0[log_index].clone())
+pub fn get_sample_log_n(sample_block_num: usize, receipt_index: usize, log_index: usize) -> Result<EthLog> {
+    get_sample_receipt_n(sample_block_num, receipt_index).map(|receipt| receipt.logs.0[log_index].clone())
 }
 
 pub fn get_sample_contract_topic() -> EthHash {
     EthHash::from_slice(&hex::decode(TEMPORARY_CONTRACT_TOPIC).unwrap())
 }
 
-pub fn get_sample_contract_topics() -> Vec<H256>{
-    vec![
-        EthHash::from_slice(&hex::decode(TEMPORARY_CONTRACT_TOPIC).unwrap())
-    ]
+pub fn get_sample_contract_topics() -> Vec<H256> {
+    vec![EthHash::from_slice(&hex::decode(TEMPORARY_CONTRACT_TOPIC).unwrap())]
 }
 
 pub fn get_sample_contract_address() -> Address {
-    EthAddress::from_slice(
-        &hex::decode(SAMPLE_PTOKEN_CONTRACT_ADDRESS).unwrap()
-    )
+    EthAddress::from_slice(&hex::decode(SAMPLE_PTOKEN_CONTRACT_ADDRESS).unwrap())
 }
 
 pub fn get_sample_eth_private_key_slice() -> [u8; 32] {
-    [ // NOTE: pEOS-test-eth-acct.
-        232, 238, 178, 99, 26, 180, 118, 218,
-        205, 104, 248, 78, 176, 185, 238, 85,
-        139, 135, 47, 81, 85, 160, 136, 191,
-        116, 56, 27, 95, 44, 99, 161, 48
+    [
+        // NOTE: pEOS-test-eth-acct.
+        232, 238, 178, 99, 26, 180, 118, 218, 205, 104, 248, 78, 176, 185, 238, 85, 139, 135, 47, 81, 85, 160, 136, 191,
+        116, 56, 27, 95, 44, 99, 161, 48,
     ]
 }
 
 pub fn get_sample_eth_public_key_bytes() -> Bytes {
     vec![
-        4, 217, 81, 73, 242, 234, 58, 7,
-        133, 35, 210, 143, 184, 251, 13, 88,
-        159, 138, 140, 142, 144, 217, 104, 138,
-        155, 220, 188, 217, 127, 67, 225, 87,
-        167, 78, 197, 33, 183, 253, 49, 126,
-        74, 2, 189, 129, 237, 88, 34, 214,
-        255, 147, 234, 120, 213, 41, 205, 42,
-        124, 45, 25, 110, 201, 146, 208, 7, 84
+        4, 217, 81, 73, 242, 234, 58, 7, 133, 35, 210, 143, 184, 251, 13, 88, 159, 138, 140, 142, 144, 217, 104, 138,
+        155, 220, 188, 217, 127, 67, 225, 87, 167, 78, 197, 33, 183, 253, 49, 126, 74, 2, 189, 129, 237, 88, 34, 214,
+        255, 147, 234, 120, 213, 41, 205, 42, 124, 45, 25, 110, 201, 146, 208, 7, 84,
     ]
 }
 
@@ -247,19 +182,15 @@ pub fn get_sample_eth_address_string() -> String {
 }
 
 pub fn get_sample_eth_address() -> EthAddress {
-    EthAddress::from_slice(
-        &hex::decode(get_sample_eth_address_string()).unwrap()
-    )
+    EthAddress::from_slice(&hex::decode(get_sample_eth_address_string()).unwrap())
 }
 
 pub fn get_sample_eth_private_key() -> EthPrivateKey {
-    EthPrivateKey::from_slice(get_sample_eth_private_key_slice())
-        .unwrap()
+    EthPrivateKey::from_slice(get_sample_eth_private_key_slice()).unwrap()
 }
 
 pub fn get_sample_eth_public_key() -> EthPublicKey {
-    get_sample_eth_private_key()
-        .to_public_key()
+    get_sample_eth_private_key().to_public_key()
 }
 
 pub fn get_sequential_eth_blocks_and_receipts() -> Vec<EthSubmissionMaterial> {
@@ -270,21 +201,15 @@ pub fn get_sequential_eth_blocks_and_receipts() -> Vec<EthSubmissionMaterial> {
             SAMPLE_SEQUENTIAL_BLOCK_AND_RECEIPT_JSONS_PATH_PREFIX,
             SEQUENTIAL_BLOCKS_FIRST_NUMBER + i,
         );
-        let string = read_to_string(path)
-            .unwrap();
-        let block_and_receipt = EthSubmissionMaterial::from_str(&string)
-            .unwrap();
+        let string = read_to_string(path).unwrap();
+        let block_and_receipt = EthSubmissionMaterial::from_str(&string).unwrap();
         block_and_receipts.push(block_and_receipt)
     }
     block_and_receipts
 }
 
 pub fn get_sample_receipt_with_desired_topic() -> EthReceipt {
-    get_sample_eth_submission_material()
-        .receipts
-        .0
-        [RECEIPT_INDEX_OF_LOG_WITH_SAMPLE_TOPIC]
-        .clone()
+    get_sample_eth_submission_material().receipts.0[RECEIPT_INDEX_OF_LOG_WITH_SAMPLE_TOPIC].clone()
 }
 
 pub fn get_sample_receipt_with_desired_address() -> EthReceipt {
@@ -321,7 +246,7 @@ pub fn get_sample_logs_without_desired_topic() -> EthLogs {
 }
 
 pub fn get_sample_log_without_desired_topic() -> EthLog {
-    get_sample_logs_without_desired_topic().0[LOG_INDEX_OF_LOG_WITHOUT_SAMPLE_TOPIC ].clone()
+    get_sample_logs_without_desired_topic().0[LOG_INDEX_OF_LOG_WITHOUT_SAMPLE_TOPIC].clone()
 }
 
 pub fn get_sample_log_without_desired_address() -> EthLog {
@@ -332,9 +257,7 @@ pub fn get_sample_log_without_desired_address() -> EthLog {
 pub fn convert_hex_string_to_nibbles(hex_string: String) -> Result<Nibbles> {
     match hex_string.len() % 2 == 0 {
         true => Ok(get_nibbles_from_bytes(hex::decode(hex_string)?)),
-        false => Ok(get_nibbles_from_offset_bytes(
-            hex::decode(format!("0{}", hex_string))?
-        )),
+        false => Ok(get_nibbles_from_offset_bytes(hex::decode(format!("0{}", hex_string))?)),
     }
 }
 
@@ -342,28 +265,19 @@ pub fn get_sample_leaf_node() -> Node {
     let path_bytes = vec![0x12, 0x34, 0x56];
     let path_nibbles = get_nibbles_from_bytes(path_bytes);
     let value = hex::decode("c0ffee".to_string()).unwrap();
-    Node::new_leaf(path_nibbles, value)
-        .unwrap()
+    Node::new_leaf(path_nibbles, value).unwrap()
 }
 
 pub fn get_sample_extension_node() -> Node {
     let path_bytes = vec![0xc0, 0xff, 0xee];
     let path_nibbles = get_nibbles_from_bytes(path_bytes);
-    let value = hex::decode(
-        "1d237c84432c78d82886cb7d6549c179ca51ebf3b324d2a3fa01af6a563a9377"
-            .to_string()
-    ).unwrap();
-    Node::new_extension(path_nibbles, value)
-        .unwrap()
+    let value = hex::decode("1d237c84432c78d82886cb7d6549c179ca51ebf3b324d2a3fa01af6a563a9377".to_string()).unwrap();
+    Node::new_extension(path_nibbles, value).unwrap()
 }
 
 pub fn get_sample_branch_node() -> Node {
-    let branch_value_1 = hex::decode(
-        "4f81663d4c7aeb115e49625430e3fa114445dc0a9ed73a7598a31cd60808a758"
-    ).unwrap();
-    let branch_value_2 = hex::decode(
-        "d55a192f93e0576f46019553e2b4c0ff4b8de57cd73020f751aed18958e9ecdb"
-    ).unwrap();
+    let branch_value_1 = hex::decode("4f81663d4c7aeb115e49625430e3fa114445dc0a9ed73a7598a31cd60808a758").unwrap();
+    let branch_value_2 = hex::decode("d55a192f93e0576f46019553e2b4c0ff4b8de57cd73020f751aed18958e9ecdb").unwrap();
     let index_1 = 1;
     let index_2 = 2;
     let value = None;
@@ -379,10 +293,7 @@ pub fn get_thing_to_put_in_trie_hash_map() -> Bytes {
 
 pub fn get_trie_hash_map_with_thing_in_it() -> Result<TrieHashMap> {
     let mut trie_hash_map: TrieHashMap = std::collections::HashMap::new();
-    trie_hash_map.insert(
-        get_expected_key_of_thing_in_trie_hash_map(),
-        b"Provable".to_vec()
-    );
+    trie_hash_map.insert(get_expected_key_of_thing_in_trie_hash_map(), b"Provable".to_vec());
     Ok(trie_hash_map)
 }
 
@@ -390,21 +301,16 @@ pub fn get_expected_key_of_thing_in_trie_hash_map() -> EthHash {
     EthHash::zero()
 }
 
-pub fn get_valid_state_with_invalid_block_and_receipts(
-) -> Result<EthState<TestDB>> {
+pub fn get_valid_state_with_invalid_block_and_receipts() -> Result<EthState<TestDB>> {
     match Path::new(&SAMPLE_BLOCK_AND_RECEIPT_JSON).exists() {
         false => Err("✘ Cannot find sample-eth-block-and-receipts-json file!".into()),
         true => {
-            let string = read_to_string(SAMPLE_INVALID_BLOCK_AND_RECEIPT_JSON)
-                .unwrap();
-            let invalid_struct = EthSubmissionMaterial::from_str(&string)
-                .unwrap();
-            let state = get_valid_eth_state()
-                .unwrap();
-            let final_state = state.add_eth_submission_material(invalid_struct)
-                .unwrap();
+            let string = read_to_string(SAMPLE_INVALID_BLOCK_AND_RECEIPT_JSON).unwrap();
+            let invalid_struct = EthSubmissionMaterial::from_str(&string).unwrap();
+            let state = get_valid_eth_state().unwrap();
+            let final_state = state.add_eth_submission_material(invalid_struct).unwrap();
             Ok(final_state)
-        }
+        },
     }
 }
 
@@ -415,13 +321,12 @@ pub fn get_sample_invalid_block() -> EthBlock {
 }
 
 pub fn get_sample_eth_submission_material_json() -> Result<EthSubmissionMaterialJson> {
-    get_sample_eth_submission_material_string(0)
-        .and_then(|eth_submission_material_json_string|
-            match serde_json::from_str(&eth_submission_material_json_string) {
-                Ok(eth_submission_material_json) => Ok(eth_submission_material_json),
-                Err(err) => Err(err.into())
-            }
-        )
+    get_sample_eth_submission_material_string(0).and_then(|eth_submission_material_json_string| {
+        match serde_json::from_str(&eth_submission_material_json_string) {
+            Ok(eth_submission_material_json) => Ok(eth_submission_material_json),
+            Err(err) => Err(err.into()),
+        }
+    })
 }
 
 pub fn get_sample_eth_submission_material() -> EthSubmissionMaterial {
@@ -430,12 +335,7 @@ pub fn get_sample_eth_submission_material() -> EthSubmissionMaterial {
 }
 
 pub fn get_valid_state_with_block_and_receipts() -> Result<EthState<TestDB>> {
-    get_valid_eth_state()
-        .and_then(|state|
-            state.add_eth_submission_material(
-                get_sample_eth_submission_material()
-            )
-        )
+    get_valid_eth_state().and_then(|state| state.add_eth_submission_material(get_sample_eth_submission_material()))
 }
 
 pub fn get_expected_block() -> EthBlock {
@@ -460,21 +360,11 @@ pub fn get_sample_unsigned_eth_transaction() -> EthTransaction {
     let data = vec![];
     let nonce = 0;
     let value = 1;
-    let to = EthAddress::from_slice(
-        &hex::decode("53c2048dad4fcfab44C3ef3D16E882b5178df42b").unwrap()
-    );
+    let to = EthAddress::from_slice(&hex::decode("53c2048dad4fcfab44C3ef3D16E882b5178df42b").unwrap());
     let chain_id = 4; // Rinkeby
     let gas_limit = 100_000;
     let gas_price = 20_000_000_000;
-    EthTransaction::new_unsigned(
-        data,
-        nonce,
-        value,
-        to,
-        chain_id,
-        gas_limit,
-        gas_price
-    )
+    EthTransaction::new_unsigned(data, nonce, value, to, chain_id, gas_limit, gas_price)
 }
 
 mod tests {
@@ -560,7 +450,13 @@ mod tests {
     #[test]
     fn should_get_valid_state_with_invalid_block_and_receipts() {
         let state = get_valid_state_with_invalid_block_and_receipts().unwrap();
-        let is_valid = state.get_eth_submission_material().unwrap().get_block().unwrap().is_valid().unwrap();
+        let is_valid = state
+            .get_eth_submission_material()
+            .unwrap()
+            .get_block()
+            .unwrap()
+            .is_valid()
+            .unwrap();
         assert!(!is_valid);
     }
 
@@ -625,25 +521,29 @@ mod tests {
     #[test]
     fn sample_receipts_with_desired_topic_should_contain_topic() {
         let desired_topic = convert_hex_to_h256(TEMPORARY_CONTRACT_TOPIC).unwrap();
-        let result = get_sample_receipt_with_desired_topic().logs.contain_topic(&desired_topic);
+        let result = get_sample_receipt_with_desired_topic()
+            .logs
+            .contain_topic(&desired_topic);
         assert!(result);
     }
 
     #[test]
     fn sample_receipts_without_desired_topic_should_not_contain_topic() {
         let desired_topic = convert_hex_to_h256(TEMPORARY_CONTRACT_TOPIC).unwrap();
-        let result =get_sample_receipt_without_desired_topic().logs.contain_topic(&desired_topic);
+        let result = get_sample_receipt_without_desired_topic()
+            .logs
+            .contain_topic(&desired_topic);
         assert!(!result);
     }
 
     #[test]
     fn should_get_sequential_block_and_receipts() {
         let block_and_receipts = get_sequential_eth_blocks_and_receipts();
-        block_and_receipts
-            .iter()
-            .enumerate()
-            .for_each(|(i, block)|
-                 assert_eq!(block.get_block_number().unwrap().as_usize(), SEQUENTIAL_BLOCKS_FIRST_NUMBER + i)
-             );
+        block_and_receipts.iter().enumerate().for_each(|(i, block)| {
+            assert_eq!(
+                block.get_block_number().unwrap().as_usize(),
+                SEQUENTIAL_BLOCKS_FIRST_NUMBER + i
+            )
+        });
     }
 }

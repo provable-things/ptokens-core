@@ -1,12 +1,7 @@
 use crate::{
-    traits::DatabaseInterface,
     chains::eos::eos_database_utils::put_eos_enabled_protocol_features_in_db,
-    types::{
-        Byte,
-        Bytes,
-        NoneError,
-        Result,
-    },
+    traits::DatabaseInterface,
+    types::{Byte, Bytes, NoneError, Result},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,15 +38,18 @@ impl EnabledFeatures {
         EnabledFeatures(vec![])
     }
 
-    pub fn remove(mut self, feature_hash: &[Byte]) -> Result<Self>{
+    pub fn remove(mut self, feature_hash: &[Byte]) -> Result<Self> {
         if self.does_not_contain(feature_hash) {
-            return Ok(self)
+            return Ok(self);
         };
         AVAILABLE_FEATURES
             .get_feature_from_hash(feature_hash)
             .and_then(|feature| {
-                self.0.remove(self.0.iter().position(|x| x == &feature)
-                    .ok_or(NoneError("Could not unwrap EOS protocol feature while removing!"))?
+                self.0.remove(
+                    self.0
+                        .iter()
+                        .position(|x| x == &feature)
+                        .ok_or(NoneError("Could not unwrap EOS protocol feature while removing!"))?,
                 );
                 Ok(self)
             })
@@ -84,10 +82,7 @@ impl EnabledFeatures {
 
     pub fn contains(&self, feature_hash: &[Byte]) -> bool {
         let hash = hex::encode(feature_hash);
-        self
-            .0
-            .iter()
-            .any(|e| e.feature_hash == hash)
+        self.0.iter().any(|e| e.feature_hash == hash)
     }
 
     pub fn does_not_contain(&self, feature_hash: &[Byte]) -> bool {
@@ -102,18 +97,14 @@ impl EnabledFeatures {
         !self.is_enabled(feature_hash)
     }
 
-    pub fn enable_multi<D>(
-        self,
-        db: &D,
-        feature_hashes: &mut Vec<Bytes>
-    ) -> Result<Self>
-        where D: DatabaseInterface
+    pub fn enable_multi<D>(self, db: &D, feature_hashes: &mut Vec<Bytes>) -> Result<Self>
+    where
+        D: DatabaseInterface,
     {
-        self.add_multi(feature_hashes)
-            .and_then(|updated_self| {
-                put_eos_enabled_protocol_features_in_db(db, &updated_self)?;
-                Ok(updated_self)
-            })
+        self.add_multi(feature_hashes).and_then(|updated_self| {
+            put_eos_enabled_protocol_features_in_db(db, &updated_self)?;
+            Ok(updated_self)
+        })
     }
 }
 
@@ -127,10 +118,7 @@ impl AvailableFeatures {
 
     pub fn contains(&self, feature_hash: &[Byte]) -> bool {
         let hash = hex::encode(feature_hash);
-        self
-            .0
-            .iter()
-            .any(|e| e.feature_hash == hash)
+        self.0.iter().any(|e| e.feature_hash == hash)
     }
 
     pub fn check_contains(&self, feature_hash: &[Byte]) -> Result<()> {
@@ -142,50 +130,33 @@ impl AvailableFeatures {
             true => {
                 info!("✔ Feature hash exists in available features!");
                 Ok(())
-            }
-            false => Err(format!(
-                "✘ Unrecognised feature hash: {}",
-                hex::encode(feature_hash),
-            ).into())
+            },
+            false => Err(format!("✘ Unrecognised feature hash: {}", hex::encode(feature_hash),).into()),
         }
     }
 
-
-    fn get_known_feature_from_hash(
-        &self,
-        feature_hash: &[Byte],
-    ) -> ProtocolFeature {
-        self
-            .0
+    fn get_known_feature_from_hash(&self, feature_hash: &[Byte]) -> ProtocolFeature {
+        self.0
             .iter()
-            .fold(
-                ProtocolFeature::default(),
-                |mut acc, protocol_feature| {
-                    if protocol_feature.feature_hash == hex::encode(feature_hash) {
-                        acc = protocol_feature.clone();
-                    };
-                    acc
-                }
-            )
+            .fold(ProtocolFeature::default(), |mut acc, protocol_feature| {
+                if protocol_feature.feature_hash == hex::encode(feature_hash) {
+                    acc = protocol_feature.clone();
+                };
+                acc
+            })
     }
 
-    pub fn maybe_get_feature_from_hash(
-        &self,
-        feature_hash: &[Byte],
-    ) -> Option<ProtocolFeature> {
+    pub fn maybe_get_feature_from_hash(&self, feature_hash: &[Byte]) -> Option<ProtocolFeature> {
         match self.contains(feature_hash) {
             true => Some(self.get_known_feature_from_hash(feature_hash)),
             false => {
                 info!("✘ Unrecognised feature hash: {}", hex::encode(feature_hash));
                 None
-            }
+            },
         }
     }
 
-    pub fn get_feature_from_hash(
-        &self,
-        feature_hash: &[Byte],
-    ) -> Result<ProtocolFeature> {
+    pub fn get_feature_from_hash(&self, feature_hash: &[Byte]) -> Result<ProtocolFeature> {
         self.check_contains(feature_hash)
             .map(|_| self.get_known_feature_from_hash(feature_hash))
     }
@@ -193,21 +164,15 @@ impl AvailableFeatures {
 
 lazy_static! {
     pub static ref AVAILABLE_FEATURES: AvailableFeatures = {
-        AvailableFeatures::new(
-            vec![
-                ProtocolFeature::new(
-                    "WTMSIG_BLOCK_SIGNATURE",
-                    hex::encode(WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH),
-                ),
-            ]
-        )
+        AvailableFeatures::new(vec![ProtocolFeature::new(
+            "WTMSIG_BLOCK_SIGNATURE",
+            hex::encode(WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH),
+        )])
     };
 }
 
 // NOTE: 299dcb6af692324b899b39f16d5a530a33062804e41f09dc97e9f156b4476707
 pub static WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH: [u8; 32] = [
-    41, 157, 203, 106, 246, 146, 50, 75,
-    137, 155, 57, 241, 109, 90, 83, 10,
-    51, 6, 40, 4, 228, 31, 9, 220,
-    151, 233, 241, 86, 180, 71, 103, 7
+    41, 157, 203, 106, 246, 146, 50, 75, 137, 155, 57, 241, 109, 90, 83, 10, 51, 6, 40, 4, 228, 31, 9, 220, 151, 233,
+    241, 86, 180, 71, 103, 7,
 ];

@@ -9,18 +9,7 @@ use bitcoin::{blockdata::transaction::TxIn as BtcUtxo, hashes::sha256d};
 use derive_more::{Constructor, Deref, DerefMut, From, Into, IntoIterator};
 
 #[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    Eq,
-    Constructor,
-    Deref,
-    DerefMut,
-    From,
-    Into,
-    IntoIterator,
+    Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Constructor, Deref, DerefMut, From, Into, IntoIterator,
 )]
 pub struct BtcUtxosAndValues(pub Vec<BtcUtxoAndValue>);
 

@@ -1,44 +1,29 @@
-use std::str::{
-    FromStr,
-    from_utf8,
-};
-use ethereum_types::{
-    U256,
-    Address as EthAddress,
-};
-use eos_primitives::{
-    Checksum256,
-    Action as EosAction,
-    Symbol as EosSymbol,
-    AccountName as EosAccountName,
-    ActionReceipt as EosActionReceipt,
-    ActionName,
-    AccountName,
-    PermissionLevel,
-    PermissionLevels,
-};
 use crate::{
-    constants::SAFE_ETH_ADDRESS,
     btc_on_eos::eos::redeem_info::BtcOnEosRedeemInfo,
-    erc20_on_eos::eos::redeem_info::Erc20OnEosRedeemInfo,
-    types::{
-        Bytes,
-        Result,
-    },
-    utils::{
-        convert_bytes_to_u64,
-        maybe_strip_hex_prefix,
-    },
     chains::eos::{
-        eos_types:: MerkleProof,
+        eos_erc20_dictionary::{EosErc20Dictionary, EosErc20DictionaryEntry},
+        eos_types::MerkleProof,
         eos_utils::convert_hex_to_checksum256,
         parse_eos_action_receipts::parse_eos_action_receipt_json,
-        eos_erc20_dictionary::{
-            EosErc20Dictionary,
-            EosErc20DictionaryEntry,
-        },
     },
+    constants::SAFE_ETH_ADDRESS,
+    erc20_on_eos::eos::redeem_info::Erc20OnEosRedeemInfo,
+    types::{Bytes, Result},
+    utils::{convert_bytes_to_u64, maybe_strip_hex_prefix},
 };
+use eos_primitives::{
+    AccountName as EosAccountName,
+    AccountName,
+    Action as EosAction,
+    ActionName,
+    ActionReceipt as EosActionReceipt,
+    Checksum256,
+    PermissionLevel,
+    PermissionLevels,
+    Symbol as EosSymbol,
+};
+use ethereum_types::{Address as EthAddress, U256};
+use std::str::{from_utf8, FromStr};
 
 pub type EosActionProofs = Vec<EosActionProof>;
 pub type EosActionProofJsons = Vec<EosActionProofJson>;
@@ -56,7 +41,9 @@ pub struct EosActionProof {
 impl EosActionProof {
     #[allow(dead_code)] // TODO Use when checking for correct symbol!
     fn get_eos_symbol(&self) -> Result<EosSymbol> {
-        Ok(EosSymbol::new(convert_bytes_to_u64(&self.action.data[16..24].to_vec())?))
+        Ok(EosSymbol::new(convert_bytes_to_u64(
+            &self.action.data[16..24].to_vec(),
+        )?))
     }
 
     fn get_btc_on_eos_eos_amount(&self) -> Result<u64> {
@@ -84,7 +71,9 @@ impl EosActionProof {
     }
 
     fn get_erc20_on_eos_eth_redeem_address(&self) -> Result<EthAddress> {
-        Ok(EthAddress::from_slice(&hex::decode(&maybe_strip_hex_prefix(&self.get_memo_string()?)?)?))
+        Ok(EthAddress::from_slice(&hex::decode(&maybe_strip_hex_prefix(
+            &self.get_memo_string()?,
+        )?)?))
     }
 
     // TODO get sample with bad ETH address and test this!
@@ -92,10 +81,13 @@ impl EosActionProof {
         match self.get_erc20_on_eos_eth_redeem_address() {
             Ok(address) => Ok(address),
             Err(_) => {
-                info!("✘ Could not parse ETH address from action memo: {}", self.get_memo_string()?);
+                info!(
+                    "✘ Could not parse ETH address from action memo: {}",
+                    self.get_memo_string()?
+                );
                 info!("✔ Defaulting to safe ETH address: 0x{}", hex::encode(*SAFE_ETH_ADDRESS));
                 Ok(*SAFE_ETH_ADDRESS)
-            }
+            },
         }
     }
 
@@ -159,7 +151,7 @@ pub struct EosActionReceiptJson {
     pub receiver: String,
     pub act_digest: String,
     pub global_sequence: u64,
-    pub recv_sequence:  u64,
+    pub recv_sequence: u64,
     pub auth_sequence: AuthSequenceJsons,
     pub code_sequence: usize,
     pub abi_sequence: usize,
@@ -167,7 +159,6 @@ pub struct EosActionReceiptJson {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthSequenceJson(pub String, pub u64);
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EosActionJson {
@@ -179,7 +170,10 @@ pub struct EosActionJson {
 
 impl EosActionJson {
     fn parse_authorization_json(authorization_json: &AuthorizationJson) -> Result<PermissionLevel> {
-        Ok(PermissionLevel::from_str(authorization_json.actor.clone(), authorization_json.permission.clone())?)
+        Ok(PermissionLevel::from_str(
+            authorization_json.actor.clone(),
+            authorization_json.permission.clone(),
+        )?)
     }
 
     fn parse_authorization_jsons(authorization_jsons: &[AuthorizationJson]) -> Result<PermissionLevels> {
@@ -189,7 +183,7 @@ impl EosActionJson {
     fn deserialize_action_data(maybe_hex_data: &Option<String>) -> Result<Bytes> {
         match maybe_hex_data {
             Some(string) => Ok(hex::decode(string)?),
-            None => Err("✘ Failed to decode hex_data field of action!".into())
+            None => Err("✘ Failed to decode hex_data field of action!".into()),
         }
     }
 
@@ -209,19 +203,16 @@ pub struct AuthorizationJson {
     pub permission: String,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
     use crate::btc_on_eos::eos::eos_test_utils::get_sample_eos_submission_material_n;
+    use std::str::FromStr;
 
     #[test]
     fn should_get_sender() {
-        let expected_result = EosAccountName::from_str("provtestable")
-            .unwrap();
-        let result = get_sample_eos_submission_material_n(1)
-            .action_proofs[0]
+        let expected_result = EosAccountName::from_str("provtestable").unwrap();
+        let result = get_sample_eos_submission_material_n(1).action_proofs[0]
             .get_redeem_action_sender()
             .unwrap();
         assert_eq!(result, expected_result);
@@ -229,10 +220,8 @@ mod tests {
 
     #[test]
     fn should_get_symbol() {
-        let expected_result = EosSymbol::from_str("8,PFFF")
-            .unwrap();
-        let result = get_sample_eos_submission_material_n(1)
-            .action_proofs[0]
+        let expected_result = EosSymbol::from_str("8,PFFF").unwrap();
+        let result = get_sample_eos_submission_material_n(1).action_proofs[0]
             .get_eos_symbol()
             .unwrap();
         assert_eq!(result, expected_result);
@@ -241,8 +230,7 @@ mod tests {
     #[test]
     fn should_get_amount() {
         let expected_result: u64 = 5111;
-        let result = get_sample_eos_submission_material_n(1)
-            .action_proofs[0]
+        let result = get_sample_eos_submission_material_n(1).action_proofs[0]
             .get_btc_on_eos_eos_amount()
             .unwrap();
         assert_eq!(result, expected_result);
@@ -250,10 +238,8 @@ mod tests {
 
     #[test]
     fn should_get_btc_on_eos_btc_redeem_address_serialized_action() {
-        let expected_result = "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM"
-            .to_string();
-        let result = get_sample_eos_submission_material_n(1)
-            .action_proofs[0]
+        let expected_result = "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM".to_string();
+        let result = get_sample_eos_submission_material_n(1).action_proofs[0]
             .get_btc_on_eos_btc_redeem_address()
             .unwrap();
         assert_eq!(result, expected_result);
@@ -267,8 +253,9 @@ mod tests {
             recipient: "mr6ioeUxNMoavbr2VjaSbPAovzzgDT7Su9".to_string(),
             from: EosAccountName::from_str("provabletest").unwrap(),
             originating_tx_id: convert_hex_to_checksum256(
-                &"34dff748d2bbb9504057d4be24c69b8ac38b2905f7e911dd0e9ed3bf369bae03".to_string()
-            ).unwrap(),
+                &"34dff748d2bbb9504057d4be24c69b8ac38b2905f7e911dd0e9ed3bf369bae03".to_string(),
+            )
+            .unwrap(),
         };
         let action_proof = get_sample_eos_submission_material_n(2).action_proofs[0].clone();
         let result = action_proof.to_btc_on_eos_redeem_info().unwrap();
@@ -283,8 +270,9 @@ mod tests {
             recipient: "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM".to_string(),
             from: EosAccountName::from_str("provabletest").unwrap(),
             originating_tx_id: convert_hex_to_checksum256(
-                &"51f0dbbaf6989e9b980d0fa18bd70ddfc543851ff65140623d2cababce2ceb8c".to_string()
-            ).unwrap(),
+                &"51f0dbbaf6989e9b980d0fa18bd70ddfc543851ff65140623d2cababce2ceb8c".to_string(),
+            )
+            .unwrap(),
         };
         let action_proof = get_sample_eos_submission_material_n(3).action_proofs[0].clone();
         let result = action_proof.to_btc_on_eos_redeem_info().unwrap();
@@ -299,8 +287,9 @@ mod tests {
             recipient: "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM".to_string(),
             from: EosAccountName::from_str("provtestable").unwrap(),
             originating_tx_id: convert_hex_to_checksum256(
-                &"8eaafcb796002a12e0f48ebc0f832bacca72a8b370e00967c65619a2c1814a04".to_string()
-            ).unwrap(),
+                &"8eaafcb796002a12e0f48ebc0f832bacca72a8b370e00967c65619a2c1814a04".to_string(),
+            )
+            .unwrap(),
         };
         let action_proof = get_sample_eos_submission_material_n(4).action_proofs[0].clone();
         let result = action_proof.to_btc_on_eos_redeem_info().unwrap();
@@ -315,8 +304,9 @@ mod tests {
             recipient: "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM".to_string(),
             from: EosAccountName::from_str("provtestable").unwrap(),
             originating_tx_id: convert_hex_to_checksum256(
-                &"aebe7cd1a4687485bc5db87bfb1bdfb44bd1b7f9c080e5cb178a411fd99d2fd5".to_string()
-            ).unwrap(),
+                &"aebe7cd1a4687485bc5db87bfb1bdfb44bd1b7f9c080e5cb178a411fd99d2fd5".to_string(),
+            )
+            .unwrap(),
         };
         let action_proof = get_sample_eos_submission_material_n(1).action_proofs[0].clone();
         let result = action_proof.to_btc_on_eos_redeem_info().unwrap();
@@ -345,9 +335,7 @@ mod tests {
 
     #[test]
     fn should_get_erc20_on_eos_eth_redeem_address() {
-        let expected_result =  EthAddress::from_slice(
-            &hex::decode("fEDFe2616EB3661CB8FEd2782F5F0cC91D59DCaC").unwrap()
-        );
+        let expected_result = EthAddress::from_slice(&hex::decode("fEDFe2616EB3661CB8FEd2782F5F0cC91D59DCaC").unwrap());
         let proof = get_sample_action_proof_for_erc20_redeem();
         let result = proof.get_erc20_on_eos_eth_redeem_address().unwrap();
         assert_eq!(result, expected_result);

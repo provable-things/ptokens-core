@@ -1,31 +1,21 @@
-use std::fmt;
+use crate::{
+    chains::btc::{btc_types::BtcPubKeySlice, btc_utils::get_btc_one_key},
+    constants::PRIVATE_KEY_DATA_SENSITIVITY_LEVEL,
+    crypto_utils::generate_random_private_key,
+    traits::DatabaseInterface,
+    types::{Byte, Bytes, Result},
+};
 use bitcoin::{
-    util::{
-        key::PrivateKey,
-        address::Address as BtcAddress,
-    },
     network::constants::Network,
+    util::{address::Address as BtcAddress, key::PrivateKey},
 };
 use secp256k1::{
+    key::{PublicKey, SecretKey},
     Message,
     Secp256k1,
     Signature,
-    key::{
-        SecretKey,
-        PublicKey,
-    },
 };
-use crate::{
-    traits::DatabaseInterface,
-    chains::btc::btc_utils::get_btc_one_key,
-    crypto_utils::generate_random_private_key,
-    constants::PRIVATE_KEY_DATA_SENSITIVITY_LEVEL,
-    types::{
-        Byte,
-        Bytes,
-        Result,
-    },
-};
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BtcPrivateKey(PrivateKey);
@@ -36,11 +26,19 @@ impl BtcPrivateKey {
     }
 
     pub fn from_slice(slice: &[u8], network: Network) -> Result<Self> {
-        Ok(Self(PrivateKey { network, compressed: true, key: SecretKey::from_slice(&slice)? }))
+        Ok(Self(PrivateKey {
+            network,
+            compressed: true,
+            key: SecretKey::from_slice(&slice)?,
+        }))
     }
 
     pub fn generate_random(network: Network) -> Result<Self> {
-        Ok(Self(PrivateKey { network, compressed: false, key: generate_random_private_key()?  }))
+        Ok(Self(PrivateKey {
+            network,
+            compressed: false,
+            key: generate_random_private_key()?,
+        }))
     }
 
     pub fn sign_hash(&self, hash: Bytes) -> Result<Signature> {
@@ -60,14 +58,18 @@ impl BtcPrivateKey {
         PublicKey::from_secret_key(&Secp256k1::new(), &self.0.key)
     }
 
-    pub fn to_public_key_slice(&self) -> [u8; 33] {
+    pub fn to_public_key_slice(&self) -> BtcPubKeySlice {
         self.to_public_key().serialize()
     }
 
     #[cfg(test)]
     pub fn from_wif(wif: &str) -> Result<Self> {
         let pk = PrivateKey::from_wif(wif)?;
-        Ok(Self(PrivateKey { key: pk.key, network: pk.network, compressed: pk.compressed }))
+        Ok(Self(PrivateKey {
+            key: pk.key,
+            network: pk.network,
+            compressed: pk.compressed,
+        }))
     }
 
     pub fn write_to_db<D: DatabaseInterface>(&self, db: &D, key: &[Byte]) -> Result<()> {
@@ -90,22 +92,17 @@ impl Drop for BtcPrivateKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitcoin_hashes::{
-        Hash,
-        sha256d,
-    };
     use crate::chains::btc::btc_test_utils::{
+        get_sample_btc_private_key,
         SAMPLE_BTC_PUBLIC_KEY,
         SAMPLE_TARGET_BTC_ADDRESS,
-        get_sample_btc_private_key,
     };
+    use bitcoin_hashes::{sha256d, Hash};
 
     fn get_sample_btc_private_key_slice() -> [u8; 32] {
         [
-            42, 247, 128, 75, 130, 36, 250, 199,
-            18, 109, 88, 243, 110, 14, 135, 154,
-            181, 44, 141, 200, 227, 90, 199, 116,
-            29, 59, 150, 42, 200, 13, 236, 155
+            42, 247, 128, 75, 130, 36, 250, 199, 18, 109, 88, 243, 110, 14, 135, 154, 181, 44, 141, 200, 227, 90, 199,
+            116, 29, 59, 150, 42, 200, 13, 236, 155,
         ]
     }
 
@@ -121,7 +118,7 @@ mod tests {
     fn should_generate_key_from_slice() {
         let network = Network::Bitcoin;
         let slice = get_sample_btc_private_key_slice();
-        if let Err(e) =  BtcPrivateKey::from_slice(&slice, network) {
+        if let Err(e) = BtcPrivateKey::from_slice(&slice, network) {
             panic!("Error generating private btc key from slice: {}", e);
         }
     }
@@ -152,7 +149,9 @@ mod tests {
         let message_to_sign = b"message to sign";
         let hash_type: u8 = 1;
         let hash = sha256d::Hash::hash(message_to_sign).to_vec();
-        let result = btc_private_key.sign_hash_and_append_btc_hash_type(hash, hash_type).unwrap();
+        let result = btc_private_key
+            .sign_hash_and_append_btc_hash_type(hash, hash_type)
+            .unwrap();
         let result_hex = hex::encode(result);
         assert_eq!(result_hex, expected_result);
     }
@@ -167,15 +166,11 @@ mod tests {
     #[test]
     fn should_get_public_key_slice() {
         let expected_result = vec![
-            3, 210, 165, 227, 177, 98, 235, 88,
-            15, 226, 206, 2, 60, 213, 224, 221,
-            219, 182, 40, 105, 35, 172, 222, 119,
-            227, 229, 70, 131, 20, 220, 147, 115,
-            247
+            3, 210, 165, 227, 177, 98, 235, 88, 15, 226, 206, 2, 60, 213, 224, 221, 219, 182, 40, 105, 35, 172, 222,
+            119, 227, 229, 70, 131, 20, 220, 147, 115, 247,
         ];
         let btc_private_key = get_sample_btc_private_key();
-        let result = btc_private_key
-            .to_public_key_slice();
+        let result = btc_private_key.to_public_key_slice();
         assert_eq!(result.to_vec(), expected_result);
     }
 

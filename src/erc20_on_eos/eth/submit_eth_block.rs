@@ -1,30 +1,28 @@
 use crate::{
-    types::Result,
-    traits::DatabaseInterface,
     chains::{
         eos::{
-            sign_eos_transactions::maybe_sign_eos_txs_and_add_to_eth_state,
             eos_erc20_dictionary::get_erc20_dictionary_from_db_and_add_to_eth_state,
+            sign_eos_transactions::maybe_sign_eos_txs_and_add_to_eth_state,
         },
         eth::{
-            eth_state::EthState,
-            validate_block_in_state::validate_block_in_state,
-            validate_receipts_in_state::validate_receipts_in_state,
-            check_parent_exists::check_for_parent_of_block_in_state,
-            update_eth_linker_hash::maybe_update_eth_linker_hash_and_return_state,
-            eth_submission_material::parse_eth_submission_material_and_put_in_state,
-            update_latest_block_hash::maybe_update_latest_block_hash_and_return_state,
-            remove_old_eth_tail_block::maybe_remove_old_eth_tail_block_and_return_state,
-            update_eth_tail_block_hash::maybe_update_eth_tail_block_hash_and_return_state,
-            increment_eos_account_nonce::maybe_increment_eos_account_nonce_and_return_state,
-            update_eth_canon_block_hash::maybe_update_eth_canon_block_hash_and_return_state,
             add_block_and_receipts_to_db::maybe_add_block_and_receipts_to_db_and_return_state,
-            filter_receipts_in_state::filter_receipts_for_erc20_on_eos_peg_in_events_in_state,
-            remove_receipts_from_canon_block::maybe_remove_receipts_from_canon_block_and_return_state,
+            check_parent_exists::check_for_parent_of_block_in_state,
             eth_database_transactions::{
                 end_eth_db_transaction_and_return_state,
                 start_eth_db_transaction_and_return_state,
             },
+            eth_state::EthState,
+            eth_submission_material::parse_eth_submission_material_and_put_in_state,
+            filter_receipts_in_state::filter_receipts_for_erc20_on_eos_peg_in_events_in_state,
+            increment_eos_account_nonce::maybe_increment_eos_account_nonce_and_return_state,
+            remove_old_eth_tail_block::maybe_remove_old_eth_tail_block_and_return_state,
+            remove_receipts_from_canon_block::maybe_remove_receipts_from_canon_block_and_return_state,
+            update_eth_canon_block_hash::maybe_update_eth_canon_block_hash_and_return_state,
+            update_eth_linker_hash::maybe_update_eth_linker_hash_and_return_state,
+            update_eth_tail_block_hash::maybe_update_eth_tail_block_hash_and_return_state,
+            update_latest_block_hash::maybe_update_latest_block_hash_and_return_state,
+            validate_block_in_state::validate_block_in_state,
+            validate_receipts_in_state::validate_receipts_in_state,
         },
     },
     erc20_on_eos::{
@@ -37,6 +35,8 @@ use crate::{
             },
         },
     },
+    traits::DatabaseInterface,
+    types::Result,
 };
 
 /// # Submit ETH Block to Core

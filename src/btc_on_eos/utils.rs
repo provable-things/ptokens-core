@@ -1,20 +1,15 @@
 use crate::{
-    types::{
-        Result,
-        NoneError
-    },
     constants::BTC_NUM_DECIMALS,
+    types::{NoneError, Result},
 };
 
 pub fn convert_eos_asset_to_u64(eos_asset: &str) -> Result<u64> {
-    Ok(
-        eos_asset
-            .replace(".", "")
-            .split_whitespace()
-            .next()
-            .ok_or(NoneError("Error converting EOS asset to u64!"))?
-            .parse()?
-    )
+    Ok(eos_asset
+        .replace(".", "")
+        .split_whitespace()
+        .next()
+        .ok_or(NoneError("Error converting EOS asset to u64!"))?
+        .parse()?)
 }
 
 pub fn convert_u64_to_8_decimal_eos_asset(value: u64, token_symbol: &str) -> String {
@@ -32,7 +27,7 @@ pub fn convert_u64_to_8_decimal_eos_asset(value: u64, token_symbol: &str) -> Str
         _ => {
             amount_string.insert(amount_string.len() - BTC_NUM_DECIMALS, '.');
             amount_string
-        }
+        },
     };
     format!("{} {}", asset, token_symbol)
 }
@@ -85,10 +80,10 @@ mod tests {
             "0.000000001 SAM",
             "0.000000000 SAM",
         ]
-            .iter()
-            .map(|eos_asset| convert_eos_asset_to_u64(eos_asset).unwrap())
-            .zip(expected_results.iter())
-            .for_each(|(result, expected_result)| assert_eq!(&result, expected_result));
+        .iter()
+        .map(|eos_asset| convert_eos_asset_to_u64(eos_asset).unwrap())
+        .zip(expected_results.iter())
+        .for_each(|(result, expected_result)| assert_eq!(&result, expected_result));
     }
 
     #[test]
@@ -136,9 +131,9 @@ mod tests {
             1 as u64,
             0 as u64,
         ]
-            .iter()
-            .map(|u_64| convert_u64_to_8_decimal_eos_asset(*u_64, symbol))
-            .zip(expected_results.iter())
-            .for_each(|(result, expected_result)| assert_eq!(&result, expected_result));
+        .iter()
+        .map(|u_64| convert_u64_to_8_decimal_eos_asset(*u_64, symbol))
+        .zip(expected_results.iter())
+        .for_each(|(result, expected_result)| assert_eq!(&result, expected_result));
     }
 }

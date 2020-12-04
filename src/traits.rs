@@ -8,16 +8,7 @@ pub trait DatabaseInterface {
 
     fn delete(&self, key: Bytes) -> Result<()>;
 
-    fn get(
-        &self,
-        key: Bytes,
-        data_sensitivity: Option<u8>
-    ) -> Result<Bytes>;
+    fn get(&self, key: Bytes, data_sensitivity: Option<u8>) -> Result<Bytes>;
 
-    fn put(
-        &self,
-        key: Bytes,
-        value: Bytes,
-        data_sensitivity: Option<u8>
-    ) -> Result<()>;
+    fn put(&self, key: Bytes, value: Bytes, data_sensitivity: Option<u8>) -> Result<()>;
 }

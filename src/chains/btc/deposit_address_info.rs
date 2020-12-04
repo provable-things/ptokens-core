@@ -1,29 +1,16 @@
-use derive_more::{
-    Deref,
-    Constructor,
+use crate::{
+    chains::btc::btc_utils::convert_hex_to_sha256_hash,
+    types::{Bytes, Result},
+    utils::decode_hex_with_err_msg,
 };
 use bitcoin::{
+    hashes::{sha256d, Hash},
     util::address::Address as BtcAddress,
-    hashes::{
-        Hash,
-        sha256d,
-    },
 };
-use std::{
-    str::FromStr,
-    collections::HashMap,
-    fmt,
-};
-use crate::{
-    utils::decode_hex_with_err_msg,
-    chains::btc::btc_utils::convert_hex_to_sha256_hash,
-    types::{
-        Bytes,
-        Result,
-    },
-};
+use derive_more::{Constructor, Deref};
+use std::{collections::HashMap, fmt, str::FromStr};
 
-pub type DepositInfoHashMap =  HashMap<BtcAddress, DepositAddressInfo>;
+pub type DepositInfoHashMap = HashMap<BtcAddress, DepositAddressInfo>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Deref, Constructor)]
 pub struct DepositAddressInfoJsonList(pub Vec<DepositAddressInfoJson>);
@@ -33,7 +20,11 @@ pub struct DepositInfoList(pub Vec<DepositAddressInfo>);
 
 impl DepositInfoList {
     pub fn from_json(json: &DepositAddressInfoJsonList) -> Result<Self> {
-        Ok(Self::new(json.iter().map(DepositAddressInfo::from_json).collect::<Result<Vec<DepositAddressInfo>>>()?))
+        Ok(Self::new(
+            json.iter()
+                .map(DepositAddressInfo::from_json)
+                .collect::<Result<Vec<DepositAddressInfo>>>()?,
+        ))
     }
 }
 
@@ -57,7 +48,7 @@ impl DepositAddressInfoVersion {
             Some('0') => Ok(DepositAddressInfoVersion::V0),
             Some('1') => Ok(DepositAddressInfoVersion::V1),
             Some('2') => Ok(DepositAddressInfoVersion::V2),
-            _ => Err(format!("✘ Deposit address list version unrecognized: {}", version_string).into())
+            _ => Err(format!("✘ Deposit address list version unrecognized: {}", version_string).into()),
         }
     }
 }
@@ -111,7 +102,7 @@ impl DepositAddressInfoJson {
                 btc_deposit_address,
                 eth_address: Some(address),
                 address_and_nonce_hash: None,
-                eth_address_and_nonce_hash: Some(address_and_nonce_hash)
+                eth_address_and_nonce_hash: Some(address_and_nonce_hash),
             }),
             DepositAddressInfoVersion::V1 => Ok(DepositAddressInfoJson {
                 nonce,
@@ -153,23 +144,24 @@ impl DepositAddressInfo {
     }
 
     fn extract_address_and_nonce_hash_string_from_json(
-        deposit_address_info_json: &DepositAddressInfoJson
+        deposit_address_info_json: &DepositAddressInfoJson,
     ) -> Result<String> {
         match DepositAddressInfoVersion::from_maybe_string(&deposit_address_info_json.version)? {
             DepositAddressInfoVersion::V0 => match &deposit_address_info_json.eth_address_and_nonce_hash {
                 Some(hash_string) => Ok(hash_string.clone()),
                 None => Err(Self::get_missing_field_err_msg("eth_address_and_nonce_hash").into()),
             },
-            DepositAddressInfoVersion::V1 | DepositAddressInfoVersion::V2 =>
+            DepositAddressInfoVersion::V1 | DepositAddressInfoVersion::V2 => {
                 match &deposit_address_info_json.address_and_nonce_hash {
                     Some(hash_string) => Ok(hash_string.clone()),
                     None => Err(Self::get_missing_field_err_msg("address_and_nonce_hash").into()),
-                },
+                }
+            },
         }
     }
 
     fn extract_address_and_nonce_hash_from_json(
-        deposit_address_info_json: &DepositAddressInfoJson
+        deposit_address_info_json: &DepositAddressInfoJson,
     ) -> Result<sha256d::Hash> {
         Self::extract_address_and_nonce_hash_string_from_json(deposit_address_info_json)
             .and_then(|hex| convert_hex_to_sha256_hash(&hex))
@@ -184,27 +176,28 @@ impl DepositAddressInfo {
             DepositAddressInfoVersion::V1 | DepositAddressInfoVersion::V2 => match &deposit_address_info_json.address {
                 Some(hash_string) => Ok(hash_string.clone()),
                 None => Err(Self::get_missing_field_err_msg("address").into()),
-            }
+            },
         }
     }
 
     fn from_json_with_no_validation(deposit_address_info_json: &DepositAddressInfoJson) -> Result<Self> {
-        Ok(
-            DepositAddressInfo {
-                nonce: deposit_address_info_json.nonce,
-                address: Self::extract_address_string_from_json(deposit_address_info_json)?,
-                btc_deposit_address: BtcAddress::from_str(&deposit_address_info_json.btc_deposit_address)?,
-                commitment_hash: Self::extract_address_and_nonce_hash_from_json(deposit_address_info_json)?,
-                version: DepositAddressInfoVersion::from_maybe_string(&deposit_address_info_json.version)?,
-                calldata: match &deposit_address_info_json.calldata {
-                    Some(hex_string) => decode_hex_with_err_msg(
-                        hex_string,
-                        &format!("✘ Could not decode hex in calldata in {}: ", deposit_address_info_json.to_string()?),
-                    )?,
-                    None => vec![],
-                },
-            }
-        )
+        Ok(DepositAddressInfo {
+            nonce: deposit_address_info_json.nonce,
+            address: Self::extract_address_string_from_json(deposit_address_info_json)?,
+            btc_deposit_address: BtcAddress::from_str(&deposit_address_info_json.btc_deposit_address)?,
+            commitment_hash: Self::extract_address_and_nonce_hash_from_json(deposit_address_info_json)?,
+            version: DepositAddressInfoVersion::from_maybe_string(&deposit_address_info_json.version)?,
+            calldata: match &deposit_address_info_json.calldata {
+                Some(hex_string) => decode_hex_with_err_msg(
+                    hex_string,
+                    &format!(
+                        "✘ Could not decode hex in calldata in {}: ",
+                        deposit_address_info_json.to_string()?
+                    ),
+                )?,
+                None => vec![],
+            },
+        })
     }
 
     fn get_address_as_bytes(&self) -> Result<Bytes> {
@@ -218,11 +211,10 @@ impl DepositAddressInfo {
     }
 
     fn calculate_commitment_hash_v0(&self) -> Result<sha256d::Hash> {
-        self.get_address_as_bytes()
-            .map(|mut address_bytes| {
-                address_bytes.append(&mut self.nonce.to_le_bytes().to_vec());
-                sha256d::Hash::hash(&address_bytes)
-            })
+        self.get_address_as_bytes().map(|mut address_bytes| {
+            address_bytes.append(&mut self.nonce.to_le_bytes().to_vec());
+            sha256d::Hash::hash(&address_bytes)
+        })
     }
 
     fn calculate_commitment_hash_v1(&self) -> Result<sha256d::Hash> {
@@ -230,12 +222,11 @@ impl DepositAddressInfo {
     }
 
     fn calculate_commitment_hash_v2(&self) -> Result<sha256d::Hash> {
-        self.get_address_as_bytes()
-            .map(|mut address_bytes| {
-                address_bytes.append(&mut self.nonce.to_le_bytes().to_vec());
-                address_bytes.append(&mut self.calldata.clone());
-                sha256d::Hash::hash(&address_bytes)
-            })
+        self.get_address_as_bytes().map(|mut address_bytes| {
+            address_bytes.append(&mut self.nonce.to_le_bytes().to_vec());
+            address_bytes.append(&mut self.calldata.clone());
+            sha256d::Hash::hash(&address_bytes)
+        })
     }
 
     fn calculate_commitment_hash(&self) -> Result<sha256d::Hash> {
@@ -248,17 +239,15 @@ impl DepositAddressInfo {
 
     fn validate_commitment_hash(self) -> Result<Self> {
         self.calculate_commitment_hash()
-            .and_then(|calculated_hash| {
-                match calculated_hash == self.commitment_hash {
-                    true => Ok(self),
-                    false => {
-                        debug!("          Deposit info nonce: {}", &self.nonce);
-                        debug!("        Deposit info adresss: {}", &self.address);
-                        debug!("  Calculated commitment hash: {}", &calculated_hash);
-                        debug!("Deposit info commitment hash: {}", &self.commitment_hash);
-                        Err("✘ Deposit info error - commitment hash is not valid!".into())
-                    },
-                }
+            .and_then(|calculated_hash| match calculated_hash == self.commitment_hash {
+                true => Ok(self),
+                false => {
+                    debug!("          Deposit info nonce: {}", &self.nonce);
+                    debug!("        Deposit info adresss: {}", &self.address);
+                    debug!("  Calculated commitment hash: {}", &calculated_hash);
+                    debug!("Deposit info commitment hash: {}", &self.commitment_hash);
+                    Err("✘ Deposit info error - commitment hash is not valid!".into())
+                },
             })
     }
 
@@ -297,7 +286,6 @@ impl DepositAddressInfo {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,14 +296,13 @@ mod tests {
         let nonce = 1578079722;
         let address = Some("0xedb86cd455ef3ca43f0e227e00469c3bdfa40628".to_string());
         let btc_deposit_address = "2MuuCeJjptiB1ETfytAqMZFqPCKAfXyhxoQ".to_string();
-        let eth_address_and_nonce_hash = Some(
-            "348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string()
-        );
+        let eth_address_and_nonce_hash =
+            Some("348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string());
         let eth_address = None;
         let address_and_nonce_hash = None;
         let calldata = None;
         let version = Some("1".to_string());
-        let deposit_json = DepositAddressInfoJson  {
+        let deposit_json = DepositAddressInfoJson {
             nonce,
             address,
             version,
@@ -338,14 +325,13 @@ mod tests {
         let nonce = 1578079722;
         let address = Some("0xedb86cd455ef3ca43f0e227e00469c3bdfa40628".to_string());
         let btc_deposit_address = "2MuuCeJjptiB1ETfytAqMZFqPCKAfXyhxoQ".to_string();
-        let eth_address_and_nonce_hash = Some(
-            "348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string()
-        );
+        let eth_address_and_nonce_hash =
+            Some("348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string());
         let calldata = None;
         let eth_address = None;
         let address_and_nonce_hash = None;
         let version = Some("0".to_string());
-        let deposit_json = DepositAddressInfoJson  {
+        let deposit_json = DepositAddressInfoJson {
             nonce,
             address,
             version,
@@ -368,14 +354,13 @@ mod tests {
         let nonce = 1578079722;
         let eth_address = Some("0xedb86cd455ef3ca43f0e227e00469c3bdfa40628".to_string());
         let btc_deposit_address = "2MuuCeJjptiB1ETfytAqMZFqPCKAfXyhxoQ".to_string();
-        let address_and_nonce_hash = Some(
-            "348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string()
-        );
+        let address_and_nonce_hash =
+            Some("348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string());
         let address = None;
         let calldata = None;
         let version = Some("1".to_string());
         let eth_address_and_nonce_hash = None;
-        let deposit_json = DepositAddressInfoJson  {
+        let deposit_json = DepositAddressInfoJson {
             nonce,
             address,
             version,
@@ -398,14 +383,13 @@ mod tests {
         let nonce = 1578079722;
         let eth_address = Some("0xedb86cd455ef3ca43f0e227e00469c3bdfa40628".to_string());
         let btc_deposit_address = "2MuuCeJjptiB1ETfytAqMZFqPCKAfXyhxoQ".to_string();
-        let address_and_nonce_hash = Some(
-            "348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string()
-        );
+        let address_and_nonce_hash =
+            Some("348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string());
         let address = None;
         let eth_address_and_nonce_hash = None;
         let version = Some("0".to_string());
         let calldata = None;
-        let deposit_json = DepositAddressInfoJson  {
+        let deposit_json = DepositAddressInfoJson {
             nonce,
             address,
             version,
@@ -428,14 +412,13 @@ mod tests {
         let nonce = 1578079722;
         let eth_address = Some("0xedb86cd455ef3ca43f0e227e00469c3bdfa40628".to_string());
         let btc_deposit_address = "2MuuCeJjptiB1ETfytAqMZFqPCKAfXyhxoQ".to_string();
-        let eth_address_and_nonce_hash = Some(
-            "348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string()
-        );
+        let eth_address_and_nonce_hash =
+            Some("348c7ab8078c400c5b07d1c3dda4fff8218bb6f2dc40f72662edc13ed867fcae".to_string());
         let version = None;
         let address = None;
         let calldata = None;
         let address_and_nonce_hash = None;
-        let deposit_json = DepositAddressInfoJson  {
+        let deposit_json = DepositAddressInfoJson {
             nonce,
             address,
             version,
@@ -454,14 +437,13 @@ mod tests {
         let nonce = 1578079722;
         let address = Some("0xedb86cd455ef3ca43f0e227e00469c3bdfa40628".to_string());
         let btc_deposit_address = "2NCbnp5Lp1eNeT9iBz9UrjwKCTUeQtjEcyy".to_string();
-        let address_and_nonce_hash = Some(
-            "0x5b455d06e29f2b65279b947304f03ebb327cbf7d3fb2d7cd488a27c1bbf00ae9".to_string()
-        );
+        let address_and_nonce_hash =
+            Some("0x5b455d06e29f2b65279b947304f03ebb327cbf7d3fb2d7cd488a27c1bbf00ae9".to_string());
         let calldata = None;
         let eth_address = None;
         let eth_address_and_nonce_hash = None;
         let version = Some("1.0.0".to_string());
-        let deposit_json = DepositAddressInfoJson  {
+        let deposit_json = DepositAddressInfoJson {
             nonce,
             address,
             version,
@@ -483,13 +465,12 @@ mod tests {
         let calldata = None;
         let address = Some("0xedb86cd455ef3ca43f0e227e00469c3bdfa40628".to_string());
         let btc_deposit_address = "2NCbnp5Lp1eNeT9iBz9UrjwKCTUeQtjEcyy".to_string();
-        let invalid_address_and_nonce_hash = Some(
-            "0x8d1fc5859f7c21ef5253e576185e744078a269919c9b43ddeee524889d6dd12c".to_string()
-        );
+        let invalid_address_and_nonce_hash =
+            Some("0x8d1fc5859f7c21ef5253e576185e744078a269919c9b43ddeee524889d6dd12c".to_string());
         let eth_address = None;
         let eth_address_and_nonce_hash = None;
         let version = Some("1.0.0".to_string());
-        let deposit_json = DepositAddressInfoJson  {
+        let deposit_json = DepositAddressInfoJson {
             nonce,
             address,
             version,

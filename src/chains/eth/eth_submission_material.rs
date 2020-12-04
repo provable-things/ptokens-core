@@ -1,44 +1,19 @@
-use serde_json::{
-    json,
-    Value as JsonValue,
-};
-use ethereum_types::{
-    U256,
-    H256 as EthHash,
-    Address as EthAddress,
-};
 use crate::{
-    types::{
-        Byte,
-        Bytes,
-        Result,
-        NoneError,
-    },
-    traits::DatabaseInterface,
-    btc_on_eth::eth::redeem_info::{
-        BtcOnEthRedeemInfo,
-        BtcOnEthRedeemInfos,
-    },
-    erc20_on_eos::eth::peg_in_info::{
-        Erc20OnEosPegInInfo,
-        Erc20OnEosPegInInfos,
-    },
+    btc_on_eth::eth::redeem_info::{BtcOnEthRedeemInfo, BtcOnEthRedeemInfos},
     chains::{
         eos::eos_erc20_dictionary::EosErc20Dictionary,
         eth::{
+            eth_block::{EthBlock, EthBlockJson},
+            eth_receipt::{EthReceipt, EthReceiptJson, EthReceipts},
             eth_state::EthState,
-            eth_block::{
-                EthBlock,
-                EthBlockJson,
-            },
-            eth_receipt::{
-                EthReceipt,
-                EthReceipts,
-                EthReceiptJson,
-            },
         },
     },
+    erc20_on_eos::eth::peg_in_info::{Erc20OnEosPegInInfo, Erc20OnEosPegInInfos},
+    traits::DatabaseInterface,
+    types::{Byte, Bytes, NoneError, Result},
 };
+use ethereum_types::{Address as EthAddress, H256 as EthHash, U256};
+use serde_json::{json, Value as JsonValue};
 
 // TODO This could have some enum in it that defines what it's submission material for?
 // TODO The same would need to be true of the Receipts themselves since that's where the redeem param parsing is done!
@@ -59,7 +34,7 @@ impl EthSubmissionMaterial {
         block: EthBlock,
         receipts: EthReceipts,
         eos_ref_block_num: Option<u16>,
-        eos_ref_block_prefix: Option<u32>
+        eos_ref_block_prefix: Option<u32>,
     ) -> Self {
         Self {
             receipts,
@@ -74,7 +49,9 @@ impl EthSubmissionMaterial {
     }
 
     pub fn get_block(&self) -> Result<EthBlock> {
-        self.block.clone().ok_or(NoneError("✘ No block in ETH submisson material!"))
+        self.block
+            .clone()
+            .ok_or(NoneError("✘ No block in ETH submisson material!"))
     }
 
     pub fn get_block_hash(&self) -> Result<EthHash> {
@@ -82,23 +59,28 @@ impl EthSubmissionMaterial {
     }
 
     pub fn get_parent_hash(&self) -> Result<EthHash> {
-        self.parent_hash.ok_or(NoneError("✘ No` parent_hash` in ETH submission material!"))
+        self.parent_hash
+            .ok_or(NoneError("✘ No` parent_hash` in ETH submission material!"))
     }
 
     pub fn get_block_number(&self) -> Result<U256> {
-        self.block_number.ok_or(NoneError("✘ No `block_number` in ETH submission material!"))
+        self.block_number
+            .ok_or(NoneError("✘ No `block_number` in ETH submission material!"))
     }
 
     pub fn get_receipts_root(&self) -> Result<EthHash> {
-        self.receipts_root.ok_or(NoneError("✘ No `receipts_root` in ETH submission material!"))
+        self.receipts_root
+            .ok_or(NoneError("✘ No `receipts_root` in ETH submission material!"))
     }
 
     pub fn get_eos_ref_block_num(&self) -> Result<u16> {
-        self.eos_ref_block_num.ok_or(NoneError("No `eos_ref_block_num` in submission material!"))
+        self.eos_ref_block_num
+            .ok_or(NoneError("No `eos_ref_block_num` in submission material!"))
     }
 
     pub fn get_eos_ref_block_prefix(&self) -> Result<u32> {
-        self.eos_ref_block_prefix.ok_or(NoneError("No `eos_ref_block_prefix` in submission material!"))
+        self.eos_ref_block_prefix
+            .ok_or(NoneError("No `eos_ref_block_prefix` in submission material!"))
     }
 
     pub fn get_receipts(&self) -> Vec<EthReceipt> {
@@ -131,13 +113,11 @@ impl EthSubmissionMaterial {
     }
 
     pub fn from_json(json: &EthSubmissionMaterialJson) -> Result<Self> {
-        /*
-         * NOTE: Legacy cores originally stored the full block. To reduce the size of the encrypted DB,
-         * cores v1.19.0 and later remove the ETH block when saving to the db. Hence why here we
-         * first check if there *is* a block in the json retrieved from the DB and then create the correct
-         * (new) struct that way. Otherwise, we check the json correctly adheres to the new format
-         * and if so create the struct from that instead.
-         */
+        // NOTE: Legacy cores originally stored the full block. To reduce the size of the encrypted DB,
+        // cores v1.19.0 and later remove the ETH block when saving to the db. Hence why here we
+        // first check if there *is* a block in the json retrieved from the DB and then create the correct
+        // (new) struct that way. Otherwise, we check the json correctly adheres to the new format
+        // and if so create the struct from that instead.
         let block = match json.block {
             Some(ref block_json) => Some(EthBlock::from_json(block_json)?),
             None => None,
@@ -154,15 +134,15 @@ impl EthSubmissionMaterial {
                 eos_ref_block_prefix: json.eos_ref_block_prefix,
                 block: Some(block),
             }),
-            None =>  {
+            None => {
                 if json.hash.is_none() {
-                    return Err("Error parsing `EthSubmissionInfo` from json: missing `hash`!".into())
+                    return Err("Error parsing `EthSubmissionInfo` from json: missing `hash`!".into());
                 } else if json.parent_hash.is_none() {
-                    return Err("Error parsing `EthSubmissionInfo` from json: missing `parent_hash`!".into())
+                    return Err("Error parsing `EthSubmissionInfo` from json: missing `parent_hash`!".into());
                 } else if json.block_number.is_none() {
-                    return Err("Error parsing `EthSubmissionInfo` from json: missing `block_number`!".into())
+                    return Err("Error parsing `EthSubmissionInfo` from json: missing `block_number`!".into());
                 } else if json.receipts_root.is_none() {
-                    return Err("Error parsing `EthSubmissionInfo` from json: missing `receipts_root`!".into())
+                    return Err("Error parsing `EthSubmissionInfo` from json: missing `receipts_root`!".into());
                 };
                 Ok(EthSubmissionMaterial {
                     receipts,
@@ -170,11 +150,11 @@ impl EthSubmissionMaterial {
                     hash: json.hash,
                     parent_hash: json.parent_hash,
                     block_number: json.block_number,
-                    receipts_root:json.receipts_root,
+                    receipts_root: json.receipts_root,
                     eos_ref_block_num: json.eos_ref_block_num,
                     eos_ref_block_prefix: json.eos_ref_block_prefix,
                 })
-            }
+            },
         }
     }
 
@@ -195,7 +175,8 @@ impl EthSubmissionMaterial {
         info!("✔ Number of receipts before filtering: {}", self.receipts.len());
         let filtered = Self::new(
             self.get_block()?,
-            self.receipts.filter_for_receipts_containing_log_with_address_and_topics(address, topics),
+            self.receipts
+                .filter_for_receipts_containing_log_with_address_and_topics(address, topics),
             self.eos_ref_block_num,
             self.eos_ref_block_prefix,
         );
@@ -207,58 +188,63 @@ impl EthSubmissionMaterial {
         &self,
         erc20_dictionary: &EosErc20Dictionary,
     ) -> Result<Self> {
-        info!("✔ Num receipts before filtering for those pertaining to ERC20 dictionary: {}", self.receipts.len());
+        info!(
+            "✔ Num receipts before filtering for those pertaining to ERC20 dictionary: {}",
+            self.receipts.len()
+        );
         let filtered_receipts = EthReceipts::new(
-            self
-                .receipts
+            self.receipts
                 .iter()
                 .filter(|receipt| receipt.contains_supported_erc20_peg_in(erc20_dictionary))
                 .cloned()
-                .collect()
+                .collect(),
         );
-        info!("✔ Num receipts after filtering for those pertaining to ERC20 dictionary: {}", filtered_receipts.len());
-        Ok(Self::new(self.get_block()?, filtered_receipts, self.eos_ref_block_num, self.eos_ref_block_prefix))
+        info!(
+            "✔ Num receipts after filtering for those pertaining to ERC20 dictionary: {}",
+            filtered_receipts.len()
+        );
+        Ok(Self::new(
+            self.get_block()?,
+            filtered_receipts,
+            self.eos_ref_block_num,
+            self.eos_ref_block_prefix,
+        ))
     }
 
     pub fn receipts_are_valid(&self) -> Result<bool> {
-        self
-            .receipts
-            .get_merkle_root()
-            .and_then(|calculated_root| {
-                let receipts_root = self.get_receipts_root()?;
-                info!("✔    Block's receipts root: {}", receipts_root.to_string());
-                info!("✔ Calculated receipts root: {}", calculated_root.to_string());
-                Ok(calculated_root == receipts_root)
-            })
+        self.receipts.get_merkle_root().and_then(|calculated_root| {
+            let receipts_root = self.get_receipts_root()?;
+            info!("✔    Block's receipts root: {}", receipts_root.to_string());
+            info!("✔ Calculated receipts root: {}", calculated_root.to_string());
+            Ok(calculated_root == receipts_root)
+        })
     }
 
     pub fn get_btc_on_eth_redeem_infos(&self) -> Result<BtcOnEthRedeemInfos> {
         info!("✔ Getting `btc-on-eth` redeem infos from submission material...");
         Ok(BtcOnEthRedeemInfos::new(
-            self
-                .get_receipts()
+            self.get_receipts()
                 .iter()
                 .map(|receipt| receipt.get_btc_on_eth_redeem_infos())
                 .collect::<Result<Vec<Vec<BtcOnEthRedeemInfo>>>>()?
-                .concat()
+                .concat(),
         ))
     }
 
     pub fn get_erc20_on_eos_peg_in_infos(
         &self,
-        eos_erc20_dictionary: &EosErc20Dictionary
+        eos_erc20_dictionary: &EosErc20Dictionary,
     ) -> Result<Erc20OnEosPegInInfos> {
         info!("✔ Getting `erc20-on-eos` peg in infos from submission material...");
         Ok(Erc20OnEosPegInInfos::new(
-            self
-                .get_receipts()
+            self.get_receipts()
                 .iter()
                 .map(|receipt| receipt.get_erc20_on_eos_peg_in_infos(eos_erc20_dictionary))
                 .collect::<Result<Vec<Erc20OnEosPegInInfos>>>()?
                 .iter()
                 .map(|infos| infos.iter().cloned().collect())
                 .collect::<Vec<Vec<Erc20OnEosPegInInfo>>>()
-                .concat()
+                .concat(),
         ))
     }
 
@@ -305,16 +291,14 @@ impl EthSubmissionMaterialJson {
     pub fn from_str(json_str: &str) -> Result<Self> {
         match serde_json::from_str(&json_str) {
             Ok(result) => Ok(result),
-            Err(e) => Err(e.into())
+            Err(e) => Err(e.into()),
         }
     }
 }
 
-pub fn parse_eth_submission_material_and_put_in_state<D>(
-    block_json: &str,
-    state: EthState<D>,
-) -> Result<EthState<D>>
-    where D: DatabaseInterface
+pub fn parse_eth_submission_material_and_put_in_state<D>(block_json: &str, state: EthState<D>) -> Result<EthState<D>>
+where
+    D: DatabaseInterface,
 {
     info!("✔ Parsing ETH block & receipts...");
     EthSubmissionMaterial::from_str(&block_json).and_then(|result| state.add_eth_submission_material(result))
@@ -323,13 +307,19 @@ pub fn parse_eth_submission_material_and_put_in_state<D>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
     use crate::{
+        btc_on_eth::eth::eth_test_utils::{
+            get_expected_block,
+            get_expected_receipt,
+            get_sample_contract_address,
+            get_sample_contract_topics,
+            get_sample_eth_submission_material,
+            get_sample_eth_submission_material_n,
+            get_sample_eth_submission_material_string,
+            SAMPLE_RECEIPT_INDEX,
+        },
         chains::{
-            eos::{
-                eos_erc20_dictionary::EosErc20DictionaryEntry,
-                eos_test_utils::get_sample_eos_erc20_dictionary,
-            },
+            eos::{eos_erc20_dictionary::EosErc20DictionaryEntry, eos_test_utils::get_sample_eos_erc20_dictionary},
             eth::{
                 eth_constants::BTC_ON_ETH_REDEEM_EVENT_TOPIC_HEX,
                 eth_test_utils::{
@@ -338,17 +328,8 @@ mod tests {
                 },
             },
         },
-        btc_on_eth::eth::eth_test_utils::{
-            get_expected_block,
-            get_expected_receipt,
-            SAMPLE_RECEIPT_INDEX,
-            get_sample_contract_topics,
-            get_sample_contract_address,
-            get_sample_eth_submission_material,
-            get_sample_eth_submission_material_n,
-            get_sample_eth_submission_material_string,
-        },
     };
+    use std::str::FromStr;
 
     #[test]
     fn should_parse_eth_submission_material_json_string() {
@@ -372,9 +353,8 @@ mod tests {
 
     #[test]
     fn should_make_to_and_from_string_round_trip() {
-        let block_and_receipts = EthSubmissionMaterial::from_str(
-            &get_sample_eth_submission_material_string(0).unwrap()
-        ).unwrap();
+        let block_and_receipts =
+            EthSubmissionMaterial::from_str(&get_sample_eth_submission_material_string(0).unwrap()).unwrap();
         let string = block_and_receipts.to_string().unwrap();
         let result = EthSubmissionMaterial::from_str(&string).unwrap();
         assert_eq!(result, block_and_receipts);
@@ -408,7 +388,8 @@ mod tests {
         let num_receipts_before = block_and_receipts.receipts.len();
         let address = get_sample_contract_address();
         let topics = get_sample_contract_topics();
-        let result = block_and_receipts.filter_for_receipts_containing_log_with_address_and_topics(&address, &topics)
+        let result = block_and_receipts
+            .filter_for_receipts_containing_log_with_address_and_topics(&address, &topics)
             .unwrap();
         let num_receipts_after = result.receipts.len();
         assert!(num_receipts_before > num_receipts_after);
@@ -429,8 +410,11 @@ mod tests {
         let block_and_receipts = get_sample_eth_submission_material_n(6).unwrap();
         let num_receipts_before = block_and_receipts.receipts.len();
         let address = EthAddress::from_slice(&hex::decode("74630cfbc4066726107a4efe73956e219bbb46ab").unwrap());
-        let topics = vec![EthHash::from_slice(&hex::decode(BTC_ON_ETH_REDEEM_EVENT_TOPIC_HEX).unwrap()) ];
-        let result = block_and_receipts.filter_for_receipts_containing_log_with_address_and_topics(&address, &topics)
+        let topics = vec![EthHash::from_slice(
+            &hex::decode(BTC_ON_ETH_REDEEM_EVENT_TOPIC_HEX).unwrap(),
+        )];
+        let result = block_and_receipts
+            .filter_for_receipts_containing_log_with_address_and_topics(&address, &topics)
             .unwrap();
         let num_receipts_after = result.receipts.len();
         assert!(num_receipts_before > num_receipts_after);
@@ -468,7 +452,7 @@ mod tests {
             amount: U256::from_dec_str("666").unwrap(),
             from: EthAddress::from_str("edb86cd455ef3ca43f0e227e00469c3bdfa40628").unwrap(),
             recipient: "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM".to_string(),
-            originating_tx_hash: EthHash::from_slice(&hex::decode(get_tx_hash_of_redeem_tx()) .unwrap()[..]),
+            originating_tx_hash: EthHash::from_slice(&hex::decode(get_tx_hash_of_redeem_tx()).unwrap()[..]),
         };
         assert_eq!(expected_result.from, result.0[0].from);
         assert_eq!(expected_result.amount, result.0[0].amount);
@@ -493,23 +477,21 @@ mod tests {
         let eth_symbol = "SAM".to_string();
         let eos_symbol = "SAM".to_string();
         let token_name = "SampleToken".to_string();
-        let token_address = EthAddress::from_slice(
-            &hex::decode("9f57CB2a4F462a5258a49E88B4331068a391DE66").unwrap()
-        );
-        let eos_erc20_account_names = EosErc20Dictionary::new(vec![
-            EosErc20DictionaryEntry::new(
-                eth_token_decimals,
-                eos_token_decimals,
-                eth_symbol,
-                eos_symbol,
-                token_name,
-                token_address
-            )
-        ]);
+        let token_address = EthAddress::from_slice(&hex::decode("9f57CB2a4F462a5258a49E88B4331068a391DE66").unwrap());
+        let eos_erc20_account_names = EosErc20Dictionary::new(vec![EosErc20DictionaryEntry::new(
+            eth_token_decimals,
+            eos_token_decimals,
+            eth_symbol,
+            eos_symbol,
+            token_name,
+            token_address,
+        )]);
         let expected_num_results = 1;
         let submission_material = get_sample_submission_material_with_erc20_peg_in_event().unwrap();
         let expected_result = get_sample_erc20_on_eos_peg_in_infos().unwrap();
-        let result = submission_material.get_erc20_on_eos_peg_in_infos(&eos_erc20_account_names).unwrap();
+        let result = submission_material
+            .get_erc20_on_eos_peg_in_infos(&eos_erc20_account_names)
+            .unwrap();
         assert_eq!(result.len(), expected_num_results);
         assert_eq!(result, expected_result);
     }

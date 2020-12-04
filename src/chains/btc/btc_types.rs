@@ -1,24 +1,21 @@
-use std::str::FromStr;
 use crate::{
+    chains::btc::{btc_constants::BTC_PUB_KEY_SLICE_LENGTH, deposit_address_info::DepositAddressInfoJson},
     constants::SAFE_BTC_ADDRESS,
-    chains::btc::deposit_address_info::DepositAddressInfoJson,
-    types::{
-        Bytes,
-        Result,
-    },
+    types::{Byte, Bytes, Result},
 };
 pub use bitcoin::{
-    hashes::sha256d,
-    util::address::Address as BtcAddress,
-    consensus::encode::deserialize as btc_deserialize,
     blockdata::{
-        block::Block as BtcBlock,
-        block::BlockHeader as BtcBlockHeader,
+        block::{Block as BtcBlock, BlockHeader as BtcBlockHeader},
         transaction::Transaction as BtcTransaction,
     },
+    consensus::encode::deserialize as btc_deserialize,
+    hashes::sha256d,
+    util::address::Address as BtcAddress,
 };
+use std::str::FromStr;
 
 pub type BtcTransactions = Vec<BtcTransaction>;
+pub type BtcPubKeySlice = [Byte; BTC_PUB_KEY_SLICE_LENGTH];
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct BtcUtxoAndValue {
@@ -47,7 +44,7 @@ impl BtcRecipientAndAmount {
                     info!("✔ Error parsing BTC address for recipient: {}", error);
                     info!("✔ Defaulting to SAFE BTC address: {}", SAFE_BTC_ADDRESS);
                     BtcAddress::from_str(SAFE_BTC_ADDRESS)?
-                }
+                },
             },
         })
     }

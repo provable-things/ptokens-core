@@ -1,15 +1,14 @@
+use crate::constants::{BTC_NUM_DECIMALS, PTOKEN_ERC777_NUM_DECIMALS};
 use ethereum_types::U256;
-use crate::constants::{
-    BTC_NUM_DECIMALS,
-    PTOKEN_ERC777_NUM_DECIMALS,
-};
 
 pub fn convert_satoshis_to_ptoken(satoshis: u64) -> U256 {
     U256::from(satoshis) * U256::from(10u64.pow(PTOKEN_ERC777_NUM_DECIMALS - BTC_NUM_DECIMALS as u32))
 }
 
 pub fn convert_ptoken_to_satoshis(ptoken: U256) -> u64 {
-    match ptoken.checked_div(U256::from(10u64.pow(PTOKEN_ERC777_NUM_DECIMALS - BTC_NUM_DECIMALS as u32))) {
+    match ptoken.checked_div(U256::from(
+        10u64.pow(PTOKEN_ERC777_NUM_DECIMALS - BTC_NUM_DECIMALS as u32),
+    )) {
         Some(amount) => amount.as_u64(),
         None => 0,
     }

@@ -56,8 +56,7 @@ pub mod compensation {
         type Value = u64;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter
-                .write_str("an integer between 0 and 2^63 - 1 as a string - stringified base 10")
+            formatter.write_str("an integer between 0 and 2^63 - 1 as a string - stringified base 10")
         }
 
         fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>

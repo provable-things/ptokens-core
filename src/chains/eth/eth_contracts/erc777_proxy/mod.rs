@@ -1,29 +1,21 @@
-use ethabi::{encode, Token};
-use ethereum_types::{
-    U256,
-    Address as EthAddress,
-};
 use crate::{
-    types::{
-        Bytes,
-        Result,
-    },
-    traits::DatabaseInterface,
     chains::eth::{
-        eth_contracts::encode_fxn_call,
-        eth_crypto::eth_private_key::EthPrivateKey,
-        eth_crypto::eth_transaction::EthTransaction,
-        eth_contracts::erc777::ERC777_CHANGE_PNETWORK_GAS_LIMIT,
+        eth_contracts::{encode_fxn_call, erc777::ERC777_CHANGE_PNETWORK_GAS_LIMIT},
+        eth_crypto::{eth_private_key::EthPrivateKey, eth_transaction::EthTransaction},
         eth_database_utils::{
+            get_erc777_proxy_contract_address_from_db,
+            get_eth_account_nonce_from_db,
             get_eth_chain_id_from_db,
             get_eth_gas_price_from_db,
             get_eth_private_key_from_db,
-            get_eth_account_nonce_from_db,
             increment_eth_account_nonce_in_db,
-            get_erc777_proxy_contract_address_from_db,
         },
     },
+    traits::DatabaseInterface,
+    types::{Bytes, Result},
 };
+use ethabi::{encode, Token};
+use ethereum_types::{Address as EthAddress, U256};
 
 pub const ERC777_CHANGE_PNETWORK_BY_PROXY_GAS_LIMIT: usize = 33_000;
 
@@ -40,7 +32,8 @@ pub fn encode_mint_by_proxy_tx_data(
             Token::Address(EthAddress::from_slice(token_recipient.as_bytes())),
             Token::Uint(token_amount),
             Token::Uint(any_sender_nonce.into()),
-        ]))?.to_vec();
+        ]))?
+        .to_vec();
     let fxn_param_tokens = [
         Token::Address(EthAddress::from_slice(token_recipient.as_bytes())),
         Token::Uint(token_amount),
@@ -51,71 +44,59 @@ pub fn encode_mint_by_proxy_tx_data(
 }
 
 pub fn encode_erc777_proxy_change_pnetwork_fxn_data(new_pnetwork_address: EthAddress) -> Result<Bytes> {
-    encode_fxn_call(ERC777_PROXY_ABI, "changePNetwork", &[Token::Address(new_pnetwork_address)])
+    encode_fxn_call(ERC777_PROXY_ABI, "changePNetwork", &[Token::Address(
+        new_pnetwork_address,
+    )])
 }
 
 pub fn encode_erc777_proxy_change_pnetwork_by_proxy_fxn_data(new_pnetwork_address: EthAddress) -> Result<Bytes> {
-    encode_fxn_call(ERC777_PROXY_ABI, "changePNetworkByProxy", &[Token::Address(new_pnetwork_address)])
+    encode_fxn_call(ERC777_PROXY_ABI, "changePNetworkByProxy", &[Token::Address(
+        new_pnetwork_address,
+    )])
 }
-
 
 const ZERO_ETH_VALUE: usize = 0;
 
-pub fn get_signed_erc777_proxy_change_pnetwork_tx<D>(
-    db: &D,
-    new_address: EthAddress,
-) -> Result<String>
+pub fn get_signed_erc777_proxy_change_pnetwork_tx<D>(db: &D, new_address: EthAddress) -> Result<String>
 where
     D: DatabaseInterface,
 {
     let nonce_before_incrementing = get_eth_account_nonce_from_db(db)?;
-    increment_eth_account_nonce_in_db(db, 1)
-        .and(
-            Ok(EthTransaction::new_unsigned(
-                encode_erc777_proxy_change_pnetwork_fxn_data(new_address)?,
-                nonce_before_incrementing,
-                ZERO_ETH_VALUE,
-                get_erc777_proxy_contract_address_from_db(db)?,
-                get_eth_chain_id_from_db(db)?,
-                ERC777_CHANGE_PNETWORK_GAS_LIMIT,
-                get_eth_gas_price_from_db(db)?,
-            )
-            .sign(get_eth_private_key_from_db(db)?)?
-            .serialize_hex())
-        )
+    increment_eth_account_nonce_in_db(db, 1).and(Ok(EthTransaction::new_unsigned(
+        encode_erc777_proxy_change_pnetwork_fxn_data(new_address)?,
+        nonce_before_incrementing,
+        ZERO_ETH_VALUE,
+        get_erc777_proxy_contract_address_from_db(db)?,
+        get_eth_chain_id_from_db(db)?,
+        ERC777_CHANGE_PNETWORK_GAS_LIMIT,
+        get_eth_gas_price_from_db(db)?,
+    )
+    .sign(get_eth_private_key_from_db(db)?)?
+    .serialize_hex()))
 }
 
-pub fn get_signed_erc777_proxy_change_pnetwork_by_proxy_tx<D>(
-    db: &D,
-    new_address: EthAddress,
-) -> Result<String>
+pub fn get_signed_erc777_proxy_change_pnetwork_by_proxy_tx<D>(db: &D, new_address: EthAddress) -> Result<String>
 where
     D: DatabaseInterface,
 {
     let nonce_before_incrementing = get_eth_account_nonce_from_db(db)?;
-    increment_eth_account_nonce_in_db(db, 1)
-        .and(
-            Ok(EthTransaction::new_unsigned(
-                encode_erc777_proxy_change_pnetwork_by_proxy_fxn_data(new_address)?,
-                nonce_before_incrementing,
-                ZERO_ETH_VALUE,
-                get_erc777_proxy_contract_address_from_db(db)?,
-                get_eth_chain_id_from_db(db)?,
-                ERC777_CHANGE_PNETWORK_BY_PROXY_GAS_LIMIT,
-                get_eth_gas_price_from_db(db)?,
-            )
-            .sign(get_eth_private_key_from_db(db)?)?
-            .serialize_hex())
-        )
+    increment_eth_account_nonce_in_db(db, 1).and(Ok(EthTransaction::new_unsigned(
+        encode_erc777_proxy_change_pnetwork_by_proxy_fxn_data(new_address)?,
+        nonce_before_incrementing,
+        ZERO_ETH_VALUE,
+        get_erc777_proxy_contract_address_from_db(db)?,
+        get_eth_chain_id_from_db(db)?,
+        ERC777_CHANGE_PNETWORK_BY_PROXY_GAS_LIMIT,
+        get_eth_gas_price_from_db(db)?,
+    )
+    .sign(get_eth_private_key_from_db(db)?)?
+    .serialize_hex()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::btc_on_eth::eth::eth_test_utils::{
-        get_sample_eth_address,
-        get_sample_eth_private_key,
-    };
+    use crate::btc_on_eth::eth::eth_test_utils::{get_sample_eth_address, get_sample_eth_private_key};
 
     #[test]
     fn should_encode_mint_by_proxy_tx_data() {
@@ -123,8 +104,8 @@ mod tests {
         let token_amount = U256::from(1337);
         let token_recipient = get_sample_eth_address();
         let eth_private_key = get_sample_eth_private_key();
-        let result = encode_mint_by_proxy_tx_data(&eth_private_key, token_recipient, token_amount, any_sender_nonce)
-            .unwrap();
+        let result =
+            encode_mint_by_proxy_tx_data(&eth_private_key, token_recipient, token_amount, any_sender_nonce).unwrap();
         let expected_result = "7ad6ae470000000000000000000000001739624f5cd969885a224da84418d12b8570d61a000000000000000000000000000000000000000000000000000000000000053900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000004187465d778f26a5207333f3296c499ed7701f5c9fbd7adcab77117afcfcebbc1669e18b8e1af2577060b8cee764d69ce7af434510b3a256681d976dbec510850b1c00000000000000000000000000000000000000000000000000000000000000";
         assert_eq!(hex::encode(result), expected_result);
     }

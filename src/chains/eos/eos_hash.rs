@@ -1,26 +1,15 @@
+use bitcoin_hashes::{ripemd160, Hash as HashTrait, HashEngine};
+use rustc_hex::{FromHex, FromHexError, ToHex};
 use std::{
-    fmt,
-    ops,
     cmp,
-    str
-};
-use std::hash::{
-    Hash,
-    Hasher
-};
-use rustc_hex::{
-    ToHex,
-    FromHex,
-    FromHexError
-};
-use bitcoin_hashes::{
-    ripemd160,
-    Hash as HashTrait,
-    HashEngine
+    fmt,
+    hash::{Hash, Hasher},
+    ops,
+    str,
 };
 
 macro_rules! impl_hash {
-    ($name: ident, $size: expr) => {
+    ($name:ident, $size:expr) => {
         #[repr(C)]
         #[derive(Copy)]
         pub struct $name([u8; $size]);
@@ -84,7 +73,7 @@ macro_rules! impl_hash {
                         result.copy_from_slice(&vec);
                         Ok($name(result))
                     },
-                    _ => Err(FromHexError::InvalidHexLength)
+                    _ => Err(FromHexError::InvalidHexLength),
                 }
             }
         }
@@ -131,15 +120,17 @@ macro_rules! impl_hash {
             }
         }
 
-
         impl Hash for $name {
-            fn hash<H>(&self, state: &mut H) where H: Hasher {
+            fn hash<H>(&self, state: &mut H)
+            where
+                H: Hasher,
+            {
                 state.write(&self.0);
                 state.finish();
             }
         }
 
-        impl Eq for $name { }
+        impl Eq for $name {}
 
         impl $name {
             pub fn take(self) -> [u8; $size] {
@@ -160,7 +151,7 @@ macro_rules! impl_hash {
                 self.0.iter().all(|b| *b == 0)
             }
         }
-    }
+    };
 }
 
 impl_hash!(H32, 4);
@@ -172,7 +163,7 @@ impl_hash!(H264, 33);
 impl_hash!(H512, 64);
 impl_hash!(H520, 65);
 
-//known_heap_size!(0, H32, H48, H96, H160, H256, H264, H512, H520);
+// known_heap_size!(0, H32, H48, H96, H160, H256, H264, H512, H520);
 
 impl H256 {
     #[inline]
