@@ -15,6 +15,7 @@
 pub use crate::btc_on_eth::{
     btc::{initialize_btc_enclave::maybe_initialize_btc_enclave, submit_btc_block::submit_btc_block_to_enclave},
     debug_functions::{
+        debug_add_multiple_utxos,
         debug_clear_all_utxos,
         debug_consolidate_utxos,
         debug_get_all_db_keys,

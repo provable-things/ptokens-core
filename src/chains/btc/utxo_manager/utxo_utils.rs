@@ -1,11 +1,9 @@
-#![allow(dead_code)] // TODO rm me!
 use crate::{
     chains::btc::utxo_manager::{
         utxo_database_utils::{get_all_utxo_db_keys, get_utxo_from_db},
         utxo_types::{BtcUtxoAndValue, BtcUtxosAndValues},
     },
     constants::MIN_DATA_SENSITIVITY_LEVEL,
-    errors::AppError,
     traits::DatabaseInterface,
     types::{Byte, Bytes, Result},
 };
@@ -26,35 +24,27 @@ pub fn deserialize_utxo_and_value(bytes: &[Byte]) -> Result<BtcUtxoAndValue> {
 }
 
 pub fn get_all_utxos_as_json_string<D: DatabaseInterface>(db: &D) -> Result<String> {
-    #[derive(Serialize, Deserialize)]
-    struct UtxoDetails {
-        pub db_key: String,
-        pub db_value: String,
-        pub utxo_info: JsonValue,
-    }
-    Ok(serde_json::to_string(
-        &get_all_utxo_db_keys(db)
-            .iter()
-            .map(|db_key| {
-                Ok::<UtxoDetails, AppError>(UtxoDetails {
-                    db_key: hex::encode(db_key.to_vec()),
-                    db_value: hex::encode(db.get(db_key.to_vec(), MIN_DATA_SENSITIVITY_LEVEL)?),
-                    utxo_info: get_utxo_from_db(db, &db_key.to_vec()).and_then(|utxo_and_value| {
-                        Ok(json!({
-                            "value": utxo_and_value.value,
-                            "tx_id":utxo_and_value.get_tx_id()?,
-                            "v_out":utxo_and_value.get_v_out()?,
-                            "maybe_pointer": utxo_and_value.maybe_pointer,
-                            "maybe_extra_data": utxo_and_value.maybe_extra_data,
-                            "serialized_utxo": hex::encode(utxo_and_value.serialized_utxo),
-                            "maybe_deposit_info_json": utxo_and_value.maybe_deposit_info_json,
-                        }))
-                    })?,
+    Ok(json!(get_all_utxo_db_keys(db)
+        .iter()
+        .map(|db_key| {
+            get_utxo_from_db(db, &db_key.to_vec())
+                .and_then(|utxo_and_value| utxo_and_value.to_json())
+                .and_then(|utxo_and_value_json| {
+                    Ok(json!({
+                        "value": utxo_and_value_json.value,
+                        "tx_id": utxo_and_value_json.tx_id,
+                        "v_out": utxo_and_value_json.v_out,
+                        "db_key": hex::encode(db_key.to_vec()),
+                        "maybe_pointer": utxo_and_value_json.maybe_pointer,
+                        "serialized_utxo": utxo_and_value_json.serialized_utxo,
+                        "maybe_extra_data": utxo_and_value_json.maybe_extra_data,
+                        "maybe_deposit_info_json": utxo_and_value_json.maybe_deposit_info_json,
+                        "db_value": hex::encode(db.get(db_key.to_vec(), MIN_DATA_SENSITIVITY_LEVEL)?),
+                    }))
                 })
-            })
-            .flatten()
-            .collect::<Vec<UtxoDetails>>(),
-    )?)
+        })
+        .collect::<Result<Vec<JsonValue>>>()?)
+    .to_string())
 }
 
 fn get_all_utxos_from_db<D: DatabaseInterface>(db: &D) -> Result<Vec<BtcUtxoAndValue>> {

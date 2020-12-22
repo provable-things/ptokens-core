@@ -13,6 +13,7 @@ use crate::{
         btc_state::BtcState,
         btc_submission_material::parse_submission_material_and_put_in_state,
         check_btc_parent_exists::check_for_parent_of_btc_block_in_state,
+        deposit_address_info::validate_deposit_address_list_in_state,
         extract_utxos_from_p2sh_txs::maybe_extract_utxos_from_p2sh_txs_and_put_in_state,
         filter_p2sh_deposit_txs::filter_p2sh_deposit_txs_and_add_to_state,
         filter_utxos::filter_out_value_too_low_utxos_from_state,
@@ -46,6 +47,7 @@ pub fn submit_btc_block_to_core<D: DatabaseInterface>(db: D, block_json_string: 
         .and_then(validate_proof_of_work_of_btc_block_in_state)
         .and_then(validate_btc_merkle_root)
         .and_then(get_deposit_info_hash_map_and_put_in_state)
+        .and_then(validate_deposit_address_list_in_state)
         .and_then(filter_p2sh_deposit_txs_and_add_to_state)
         .and_then(parse_minting_params_from_p2sh_deposits_and_add_to_state)
         .and_then(maybe_extract_utxos_from_p2sh_txs_and_put_in_state)

@@ -33,7 +33,13 @@ use crate::{
             get_deposit_info_hash_map::get_deposit_info_hash_map_and_put_in_state,
             increment_btc_account_nonce::maybe_increment_btc_signature_nonce_and_return_eos_state,
             utxo_manager::{
-                debug_utxo_utils::{clear_all_utxos, consolidate_utxos, get_child_pays_for_parent_btc_tx, remove_utxo},
+                debug_utxo_utils::{
+                    add_multiple_utxos,
+                    clear_all_utxos,
+                    consolidate_utxos,
+                    get_child_pays_for_parent_btc_tx,
+                    remove_utxo,
+                },
                 utxo_constants::get_utxo_constants_db_keys,
                 utxo_utils::get_all_utxos_as_json_string,
             },
@@ -77,7 +83,7 @@ use crate::{
         },
     },
     check_debug_mode::check_debug_mode,
-    constants::{DB_KEY_PREFIX, PRIVATE_KEY_DATA_SENSITIVITY_LEVEL},
+    constants::{DB_KEY_PREFIX, PRIVATE_KEY_DATA_SENSITIVITY_LEVEL, SUCCESS_JSON},
     debug_database_utils::{get_key_from_db, set_key_in_db_to_value},
     traits::DatabaseInterface,
     types::Result,
@@ -216,7 +222,7 @@ pub fn debug_update_incremerkle<D: DatabaseInterface>(db: &D, eos_init_json: &st
         .and_then(|_| db.start_transaction())
         .and_then(|_| generate_and_put_incremerkle_in_db(db, &init_json.blockroot_merkle))
         .and_then(|_| db.end_transaction())
-        .map(|_| "{debug_update_blockroot_merkle_success:true}".to_string())
+        .map(|_| SUCCESS_JSON.to_string())
         .map(prepend_debug_output_marker_to_string)
 }
 
@@ -228,7 +234,9 @@ pub fn debug_update_incremerkle<D: DatabaseInterface>(db: &D, eos_init_json: &st
 /// Use with extreme caution, and only if you know exactly what you are doing and why.
 pub fn debug_clear_all_utxos<D: DatabaseInterface>(db: &D) -> Result<String> {
     info!("✔ Debug clearing all UTXOs...");
-    clear_all_utxos(db).map(prepend_debug_output_marker_to_string)
+    check_debug_mode()
+        .and_then(|_| clear_all_utxos(db))
+        .map(prepend_debug_output_marker_to_string)
 }
 
 /// # Debug Add New Eos Schedule
@@ -244,7 +252,7 @@ pub fn debug_add_new_eos_schedule<D: DatabaseInterface>(db: D, schedule_json: &s
         .and_then(|_| parse_v2_schedule_string_to_v2_schedule(&schedule_json))
         .and_then(|schedule| put_eos_schedule_in_db(&db, &schedule))
         .and_then(|_| db.end_transaction())
-        .map(|_| "{debug_adding_eos_schedule_succeeded:true}".to_string())
+        .map(|_| SUCCESS_JSON.to_string())
         .map(prepend_debug_output_marker_to_string)
 }
 
@@ -300,7 +308,8 @@ pub fn debug_get_child_pays_for_parent_btc_tx<D: DatabaseInterface>(
     tx_id: &str,
     v_out: u32,
 ) -> Result<String> {
-    check_core_is_initialized(&db)
+    check_debug_mode()
+        .and_then(|_| check_core_is_initialized(&db))
         .and_then(|_| get_child_pays_for_parent_btc_tx(db, fee, tx_id, v_out))
         .map(prepend_debug_output_marker_to_string)
 }
@@ -316,7 +325,8 @@ pub fn debug_get_child_pays_for_parent_btc_tx<D: DatabaseInterface>(
 /// broadcast, the consolidated  output saved in the DB will NOT be spendable, leaving the enclave
 /// bricked. Use ONLY if you know exactly what you're doing and why!
 pub fn debug_consolidate_utxos<D: DatabaseInterface>(db: D, fee: u64, num_utxos: usize) -> Result<String> {
-    check_core_is_initialized(&db)
+    check_debug_mode()
+        .and_then(|_| check_core_is_initialized(&db))
         .and_then(|_| consolidate_utxos(db, fee, num_utxos))
         .map(prepend_debug_output_marker_to_string)
 }
@@ -328,7 +338,25 @@ pub fn debug_consolidate_utxos<D: DatabaseInterface>(db: D, fee: u64, num_utxos:
 /// ### BEWARE:
 /// Use ONLY if you know exactly what you're doing and why!
 pub fn debug_remove_utxo<D: DatabaseInterface>(db: D, tx_id: &str, v_out: u32) -> Result<String> {
-    check_core_is_initialized(&db)
+    check_debug_mode()
+        .and_then(|_| check_core_is_initialized(&db))
         .and_then(|_| remove_utxo(db, tx_id, v_out))
         .map(prepend_debug_output_marker_to_string)
+}
+
+/// # Debug Add Multiple Utxos
+///
+/// Add multiple UTXOs to the databsae. This function first checks if that UTXO already exists in
+/// the encrypted database, skipping it if so.
+///
+/// ### NOTE:
+///
+/// This function takes as it's argument and valid JSON string in the format that the
+/// `debug_get_all_utxos` returns. In this way, it's useful for migrating a UTXO set from one core
+/// to another.
+///
+/// ### BEWARE:
+/// Use ONLY if you know exactly what you're doing and why!
+pub fn debug_add_multiple_utxos<D: DatabaseInterface>(db: D, json_str: &str) -> Result<String> {
+    check_debug_mode().and_then(|_| add_multiple_utxos(&db, json_str).map(prepend_debug_output_marker_to_string))
 }

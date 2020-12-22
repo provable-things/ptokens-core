@@ -6,7 +6,7 @@ use crate::{
             btc_block::{BtcBlockAndId, BtcBlockInDbFormat},
             btc_submission_material::{BtcSubmissionMaterial, BtcSubmissionMaterialJson},
             btc_types::{BtcTransaction, BtcTransactions},
-            deposit_address_info::DepositInfoHashMap,
+            deposit_address_info::{DepositInfoHashMap, DepositInfoList},
             utxo_manager::utxo_types::BtcUtxosAndValues,
         },
         eos::eos_types::EosSignedTransactions,
@@ -232,6 +232,11 @@ where
             },
             None => Err(get_not_in_state_err("btc_block_and_id").into()),
         }
+    }
+
+    pub fn get_deposit_info_list(&self) -> Result<&DepositInfoList> {
+        self.get_btc_block_and_id()
+            .map(|block_and_id| &block_and_id.deposit_address_list)
     }
 
     pub fn get_deposit_info_hash_map(&self) -> Result<&DepositInfoHashMap> {

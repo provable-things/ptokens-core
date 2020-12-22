@@ -14,6 +14,7 @@
 
 pub use btc::{initialize_btc_core::maybe_initialize_btc_core, submit_btc_block::submit_btc_block_to_core};
 pub use debug_functions::{
+    debug_add_multiple_utxos,
     debug_add_new_eos_schedule,
     debug_clear_all_utxos,
     debug_consolidate_utxos,
