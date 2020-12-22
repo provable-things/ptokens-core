@@ -19,6 +19,7 @@ pub const U64_NUM_BYTES: usize = 8;
 pub const BTC_NUM_DECIMALS: usize = 8;
 pub const ETH_HASH_LENGTH: usize = 32;
 pub const PTOKEN_ERC777_NUM_DECIMALS: u32 = 18;
+pub const SUCCESS_JSON: &str = "{success:true}";
 pub const SAFE_EOS_ADDRESS: &str = "safu.ptokens";
 pub const MIN_DATA_SENSITIVITY_LEVEL: Option<u8> = None;
 pub const DEBUG_OUTPUT_MARKER: &str = "DEBUG_OUTPUT_MARKER";

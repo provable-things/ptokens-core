@@ -37,7 +37,7 @@ use crate::{
 use bitcoin::network::constants::Network as BtcNetwork;
 use bitcoin_hashes::{sha256d, Hash};
 
-pub fn pub_btc_pub_key_slice_in_db<D>(db: &D, pub_key_slice: &BtcPubKeySlice) -> Result<()>
+pub fn put_btc_pub_key_slice_in_db<D>(db: &D, pub_key_slice: &BtcPubKeySlice) -> Result<()>
 where
     D: DatabaseInterface,
 {
@@ -712,7 +712,7 @@ mod tests {
     fn should_save_and_get_btc_pub_key_slice_from_db() {
         let db = get_test_database();
         let pub_key_slice = get_sample_btc_pub_key_slice();
-        pub_btc_pub_key_slice_in_db(&db, &pub_key_slice).unwrap();
+        put_btc_pub_key_slice_in_db(&db, &pub_key_slice).unwrap();
         let result = get_btc_public_key_slice_from_db(&db).unwrap();
         result
             .iter()
