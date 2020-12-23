@@ -19,6 +19,7 @@ pub use types::{Bytes, Result};
 pub mod btc_on_eos;
 pub mod btc_on_eth;
 pub mod chains;
+pub mod eos_on_eth;
 pub mod erc20_on_eos;
 pub mod errors;
 pub mod traits;
@@ -30,6 +31,7 @@ mod constants;
 mod crypto_utils;
 mod database_utils;
 mod debug_database_utils;
+mod enclave_info;
 mod utils;
 
 #[cfg(test)]

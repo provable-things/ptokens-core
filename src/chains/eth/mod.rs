@@ -12,6 +12,7 @@ pub(crate) mod eth_crypto;
 pub(crate) mod eth_crypto_utils;
 pub(crate) mod eth_database_transactions;
 pub(crate) mod eth_database_utils;
+pub(crate) mod eth_enclave_state;
 pub(crate) mod eth_log;
 pub(crate) mod eth_metadata;
 pub(crate) mod eth_network;

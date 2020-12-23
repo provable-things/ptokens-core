@@ -8,6 +8,7 @@ pub(crate) mod add_btc_block_to_db;
 pub(crate) mod btc_block;
 pub(crate) mod btc_crypto;
 pub(crate) mod btc_database_utils;
+pub(crate) mod btc_enclave_state;
 pub(crate) mod btc_state;
 pub(crate) mod btc_submission_material;
 pub(crate) mod btc_test_utils;

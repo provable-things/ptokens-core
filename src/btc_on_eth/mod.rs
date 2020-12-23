@@ -12,29 +12,35 @@
 //! ptokens_core = { version = "1.0.0", features = ["debug"] }
 //! ```
 
-pub use crate::btc_on_eth::{
-    btc::{initialize_btc_enclave::maybe_initialize_btc_enclave, submit_btc_block::submit_btc_block_to_enclave},
-    debug_functions::{
-        debug_add_multiple_utxos,
-        debug_clear_all_utxos,
-        debug_consolidate_utxos,
-        debug_get_all_db_keys,
-        debug_get_all_utxos,
-        debug_get_child_pays_for_parent_btc_tx,
-        debug_get_key_from_db,
-        debug_get_signed_erc777_change_pnetwork_tx,
-        debug_get_signed_erc777_proxy_change_pnetwork_by_proxy_tx,
-        debug_get_signed_erc777_proxy_change_pnetwork_tx,
-        debug_maybe_add_utxo_to_db,
-        debug_mint_pbtc,
-        debug_remove_utxo,
-        debug_reprocess_btc_block,
-        debug_reprocess_eth_block,
-        debug_set_key_in_db_to_value,
+pub use crate::{
+    btc_on_eth::{
+        btc::{initialize_btc_enclave::maybe_initialize_btc_enclave, submit_btc_block::submit_btc_block_to_enclave},
+        debug_functions::{
+            debug_add_multiple_utxos,
+            debug_clear_all_utxos,
+            debug_consolidate_utxos,
+            debug_get_all_db_keys,
+            debug_get_all_utxos,
+            debug_get_child_pays_for_parent_btc_tx,
+            debug_get_key_from_db,
+            debug_get_signed_erc777_change_pnetwork_tx,
+            debug_get_signed_erc777_proxy_change_pnetwork_by_proxy_tx,
+            debug_get_signed_erc777_proxy_change_pnetwork_tx,
+            debug_maybe_add_utxo_to_db,
+            debug_mint_pbtc,
+            debug_remove_utxo,
+            debug_reprocess_btc_block,
+            debug_reprocess_eth_block,
+            debug_set_key_in_db_to_value,
+        },
+        eth::{initialize_eth_core::maybe_initialize_eth_enclave, submit_eth_block::submit_eth_block_to_enclave},
+        get_enclave_state::get_enclave_state,
+        get_latest_block_numbers::get_latest_block_numbers,
     },
-    eth::{initialize_eth_core::maybe_initialize_eth_enclave, submit_eth_block::submit_eth_block_to_enclave},
-    get_enclave_state::get_enclave_state,
-    get_latest_block_numbers::get_latest_block_numbers,
+    chains::eth::eth_message_signer::{
+        sign_ascii_msg_with_eth_key_with_no_prefix,
+        sign_hex_msg_with_eth_key_with_prefix,
+    },
 };
 
 pub mod btc;
