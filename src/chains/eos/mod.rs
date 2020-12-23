@@ -11,6 +11,7 @@ pub(crate) mod eos_action_proofs;
 pub(crate) mod eos_crypto;
 pub(crate) mod eos_database_transactions;
 pub(crate) mod eos_database_utils;
+pub(crate) mod eos_enclave_state;
 pub(crate) mod eos_erc20_dictionary;
 pub(crate) mod eos_hash;
 pub(crate) mod eos_merkle_utils;
