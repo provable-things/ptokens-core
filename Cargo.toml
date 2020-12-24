@@ -2,7 +2,7 @@
 license = "MIT"
 publish = false
 edition = "2018"
-version = "4.1.0"
+version = "4.2.0"
 readme = "README.md"
 name = "ptokens_core"
 keywords = ["provable", "defi", "crypto"]
@@ -14,11 +14,11 @@ non-validating = ["debug"]
 
 [dependencies]
 hex = "=0.4.0"
-log = "=0.4.8"
+log = "=0.4.11"
 rlp = "=0.4.2"
 rand = "=0.7.2"
 base58 = "=0.1.0"
-chrono = "=0.4.9"
+chrono = "=0.4.10"
 sha256 = "=0.1.0"
 ethabi = "=12.0.0"
 byteorder = "=1.3.2"
