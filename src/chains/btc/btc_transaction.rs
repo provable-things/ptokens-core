@@ -1,3 +1,8 @@
+use bitcoin::{
+    blockdata::transaction::{Transaction as BtcTransaction, TxIn as BtcUtxo, TxOut as BtcTxOut},
+    hashes::sha256d,
+};
+
 use crate::{
     chains::btc::{
         btc_crypto::btc_private_key::BtcPrivateKey,
@@ -14,10 +19,6 @@ use crate::{
         utxo_manager::utxo_types::BtcUtxosAndValues,
     },
     types::{Bytes, Result},
-};
-use bitcoin::{
-    blockdata::transaction::{Transaction as BtcTransaction, TxIn as BtcUtxo, TxOut as BtcTxOut},
-    hashes::sha256d,
 };
 
 // NOTE: Current tx constants. Could make generic in future if needed.
@@ -98,8 +99,7 @@ pub fn create_signed_raw_btc_tx_for_n_input_n_outputs(
         })
         .map(|hash: Result<sha256d::Hash>| Ok(hash?.to_vec()))
         .map(|tx_hash_to_sign: Result<Bytes>| {
-            Ok(btc_private_key
-                .sign_hash_and_append_btc_hash_type(tx_hash_to_sign?.to_vec(), SIGN_ALL_HASH_TYPE as u8)?)
+            btc_private_key.sign_hash_and_append_btc_hash_type(tx_hash_to_sign?.to_vec(), SIGN_ALL_HASH_TYPE as u8)
         })
         .collect::<Result<Vec<Bytes>>>()?;
     let utxos_with_signatures = utxos_and_values
@@ -147,8 +147,8 @@ mod tests {
     use crate::chains::btc::{
         btc_test_utils::{
             get_sample_btc_private_key,
-            get_sample_op_return_utxo_and_value,
-            get_sample_op_return_utxo_and_value_n,
+            get_sample_p2pkh_utxo_and_value,
+            get_sample_p2pkh_utxo_and_value_n,
             SAMPLE_TARGET_BTC_ADDRESS,
         },
         btc_types::BtcRecipientAndAmount,
@@ -165,7 +165,7 @@ mod tests {
             vec![BtcRecipientAndAmount::new("mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM", 3342899).unwrap()];
         let btc_private_key = get_sample_btc_private_key();
         let remainder_btc_address = SAMPLE_TARGET_BTC_ADDRESS;
-        let utxos_and_values = BtcUtxosAndValues::new(vec![get_sample_op_return_utxo_and_value()]);
+        let utxos_and_values = BtcUtxosAndValues::new(vec![get_sample_p2pkh_utxo_and_value()]);
         let final_signed_tx = create_signed_raw_btc_tx_for_n_input_n_outputs(
             sats_per_byte,
             recipient_addresses_and_amounts,
@@ -185,7 +185,7 @@ mod tests {
         // NOTE: Actual txhash on BTC testnet:
         let expected_tx_id = "02a76498ed723f38d2872416555199c5eeba0357267eb045d44b724ce4a3b3a5";
         let expected_serialized_tx = "0100000001b5f75f17e28fa0edaa8148bc6e255797975e1529d9ad97d790914f7c6be26bb5020000006b483045022100d7f563a7523408d4dd04fc272e98ab8aea900cf0dc872f98eac30873e720bb09022063812e1e45b9bc87f5eca162822082712cd5b3e3aa8ee7fcbe1e729f5a9b9775012103d2a5e3b162eb580fe2ce023cd5e0dddbb6286923acde77e3e5468314dc9373f7ffffffff0239050000000000001976a9149ae6e42c56f1ea319cfc704ad50db0683015029b88ac0fa60e00000000001976a91454102783c8640c5144d039cea53eb7dbb470081488ac00000000";
-        let utxos_and_values = BtcUtxosAndValues::new(vec![get_sample_op_return_utxo_and_value_n(2).unwrap()]);
+        let utxos_and_values = BtcUtxosAndValues::new(vec![get_sample_p2pkh_utxo_and_value_n(2).unwrap()]);
         let sats_per_byte = 23;
         let recipient_addresses_and_amounts =
             vec![BtcRecipientAndAmount::new("mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM", 1337).unwrap()];
@@ -211,8 +211,8 @@ mod tests {
         let expected_tx_id = "b56be26b7c4f9190d797add929155e979757256ebc4881aaeda08fe2175ff7b5";
         let expected_result = "0100000002637cb89f9647c2de31478d554696fb1878f86fd91e399989747e3c6ff296828f000000006b483045022100f25cf2c01caf78152a4d7ed2acaea70ac4723b32bf69d472a155d4f6f726f79b0220656f96577fbf1a8bb9d12de20c784a21f79db357ebcf53f2f8a35cbe1a4131fa012103d2a5e3b162eb580fe2ce023cd5e0dddbb6286923acde77e3e5468314dc9373f7ffffffff637cb89f9647c2de31478d554696fb1878f86fd91e399989747e3c6ff296828f010000006a473044022057ea8a3669fbec98536019701187ab519f44681186c36f83eac780ac3b08d852022017f806e100c3fedc82dd44615434db9f5c911d1fc0d3ceecb65424bc5ba1c9d4012103d2a5e3b162eb580fe2ce023cd5e0dddbb6286923acde77e3e5468314dc9373f7ffffffff039a020000000000001976a9149ae6e42c56f1ea319cfc704ad50db0683015029b88ac39050000000000001976a91493f36f39571997887fb4eff72d7a96259c34292288ac9fbc0e00000000001976a91454102783c8640c5144d039cea53eb7dbb470081488ac00000000";
         let utxos_and_values = BtcUtxosAndValues::new(vec![
-            get_sample_op_return_utxo_and_value_n(3).unwrap(),
-            get_sample_op_return_utxo_and_value_n(4).unwrap(),
+            get_sample_p2pkh_utxo_and_value_n(3).unwrap(),
+            get_sample_p2pkh_utxo_and_value_n(4).unwrap(),
         ]);
         let sats_per_byte = 23;
         let btc_private_key = get_sample_btc_private_key();

@@ -1,3 +1,7 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
+
 use crate::{
     btc_on_eos::eos::redeem_info::{BtcOnEosRedeemInfo, BtcOnEosRedeemInfos},
     chains::{
@@ -7,8 +11,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EosOutput {

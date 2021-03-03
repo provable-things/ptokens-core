@@ -1,3 +1,6 @@
+use ethereum_types::Address as EthAddress;
+use serde_json::to_string;
+
 use crate::{
     chains::eth::{
         eth_database_utils::{
@@ -16,67 +19,43 @@ use crate::{
 pub struct EthInitializationOutput {
     pub eth_address: String,
     pub eth_latest_block_num: usize,
-    pub eth_ptoken_contract_tx: String,
-    pub smart_contract_address: String,
+    pub eth_ptoken_contract_tx: Option<String>,
+    pub smart_contract_address: Option<String>,
 }
 
 impl EthInitializationOutput {
-    pub fn new(
-        eth_address: String,
-        eth_latest_block_num: usize,
-        eth_ptoken_contract_tx: String,
-        smart_contract_address: String,
+    fn init<D: DatabaseInterface>(
+        db: &D,
+        contract_address: Option<&EthAddress>,
+        contract_tx: Option<&str>,
     ) -> Result<Self> {
-        Ok(EthInitializationOutput {
-            eth_address,
-            eth_latest_block_num,
-            eth_ptoken_contract_tx,
-            smart_contract_address,
+        Ok(Self {
+            eth_address: format!("0x{}", hex::encode(get_public_eth_address_from_db(db)?.as_bytes())),
+            eth_latest_block_num: get_latest_eth_block_number(db)?,
+            eth_ptoken_contract_tx: contract_tx.map(|tx| tx.to_string()),
+            smart_contract_address: contract_address.map(|address| format!("0x{}", hex::encode(address))),
         })
     }
-}
 
-fn json_stringify(output: EthInitializationOutput) -> Result<String> {
-    match serde_json::to_string(&output) {
-        Ok(res) => Ok(res),
-        Err(err) => Err(err.into()),
+    pub fn new_for_eos_on_eth<D: DatabaseInterface>(state: EthState<D>) -> Result<String> {
+        let contract_tx = None;
+        let contract_address = None;
+        Ok(to_string(&Self::init(&state.db, contract_address, contract_tx)?)?)
     }
-}
 
-pub fn get_btc_on_eth_eth_core_init_output_json<D>(state: EthState<D>) -> Result<String>
-where
-    D: DatabaseInterface,
-{
-    EthInitializationOutput::new(
-        format!(
-            "0x{}",
-            hex::encode(get_public_eth_address_from_db(&state.db)?.as_bytes())
-        ),
-        get_latest_eth_block_number(&state.db)?,
-        state.get_misc_string()?,
-        format!(
-            "0x{}",
-            hex::encode(get_erc777_contract_address_from_db(&state.db)?.as_bytes())
-        ),
-    )
-    .and_then(json_stringify)
-}
+    pub fn new_for_btc_on_eth<D: DatabaseInterface>(state: EthState<D>) -> Result<String> {
+        Ok(to_string(&Self::init(
+            &state.db,
+            Some(&get_erc777_contract_address_from_db(&state.db)?),
+            Some(&state.get_misc_string()?),
+        )?)?)
+    }
 
-pub fn get_erc20_on_eth_eth_core_init_output_json<D>(state: EthState<D>) -> Result<String>
-where
-    D: DatabaseInterface,
-{
-    EthInitializationOutput::new(
-        format!(
-            "0x{}",
-            hex::encode(get_public_eth_address_from_db(&state.db)?.as_bytes())
-        ),
-        get_latest_eth_block_number(&state.db)?,
-        state.get_misc_string()?,
-        format!(
-            "0x{}",
-            hex::encode(get_erc20_on_eos_smart_contract_address_from_db(&state.db)?.as_bytes())
-        ),
-    )
-    .and_then(json_stringify)
+    pub fn new_for_erc20_on_eth<D: DatabaseInterface>(state: EthState<D>) -> Result<String> {
+        Ok(to_string(&Self::init(
+            &state.db,
+            Some(&get_erc20_on_eos_smart_contract_address_from_db(&state.db)?),
+            Some(&state.get_misc_string()?),
+        )?)?)
+    }
 }

@@ -1,10 +1,5 @@
-use crate::{
-    chains::btc::{btc_types::BtcPubKeySlice, btc_utils::get_btc_one_key},
-    constants::PRIVATE_KEY_DATA_SENSITIVITY_LEVEL,
-    crypto_utils::generate_random_private_key,
-    traits::DatabaseInterface,
-    types::{Byte, Bytes, Result},
-};
+use std::fmt;
+
 use bitcoin::{
     network::constants::Network,
     util::{address::Address as BtcAddress, key::PrivateKey},
@@ -15,7 +10,14 @@ use secp256k1::{
     Secp256k1,
     Signature,
 };
-use std::fmt;
+
+use crate::{
+    chains::btc::{btc_types::BtcPubKeySlice, btc_utils::get_btc_one_key},
+    constants::PRIVATE_KEY_DATA_SENSITIVITY_LEVEL,
+    crypto_utils::generate_random_private_key,
+    traits::DatabaseInterface,
+    types::{Byte, Bytes, Result},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BtcPrivateKey(PrivateKey);
@@ -91,13 +93,14 @@ impl Drop for BtcPrivateKey {
 
 #[cfg(test)]
 mod tests {
+    use bitcoin_hashes::{sha256d, Hash};
+
     use super::*;
     use crate::chains::btc::btc_test_utils::{
         get_sample_btc_private_key,
         SAMPLE_BTC_PUBLIC_KEY,
         SAMPLE_TARGET_BTC_ADDRESS,
     };
-    use bitcoin_hashes::{sha256d, Hash};
 
     fn get_sample_btc_private_key_slice() -> [u8; 32] {
         [

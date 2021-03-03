@@ -1,10 +1,11 @@
+use ethereum_types::{Address as EthAddress, H256, U256};
+use serde_json::Value as JsonValue;
+
 use crate::{
     constants::{ETH_HASH_LENGTH, SAFE_ETH_ADDRESS, U64_NUM_BYTES},
     types::{Byte, Bytes, NoneError, Result},
     utils::decode_hex_with_no_padding_with_err_msg,
 };
-use ethereum_types::{Address as EthAddress, H256, U256};
-use serde_json::Value as JsonValue;
 
 pub fn get_eth_address_from_str(eth_address_str: &str) -> Result<EthAddress> {
     info!("✔ Getting ETH address from str...");
@@ -22,7 +23,7 @@ pub fn convert_h256_to_bytes(hash: H256) -> Bytes {
 
 pub fn convert_bytes_to_h256(bytes: &[Byte]) -> Result<H256> {
     match bytes.len() {
-        32 => Ok(H256::from_slice(&bytes[..])),
+        32 => Ok(H256::from_slice(bytes)),
         _ => Err("✘ Not enough bytes to convert to h256!".into()),
     }
 }
@@ -40,8 +41,7 @@ pub fn convert_hex_to_h256(hex: &str) -> Result<H256> {
 }
 
 pub fn convert_hex_strings_to_h256s(hex_strings: Vec<&str>) -> Result<Vec<H256>> {
-    let hashes: Result<Vec<H256>> = hex_strings.into_iter().map(convert_hex_to_h256).collect();
-    Ok(hashes?)
+    hex_strings.into_iter().map(convert_hex_to_h256).collect()
 }
 
 pub fn convert_hex_to_address(hex: &str) -> Result<EthAddress> {
@@ -49,13 +49,13 @@ pub fn convert_hex_to_address(hex: &str) -> Result<EthAddress> {
 }
 
 pub fn convert_hex_to_bytes(hex: &str) -> Result<Bytes> {
-    Ok(hex::decode(strip_hex_prefix(&hex)?)?)
+    Ok(hex::decode(strip_hex_prefix(&hex))?)
 }
 
-pub fn strip_hex_prefix(prefixed_hex: &str) -> Result<String> {
+pub fn strip_hex_prefix(prefixed_hex: &str) -> String {
     let res = str::replace(prefixed_hex, "0x", "");
     match res.len() % 2 {
-        0 => Ok(res),
+        0 => res,
         _ => left_pad_with_zero(&res),
     }
 }
@@ -65,7 +65,7 @@ pub fn decode_hex(hex_to_decode: &str) -> Result<Vec<u8>> {
 }
 
 pub fn decode_prefixed_hex(hex_to_decode: &str) -> Result<Vec<u8>> {
-    strip_hex_prefix(&hex_to_decode).and_then(|hex| decode_hex(&hex))
+    decode_hex(&strip_hex_prefix(&hex_to_decode))
 }
 
 pub fn convert_bytes_to_u64(bytes: &[Byte]) -> Result<u64> {
@@ -103,8 +103,8 @@ pub fn convert_json_value_to_string(value: &JsonValue) -> Result<String> {
         .to_string())
 }
 
-fn left_pad_with_zero(string: &str) -> Result<String> {
-    Ok(format!("0{}", string))
+fn left_pad_with_zero(string: &str) -> String {
+    format!("0{}", string)
 }
 
 pub fn safely_convert_hex_to_eth_address(hex: &str) -> Result<EthAddress> {
@@ -125,7 +125,7 @@ pub fn safely_convert_hex_to_eth_address(hex: &str) -> Result<EthAddress> {
 mod tests {
     use super::*;
     use crate::{
-        btc_on_eth::eth::eth_test_utils::{HASH_HEX_CHARS, HEX_PREFIX_LENGTH},
+        chains::eth::eth_test_utils::{HASH_HEX_CHARS, HEX_PREFIX_LENGTH},
         errors::AppError,
     };
 
@@ -215,7 +215,7 @@ mod tests {
     fn should_left_pad_string_with_zero_correctly() {
         let dummy_hex = "0xc0ffee";
         let expected_result = "00xc0ffee".to_string();
-        let result = left_pad_with_zero(dummy_hex).unwrap();
+        let result = left_pad_with_zero(dummy_hex);
         assert_eq!(result, expected_result);
     }
 
@@ -223,7 +223,7 @@ mod tests {
     fn should_strip_hex_prefix_correctly() {
         let dummy_hex = "0xc0ffee";
         let expected_result = "c0ffee".to_string();
-        let result = strip_hex_prefix(dummy_hex).unwrap();
+        let result = strip_hex_prefix(dummy_hex);
         assert_eq!(result, expected_result)
     }
 
@@ -231,7 +231,7 @@ mod tests {
     fn should_not_strip_missing_hex_prefix_correctly() {
         let dummy_hex = "c0ffee";
         let expected_result = "c0ffee".to_string();
-        let result = strip_hex_prefix(dummy_hex).unwrap();
+        let result = strip_hex_prefix(dummy_hex);
         assert_eq!(result, expected_result)
     }
 

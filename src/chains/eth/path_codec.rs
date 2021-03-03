@@ -43,8 +43,11 @@ fn encode_even_length_leaf_path_from_nibbles(nibbles: Nibbles) -> Result<Bytes> 
 }
 
 fn encode_odd_length_path_from_nibbles(nibbles: Nibbles, prefix_nibble: Nibbles) -> Result<Bytes> {
-    replace_nibble_in_nibbles_at_nibble_index(set_nibble_offset_to_zero(nibbles), prefix_nibble, 0)
-        .and_then(convert_nibble_to_bytes)
+    convert_nibble_to_bytes(replace_nibble_in_nibbles_at_nibble_index(
+        set_nibble_offset_to_zero(nibbles),
+        prefix_nibble,
+        0,
+    ))
 }
 
 fn encode_odd_length_extension_path_from_nibbles(nibbles: Nibbles) -> Result<Bytes> {
@@ -55,17 +58,17 @@ fn encode_odd_length_leaf_path_from_nibbles(nibbles: Nibbles) -> Result<Bytes> {
     encode_odd_length_path_from_nibbles(nibbles, get_leaf_prefix_nibble())
 }
 
-fn decode_odd_length_nibbles(nibbles: Nibbles) -> Result<Nibbles> {
-    replace_nibble_in_nibbles_at_nibble_index(nibbles, get_zero_nibble(), 0).map(set_nibble_offset_to_one)
+fn decode_odd_length_nibbles(nibbles: Nibbles) -> Nibbles {
+    set_nibble_offset_to_one(replace_nibble_in_nibbles_at_nibble_index(nibbles, get_zero_nibble(), 0))
 }
 
 pub fn decode_path_to_nibbles_and_node_type(path: Bytes) -> Result<(Nibbles, &'static str)> {
     let nibbles = get_nibbles_from_bytes(path);
     match get_nibble_at_index(&nibbles, 0)? {
-        EVEN_LENGTH_LEAF_PREFIX_NIBBLE => Ok((slice_nibbles_at_nibble_index(nibbles, 2)?, LEAF_NODE_STRING)),
-        EVEN_LENGTH_EXTENSION_PREFIX_NIBBLE => Ok((slice_nibbles_at_nibble_index(nibbles, 2)?, EXTENSION_NODE_STRING)),
-        ODD_LENGTH_LEAF_PREFIX_NIBBLE => Ok((decode_odd_length_nibbles(nibbles)?, LEAF_NODE_STRING)),
-        ODD_LENGTH_EXTENSION_PREFIX_NIBBLE => Ok((decode_odd_length_nibbles(nibbles)?, EXTENSION_NODE_STRING)),
+        EVEN_LENGTH_LEAF_PREFIX_NIBBLE => Ok((slice_nibbles_at_nibble_index(nibbles, 2), LEAF_NODE_STRING)),
+        EVEN_LENGTH_EXTENSION_PREFIX_NIBBLE => Ok((slice_nibbles_at_nibble_index(nibbles, 2), EXTENSION_NODE_STRING)),
+        ODD_LENGTH_LEAF_PREFIX_NIBBLE => Ok((decode_odd_length_nibbles(nibbles), LEAF_NODE_STRING)),
+        ODD_LENGTH_EXTENSION_PREFIX_NIBBLE => Ok((decode_odd_length_nibbles(nibbles), EXTENSION_NODE_STRING)),
         _ => Err("✘ Malformed path - cannot determine node type!".into()),
     }
 }
@@ -233,7 +236,7 @@ mod tests {
     fn should_decode_odd_length_leaf_path_to_nibbles_correctly() {
         let (expected_nibbles, path) = get_odd_leaf_path_sample();
         let encoded_nibbles = get_nibbles_from_bytes(path);
-        let result = decode_odd_length_nibbles(encoded_nibbles).unwrap();
+        let result = decode_odd_length_nibbles(encoded_nibbles);
         assert_eq!(result.data, expected_nibbles.data);
     }
 
@@ -241,7 +244,7 @@ mod tests {
     fn should_decode_odd_length_extension_path_to_nibbles_correctly() {
         let (expected_nibbles, path) = get_odd_extension_path_sample();
         let encoded_nibbles = get_nibbles_from_bytes(path);
-        let result = decode_odd_length_nibbles(encoded_nibbles).unwrap();
+        let result = decode_odd_length_nibbles(encoded_nibbles);
         assert_eq!(result.data, expected_nibbles.data);
     }
 }

@@ -14,7 +14,7 @@
 
 pub use crate::{
     btc_on_eth::{
-        btc::{initialize_btc_enclave::maybe_initialize_btc_enclave, submit_btc_block::submit_btc_block_to_enclave},
+        btc::submit_btc_block::submit_btc_block_to_enclave,
         debug_functions::{
             debug_add_multiple_utxos,
             debug_clear_all_utxos,
@@ -37,9 +37,9 @@ pub use crate::{
         get_enclave_state::get_enclave_state,
         get_latest_block_numbers::get_latest_block_numbers,
     },
-    chains::eth::eth_message_signer::{
-        sign_ascii_msg_with_eth_key_with_no_prefix,
-        sign_hex_msg_with_eth_key_with_prefix,
+    chains::{
+        btc::core_initialization::initialize_btc_core::maybe_initialize_btc_core as maybe_initialize_btc_enclave,
+        eth::eth_message_signer::{sign_ascii_msg_with_eth_key_with_no_prefix, sign_hex_msg_with_eth_key_with_prefix},
     },
 };
 

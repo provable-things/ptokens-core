@@ -1,12 +1,3 @@
-use crate::{
-    chains::btc::{
-        btc_block::{BtcBlockAndId, BtcBlockJson},
-        btc_state::BtcState,
-        deposit_address_info::DepositAddressInfoJsonList,
-    },
-    traits::DatabaseInterface,
-    types::Result,
-};
 pub use bitcoin::{
     blockdata::{
         block::{Block as BtcBlock, BlockHeader as BtcBlockHeader},
@@ -17,10 +8,20 @@ pub use bitcoin::{
     util::address::Address as BtcAddress,
 };
 
-pub fn parse_btc_submission_json_and_put_in_state<D>(json_str: &str, state: BtcState<D>) -> Result<BtcState<D>>
-where
-    D: DatabaseInterface,
-{
+use crate::{
+    chains::btc::{
+        btc_block::{BtcBlockAndId, BtcBlockJson},
+        btc_state::BtcState,
+        deposit_address_info::DepositAddressInfoJsonList,
+    },
+    traits::DatabaseInterface,
+    types::Result,
+};
+
+pub fn parse_btc_submission_json_and_put_in_state<D: DatabaseInterface>(
+    json_str: &str,
+    state: BtcState<D>,
+) -> Result<BtcState<D>> {
     info!("✔ Parsing BTC submission json and adding to state...");
     BtcSubmissionMaterialJson::from_str(&json_str).and_then(|result| state.add_btc_submission_json(result))
 }

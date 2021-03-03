@@ -67,18 +67,22 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        btc_on_eth::{
-            btc::minting_params::BtcOnEthMintingParamStruct,
-            eth::eth_test_utils::{get_sample_eth_address, get_sample_eth_private_key},
-            utils::convert_satoshis_to_ptoken,
-        },
-        chains::{btc::btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS, eth::eth_types::EthAddress},
-    };
+    use std::str::FromStr;
+
     use bitcoin::util::address::Address as BtcAddress;
     use bitcoin_hashes::{sha256d, Hash};
-    use std::str::FromStr;
+
+    use super::*;
+    use crate::{
+        btc_on_eth::{btc::minting_params::BtcOnEthMintingParamStruct, utils::convert_satoshis_to_ptoken},
+        chains::{
+            btc::btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
+            eth::{
+                eth_test_utils::{get_sample_eth_address, get_sample_eth_private_key},
+                eth_types::EthAddress,
+            },
+        },
+    };
 
     #[test]
     fn should_get_any_sender_signatures() {

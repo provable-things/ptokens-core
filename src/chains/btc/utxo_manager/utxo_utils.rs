@@ -1,3 +1,7 @@
+use bitcoin::{blockdata::transaction::TxIn as BtcUtxo, consensus::encode::deserialize as btc_deserialize};
+use bitcoin_hashes::{sha256d, Hash};
+use serde_json::{json, Value as JsonValue};
+
 use crate::{
     chains::btc::utxo_manager::{
         utxo_database_utils::{get_all_utxo_db_keys, get_utxo_from_db},
@@ -7,9 +11,6 @@ use crate::{
     traits::DatabaseInterface,
     types::{Byte, Bytes, Result},
 };
-use bitcoin::{blockdata::transaction::TxIn as BtcUtxo, consensus::encode::deserialize as btc_deserialize};
-use bitcoin_hashes::{sha256d, Hash};
-use serde_json::{json, Value as JsonValue};
 
 pub fn get_utxo_and_value_db_key(utxo_number: u64) -> Bytes {
     sha256d::Hash::hash(format!("utxo-number-{}", utxo_number).as_bytes()).to_vec()
@@ -88,7 +89,7 @@ mod tests {
     use crate::{
         chains::btc::{
             btc_test_utils::{
-                get_sample_op_return_utxo_and_value,
+                get_sample_p2pkh_utxo_and_value,
                 get_sample_p2sh_utxo_and_value,
                 get_sample_utxo_and_values,
             },
@@ -98,8 +99,8 @@ mod tests {
     };
 
     #[test]
-    fn should_serde_op_return_btc_utxo_and_value() {
-        let utxo = get_sample_op_return_utxo_and_value();
+    fn should_serde_p2pkh_btc_utxo_and_value() {
+        let utxo = get_sample_p2pkh_utxo_and_value();
         let serialized_utxo = serialize_btc_utxo_and_value(&utxo).unwrap();
         let result = deserialize_utxo_and_value(&serialized_utxo).unwrap();
         assert_eq!(result, utxo);
@@ -123,7 +124,7 @@ mod tests {
 
     #[test]
     fn should_serde_utxo_and_value_with_something_in_the_maybe_pointer() {
-        let mut utxo = get_sample_op_return_utxo_and_value();
+        let mut utxo = get_sample_p2pkh_utxo_and_value();
         let pointer_hash = sha256d::Hash::hash(b"pointer hash");
         utxo.maybe_pointer = Some(pointer_hash);
         let serialized_utxo = serialize_btc_utxo_and_value(&utxo).unwrap();
@@ -154,7 +155,7 @@ mod tests {
         let expected_result = vec![false, true];
         let db = get_test_database();
         let utxo_and_value_1 = get_sample_p2sh_utxo_and_value().unwrap();
-        let utxo_and_value_2 = get_sample_op_return_utxo_and_value();
+        let utxo_and_value_2 = get_sample_p2pkh_utxo_and_value();
         save_new_utxo_and_value(&db, &utxo_and_value_2).unwrap();
         let result = utxos_exist_in_db(&db, &BtcUtxosAndValues::new(vec![utxo_and_value_1, utxo_and_value_2])).unwrap();
         assert_eq!(result, expected_result);

@@ -1,16 +1,15 @@
-use crate::types::Result;
-use eos_primitives::{
-    AccountName as EosAccountName,
-    Key as EosKey,
-    KeysAndThreshold,
-    KeysAndThreshold as EosKeysAndThreshold,
-    ProducerKey as EosProducerKeyV1,
-    ProducerKeyV2 as EosProducerKeyV2,
-    ProducerSchedule as EosProducerScheduleV1,
-    ProducerScheduleV2 as EosProducerScheduleV2,
-    PublicKey as EosPublicKey,
-};
+// TODO Move this mod to the new eos_schedule one and impl on the types etc.
 use std::str::FromStr;
+
+use eos_primitives::{AccountName as EosAccountName, PublicKey as EosPublicKey};
+
+use crate::{
+    chains::eos::{
+        eos_producer_key::{EosKey, EosKeysAndThreshold, EosProducerKeyV1, EosProducerKeyV2},
+        eos_producer_schedule::{EosProducerScheduleV1, EosProducerScheduleV2},
+    },
+    types::Result,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EosProducerScheduleJsonV1 {
@@ -56,7 +55,7 @@ pub fn convert_v1_schedule_to_v2(v1_schedule: &EosProducerScheduleV1) -> EosProd
             .iter()
             .map(|producer| EosProducerKeyV2 {
                 producer_name: producer.producer_name,
-                authority: (0, KeysAndThreshold {
+                authority: (0, EosKeysAndThreshold {
                     threshold: 0,
                     keys: vec![EosKey {
                         weight: 0,
@@ -151,7 +150,7 @@ pub fn parse_v2_schedule_string_to_v2_schedule(schedule_string: &str) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::btc_on_eos::eos::eos_test_utils::{
+    use crate::chains::eos::eos_test_utils::{
         get_sample_v1_schedule,
         get_sample_v1_schedule_json,
         get_sample_v1_schedule_json_string,

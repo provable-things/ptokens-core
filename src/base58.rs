@@ -10,9 +10,10 @@
 // You should have received a copy of the CC0 Public Domain Dedication
 // along with this software.
 // If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
+use std::{error, fmt, iter, slice, str};
+
 use bitcoin_hashes::{sha256d, Hash};
 use byteorder::{ByteOrder, LittleEndian};
-use std::{error, fmt, iter, slice, str};
 
 /// An error that might occur during base58 decoding
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -245,8 +246,9 @@ fn check_encode_slice(data: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use hex::decode as hex_decode;
+
+    use super::*;
 
     #[test]
     fn test_base58_encode() {

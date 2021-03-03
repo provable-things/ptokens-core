@@ -1,3 +1,7 @@
+use std::{fmt, io, str::FromStr};
+
+use secp256k1::{self, key::PublicKey, Secp256k1};
+
 use crate::{
     base58,
     chains::eos::{
@@ -8,8 +12,6 @@ use crate::{
     errors::AppError,
     types::{Byte, Bytes, Result},
 };
-use secp256k1::{self, key::PublicKey, Secp256k1};
-use std::{fmt, io, str::FromStr};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct EosPublicKey {
@@ -89,22 +91,26 @@ impl FromStr for EosPublicKey {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{
-        btc_on_eos::eos::eos_test_utils::{
-            get_sample_eos_private_key,
-            get_sample_eos_public_key,
-            get_sample_eos_public_key_bytes,
-            get_sample_eos_public_key_str,
-            get_sample_eos_signature,
-            sha256_hash_message_bytes,
-        },
-        chains::eos::eos_crypto::eos_signature::EosSignature,
-        test_utils::get_sample_message_to_sign_bytes,
-    };
+    use std::str::FromStr;
+
     use bitcoin_hashes::{sha256, Hash};
     use secp256k1::Message;
-    use std::str::FromStr;
+
+    use super::*;
+    use crate::{
+        chains::eos::{
+            eos_crypto::eos_signature::EosSignature,
+            eos_test_utils::{
+                get_sample_eos_private_key,
+                get_sample_eos_public_key,
+                get_sample_eos_public_key_bytes,
+                get_sample_eos_public_key_str,
+                get_sample_eos_signature,
+                sha256_hash_message_bytes,
+            },
+        },
+        test_utils::get_sample_message_to_sign_bytes,
+    };
 
     impl EosPublicKey {
         pub fn verify_signature(&self, message_slice: &[u8], signature: &EosSignature) -> Result<()> {

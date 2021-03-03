@@ -1,6 +1,15 @@
+use std::str::FromStr;
+
+use bitcoin_hashes::{sha256, Hash};
+use eos_primitives::{AccountName as EosAccountName, PublicKey as EosProducerKey};
+use secp256k1::Message;
+
 use crate::{
     chains::eos::{
+        eos_block_header::{EosBlockHeaderV1, EosBlockHeaderV2},
         eos_crypto::{eos_public_key::EosPublicKey, eos_signature::EosSignature},
+        eos_producer_key::EosProducerKeyV1,
+        eos_producer_schedule::{EosProducerScheduleV1, EosProducerScheduleV2},
         eos_state::EosState,
         protocol_features::WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH,
     },
@@ -8,22 +17,10 @@ use crate::{
     traits::DatabaseInterface,
     types::{Byte, Bytes, Result},
 };
-use bitcoin_hashes::{sha256, Hash};
-use eos_primitives::{
-    AccountName as EosAccountName,
-    BlockHeader as EosBlockHeaderV2,
-    BlockHeaderV1 as EosBlockHeaderV1,
-    ProducerKey as EosProducerKeyV1,
-    ProducerSchedule as EosProducerScheduleV1,
-    ProducerScheduleV2 as EosProducerScheduleV2,
-    PublicKey as EosProducerKey,
-};
-use secp256k1::Message;
-use std::str::FromStr;
 
 fn create_eos_signing_digest(block_mroot: &[Byte], schedule_hash: &[Byte], block_header_digest: &[Byte]) -> Bytes {
-    let hash_1 = sha256::Hash::hash(&[&block_header_digest[..], &block_mroot[..]].concat());
-    sha256::Hash::hash(&[&hash_1[..], &schedule_hash[..]].concat()).to_vec()
+    let hash_1 = sha256::Hash::hash(&[block_header_digest, block_mroot].concat());
+    sha256::Hash::hash(&[&hash_1[..], schedule_hash].concat()).to_vec()
 }
 
 fn get_block_digest(msig_enabled: bool, block_header: &EosBlockHeaderV2) -> Result<Bytes> {
@@ -52,11 +49,11 @@ fn convert_v2_schedule_block_header_to_v1_schedule_block_header(
         v2_block_header.transaction_mroot,
         v2_block_header.action_mroot,
         v2_block_header.schedule_version,
-        match &v2_block_header.new_producer_schedule {
-            None => None,
-            Some(v2_schedule) => Some(convert_v2_schedule_to_v1(&v2_schedule.clone())),
-        },
-        v2_block_header.header_extensions.clone(),
+        v2_block_header
+            .new_producer_schedule
+            .as_ref()
+            .map(|v2_schedule| convert_v2_schedule_to_v1(&v2_schedule.clone())),
+        &v2_block_header.header_extensions,
     )
 }
 
@@ -186,10 +183,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use eos_primitives::Checksum256;
 
-    use crate::{
-        btc_on_eos::eos::eos_test_utils::{
+    use super::*;
+    use crate::chains::eos::{
+        eos_merkle_utils::Incremerkle,
+        eos_test_utils::{
             get_init_and_subsequent_blocks_json_n,
             get_sample_eos_submission_material_json_n,
             get_sample_eos_submission_material_n,
@@ -198,9 +197,8 @@ mod tests {
             get_sample_v2_schedule,
             EosInitAndSubsequentBlocksJson,
         },
-        chains::eos::{eos_merkle_utils::Incremerkle, eos_utils::convert_hex_to_checksum256},
+        eos_utils::convert_hex_to_checksum256,
     };
-    use eos_primitives::Checksum256;
 
     fn validate_subsequent_block(block_num: usize, blocks_json: &EosInitAndSubsequentBlocksJson) {
         println!("Checking subsequent block #{} is valid...", block_num);

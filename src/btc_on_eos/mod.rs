@@ -12,30 +12,42 @@
 //! ptokens_core = { version = "1.0.0", features = ["debug"] }
 //! ```
 
-pub use btc::{initialize_btc_core::maybe_initialize_btc_core, submit_btc_block::submit_btc_block_to_core};
-pub use debug_functions::{
-    debug_add_multiple_utxos,
-    debug_add_new_eos_schedule,
-    debug_clear_all_utxos,
-    debug_consolidate_utxos,
-    debug_get_all_db_keys,
-    debug_get_all_utxos,
-    debug_get_child_pays_for_parent_btc_tx,
-    debug_get_key_from_db,
-    debug_remove_utxo,
-    debug_reprocess_btc_block_for_stale_eos_tx,
-    debug_reprocess_eos_block,
-    debug_set_key_in_db_to_value,
-    debug_update_incremerkle,
+pub use crate::{
+    btc_on_eos::{
+        btc::submit_btc_block::submit_btc_block_to_core,
+        debug_functions::{
+            debug_add_multiple_utxos,
+            debug_add_new_eos_schedule,
+            debug_clear_all_utxos,
+            debug_consolidate_utxos,
+            debug_get_all_db_keys,
+            debug_get_all_utxos,
+            debug_get_child_pays_for_parent_btc_tx,
+            debug_get_key_from_db,
+            debug_get_processed_actions_list,
+            debug_remove_utxo,
+            debug_reprocess_btc_block_for_stale_eos_tx,
+            debug_reprocess_eos_block,
+            debug_set_key_in_db_to_value,
+            debug_update_incremerkle,
+        },
+        eos::submit_eos_block::submit_eos_block_to_core,
+        get_enclave_state::get_enclave_state,
+        get_latest_block_numbers::get_latest_block_numbers,
+    },
+    chains::{
+        btc::core_initialization::initialize_btc_core::maybe_initialize_btc_core,
+        eos::{
+            core_initialization::initialize_eos_core::maybe_initialize_eos_core_with_eos_account_and_symbol as maybe_initialize_eos_core,
+            disable_protocol_feature::disable_eos_protocol_feature,
+            enable_protocol_feature::enable_eos_protocol_feature,
+            eos_debug_functions::{
+                debug_add_global_sequences_to_processed_list,
+                debug_remove_global_sequences_from_processed_list,
+            },
+        },
+    },
 };
-pub use eos::{
-    disable_protocol_feature::disable_eos_protocol_feature,
-    enable_protocol_feature::enable_eos_protocol_feature,
-    initialize_eos_core::maybe_initialize_eos_core,
-    submit_eos_block::submit_eos_block_to_core,
-};
-pub use get_enclave_state::get_enclave_state;
-pub use get_latest_block_numbers::get_latest_block_numbers;
 
 pub mod btc;
 pub mod debug_functions;

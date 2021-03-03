@@ -1,34 +1,34 @@
+use ethereum_types::H256 as EthHash;
+
 use crate::{
     btc_on_eth::eth::redeem_info::BtcOnEthRedeemInfos,
     chains::{
         btc::{btc_types::BtcTransactions, utxo_manager::utxo_types::BtcUtxosAndValues},
-        eos::{eos_erc20_dictionary::EosErc20Dictionary, eos_types::EosSignedTransactions},
+        eos::{eos_crypto::eos_transaction::EosSignedTransactions, eos_eth_token_dictionary::EosEthTokenDictionary},
         eth::eth_submission_material::EthSubmissionMaterial,
     },
+    eos_on_eth::eth::eth_tx_info::EosOnEthEthTxInfos,
     erc20_on_eos::eth::peg_in_info::Erc20OnEosPegInInfos,
     traits::DatabaseInterface,
     types::Result,
     utils::{get_no_overwrite_state_err, get_not_in_state_err},
 };
-use ethereum_types::H256 as EthHash;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct EthState<D: DatabaseInterface> {
     pub db: D,
     pub misc: Option<String>,
     pub btc_transactions: Option<BtcTransactions>,
+    pub eos_on_eth_eth_tx_infos: EosOnEthEthTxInfos,
     pub btc_on_eth_redeem_infos: BtcOnEthRedeemInfos,
     pub eos_transactions: Option<EosSignedTransactions>,
     pub erc20_on_eos_peg_in_infos: Erc20OnEosPegInInfos,
     pub btc_utxos_and_values: Option<BtcUtxosAndValues>,
-    pub eos_erc20_dictionary: Option<EosErc20Dictionary>,
+    pub eos_eth_token_dictionary: Option<EosEthTokenDictionary>,
     pub eth_submission_material: Option<EthSubmissionMaterial>,
 }
 
-impl<D> EthState<D>
-where
-    D: DatabaseInterface,
-{
+impl<D: DatabaseInterface> EthState<D> {
     pub fn init(db: D) -> EthState<D> {
         EthState {
             db,
@@ -36,8 +36,9 @@ where
             btc_transactions: None,
             eos_transactions: None,
             btc_utxos_and_values: None,
-            eos_erc20_dictionary: None,
+            eos_eth_token_dictionary: None,
             eth_submission_material: None,
+            eos_on_eth_eth_tx_infos: EosOnEthEthTxInfos::new(vec![]),
             btc_on_eth_redeem_infos: BtcOnEthRedeemInfos::new(vec![]),
             erc20_on_eos_peg_in_infos: Erc20OnEosPegInInfos::new(vec![]),
         }
@@ -68,6 +69,12 @@ where
         self.replace_erc20_on_eos_peg_in_infos(Erc20OnEosPegInInfos::new(new_infos))
     }
 
+    pub fn add_eos_on_eth_eth_tx_infos(self, mut infos: EosOnEthEthTxInfos) -> Result<EthState<D>> {
+        let mut new_infos = self.eos_on_eth_eth_tx_infos.clone().0;
+        new_infos.append(&mut infos.0);
+        self.replace_eos_on_eth_eth_tx_infos(EosOnEthEthTxInfos::new(new_infos))
+    }
+
     pub fn replace_btc_on_eth_redeem_infos(mut self, replacements: BtcOnEthRedeemInfos) -> Result<EthState<D>> {
         self.btc_on_eth_redeem_infos = replacements;
         Ok(self)
@@ -75,6 +82,11 @@ where
 
     pub fn replace_erc20_on_eos_peg_in_infos(mut self, replacements: Erc20OnEosPegInInfos) -> Result<EthState<D>> {
         self.erc20_on_eos_peg_in_infos = replacements;
+        Ok(self)
+    }
+
+    pub fn replace_eos_on_eth_eth_tx_infos(mut self, replacements: EosOnEthEthTxInfos) -> Result<EthState<D>> {
+        self.eos_on_eth_eth_tx_infos = replacements;
         Ok(self)
     }
 
@@ -138,7 +150,7 @@ where
     }
 
     pub fn get_parent_hash(&self) -> Result<EthHash> {
-        Ok(self.get_eth_submission_material()?.get_parent_hash()?)
+        self.get_eth_submission_material()?.get_parent_hash()
     }
 
     pub fn get_num_eos_txs(&self) -> usize {
@@ -148,20 +160,20 @@ where
         }
     }
 
-    pub fn add_eos_erc20_dictionary(mut self, dictionary: EosErc20Dictionary) -> Result<EthState<D>> {
-        match self.eos_erc20_dictionary {
-            Some(_) => Err(get_no_overwrite_state_err("eos_erc20_dictionary").into()),
+    pub fn add_eos_eth_token_dictionary(mut self, dictionary: EosEthTokenDictionary) -> Result<EthState<D>> {
+        match self.eos_eth_token_dictionary {
+            Some(_) => Err(get_no_overwrite_state_err("eos_eth_token_dictionary").into()),
             None => {
-                self.eos_erc20_dictionary = Some(dictionary);
+                self.eos_eth_token_dictionary = Some(dictionary);
                 Ok(self)
             },
         }
     }
 
-    pub fn get_eos_erc20_dictionary(&self) -> Result<&EosErc20Dictionary> {
-        match self.eos_erc20_dictionary {
+    pub fn get_eos_eth_token_dictionary(&self) -> Result<&EosEthTokenDictionary> {
+        match self.eos_eth_token_dictionary {
             Some(ref dictionary) => Ok(dictionary),
-            None => Err(get_not_in_state_err("eos_erc20_dictionary").into()),
+            None => Err(get_not_in_state_err("eos_eth_token_dictionary").into()),
         }
     }
 }
@@ -170,15 +182,15 @@ where
 mod tests {
     use super::*;
     use crate::{
-        btc_on_eth::eth::eth_test_utils::{
+        chains::eth::eth_test_utils::{
             get_expected_block,
             get_expected_receipt,
+            get_sample_erc20_on_eos_peg_in_infos,
             get_sample_eth_submission_material,
             get_sample_eth_submission_material_n,
             get_valid_state_with_block_and_receipts,
             SAMPLE_RECEIPT_INDEX,
         },
-        chains::eth::eth_test_utils::get_sample_erc20_on_eos_peg_in_infos,
         errors::AppError,
         test_utils::get_test_database,
     };

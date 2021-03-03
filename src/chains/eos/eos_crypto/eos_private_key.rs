@@ -1,3 +1,12 @@
+use std::{fmt, str::FromStr};
+
+use bitcoin_hashes::{sha256, Hash as HashTrait};
+use secp256k1::{
+    key::{PublicKey, SecretKey, ONE_KEY},
+    Message,
+    Secp256k1,
+};
+
 use crate::{
     base58,
     chains::eos::{
@@ -11,13 +20,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use bitcoin_hashes::{sha256, Hash as HashTrait};
-use secp256k1::{
-    key::{PublicKey, SecretKey, ONE_KEY},
-    Message,
-    Secp256k1,
-};
-use std::{fmt, str::FromStr};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct EosPrivateKey {
@@ -136,19 +138,22 @@ impl Drop for EosPrivateKey {
 
 #[cfg(test)]
 mod test {
+    use bitcoin_hashes::{sha256, Hash as HashTrait};
+
     use super::*;
     use crate::{
-        btc_on_eos::eos::eos_test_utils::{
-            get_sample_eos_private_key,
-            get_sample_eos_private_key_str,
-            get_sample_eos_public_key,
-            get_sample_eos_public_key_str,
-            get_sample_eos_signature,
+        chains::eos::{
+            eos_crypto::eos_private_key::EosPrivateKey,
+            eos_test_utils::{
+                get_sample_eos_private_key,
+                get_sample_eos_private_key_str,
+                get_sample_eos_public_key,
+                get_sample_eos_public_key_str,
+                get_sample_eos_signature,
+            },
         },
-        chains::eos::eos_crypto::eos_private_key::EosPrivateKey,
         test_utils::get_sample_message_to_sign_bytes,
     };
-    use bitcoin_hashes::{sha256, Hash as HashTrait};
 
     #[test]
     fn should_generate_random_eos_crypto() {

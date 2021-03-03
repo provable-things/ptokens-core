@@ -44,14 +44,14 @@ where
 mod tests {
     use super::*;
     use crate::{
-        btc_on_eth::eth::eth_test_utils::{
-            get_eth_latest_block_hash_from_db,
-            get_sequential_eth_blocks_and_receipts,
-            put_eth_latest_block_in_db,
-        },
         chains::eth::{
             eth_constants::ETH_LATEST_BLOCK_HASH_KEY,
             eth_database_utils::get_hash_from_db_via_hash_key,
+            eth_test_utils::{
+                get_eth_latest_block_hash_from_db,
+                get_sequential_eth_blocks_and_receipts,
+                put_eth_latest_block_in_db,
+            },
             eth_types::EthHash,
         },
         test_utils::get_test_database,

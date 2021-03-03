@@ -1,9 +1,10 @@
+use ethabi::Token;
+use ethereum_types::{Address as EthAddress, U256};
+
 use crate::{
     chains::eth::eth_contracts::encode_fxn_call,
     types::{Bytes, Result},
 };
-use ethabi::Token;
-use ethereum_types::{Address as EthAddress, U256};
 
 pub const PERC20_PEGOUT_GAS_LIMIT: usize = 180_000;
 pub const PERC20_MIGRATE_GAS_LIMIT: usize = 6_000_000;
@@ -28,18 +29,17 @@ pub fn encode_perc20_migrate_fxn_data(migrate_to: EthAddress) -> Result<Bytes> {
 }
 
 pub fn encode_perc20_add_supported_token_fx_data(token_to_support: EthAddress) -> Result<Bytes> {
-    // TODO test!
     encode_fxn_call(PERC20_ABI, "addSupportedToken", &[Token::Address(token_to_support)])
 }
 
 pub fn encode_perc20_remove_supported_token_fx_data(token_to_remove: EthAddress) -> Result<Bytes> {
-    // TODO test!
     encode_fxn_call(PERC20_ABI, "removeSupportedToken", &[Token::Address(token_to_remove)])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chains::eth::eth_test_utils::get_sample_eth_address;
 
     #[test]
     fn should_encode_peg_out_fxn_data() {
@@ -58,5 +58,21 @@ mod tests {
         let expected_result = "ce5494bb000000000000000000000000edb86cd455ef3ca43f0e227e00469c3bdfa40628";
         let result = hex::encode(encode_perc20_migrate_fxn_data(address).unwrap());
         assert_eq!(result, expected_result)
+    }
+
+    #[test]
+    fn should_encode_perc20_add_supported_token_fx_data() {
+        let expected_result = "6d69fcaf0000000000000000000000001739624f5cd969885a224da84418d12b8570d61a";
+        let address = get_sample_eth_address();
+        let result = encode_perc20_add_supported_token_fx_data(address).unwrap();
+        assert_eq!(hex::encode(&result), expected_result);
+    }
+
+    #[test]
+    fn should_encode_perc20_remove_supported_token_fx_data() {
+        let expected_result = "763191900000000000000000000000001739624f5cd969885a224da84418d12b8570d61a";
+        let address = get_sample_eth_address();
+        let result = encode_perc20_remove_supported_token_fx_data(address).unwrap();
+        assert_eq!(hex::encode(&result), expected_result);
     }
 }

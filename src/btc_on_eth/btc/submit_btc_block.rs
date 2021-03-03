@@ -1,10 +1,10 @@
 use crate::{
     btc_on_eth::{
         btc::{
-            filter_op_return_deposit_txs::filter_op_return_deposit_txs_and_add_to_state,
+            filter_p2pkh_deposit_txs::filter_for_p2pkh_deposit_txs_excluding_change_outputs_and_add_to_state,
             get_btc_output_json::{create_btc_output_json_and_put_in_state, get_btc_output_as_string},
             minting_params::{
-                parse_minting_params_from_op_return_deposits_and_add_to_state,
+                parse_minting_params_from_p2pkh_deposits_and_add_to_state,
                 parse_minting_params_from_p2sh_deposits_and_add_to_state,
             },
             sign_any_sender_transactions::maybe_sign_any_sender_canon_block_txs_and_add_to_state,
@@ -20,7 +20,7 @@ use crate::{
         btc_submission_material::parse_btc_submission_json_and_put_in_state,
         check_btc_parent_exists::check_for_parent_of_btc_block_in_state,
         deposit_address_info::validate_deposit_address_list_in_state,
-        extract_utxos_from_op_return_txs::maybe_extract_utxos_from_op_return_txs_and_put_in_state,
+        extract_utxos_from_p2pkh_txs::maybe_extract_utxos_from_p2pkh_txs_and_put_in_state,
         extract_utxos_from_p2sh_txs::maybe_extract_utxos_from_p2sh_txs_and_put_in_state,
         filter_minting_params::maybe_filter_out_value_too_low_btc_on_eth_minting_params_in_state,
         filter_p2sh_deposit_txs::filter_p2sh_deposit_txs_and_add_to_state,
@@ -67,11 +67,11 @@ pub fn submit_btc_block_to_enclave<D: DatabaseInterface>(db: D, block_json_strin
         .and_then(validate_btc_merkle_root)
         .and_then(get_deposit_info_hash_map_and_put_in_state)
         .and_then(validate_deposit_address_list_in_state)
-        .and_then(filter_op_return_deposit_txs_and_add_to_state)
+        .and_then(filter_for_p2pkh_deposit_txs_excluding_change_outputs_and_add_to_state)
         .and_then(filter_p2sh_deposit_txs_and_add_to_state)
-        .and_then(parse_minting_params_from_op_return_deposits_and_add_to_state)
+        .and_then(parse_minting_params_from_p2pkh_deposits_and_add_to_state)
         .and_then(parse_minting_params_from_p2sh_deposits_and_add_to_state)
-        .and_then(maybe_extract_utxos_from_op_return_txs_and_put_in_state)
+        .and_then(maybe_extract_utxos_from_p2pkh_txs_and_put_in_state)
         .and_then(maybe_extract_utxos_from_p2sh_txs_and_put_in_state)
         .and_then(filter_out_value_too_low_utxos_from_state)
         .and_then(maybe_save_utxos_to_db)

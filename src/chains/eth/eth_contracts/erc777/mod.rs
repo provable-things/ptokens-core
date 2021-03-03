@@ -1,5 +1,10 @@
+use derive_more::Constructor;
+use ethabi::Token;
+use ethereum_types::{Address as EthAddress, H256 as EthHash, U256};
+
 use crate::{
     chains::eth::{
+        eth_constants::ETH_WORD_SIZE_IN_BYTES,
         eth_contracts::encode_fxn_call,
         eth_crypto::eth_transaction::EthTransaction,
         eth_database_utils::{
@@ -10,15 +15,15 @@ use crate::{
             get_eth_private_key_from_db,
             increment_eth_account_nonce_in_db,
         },
+        eth_log::EthLog,
     },
     traits::DatabaseInterface,
     types::{Byte, Bytes, Result},
 };
-use ethabi::Token;
-use ethereum_types::{Address as EthAddress, U256};
 
 pub const EMPTY_DATA: Bytes = vec![];
 pub const ERC777_CHANGE_PNETWORK_GAS_LIMIT: usize = 30_000;
+pub const ERC777_MINT_WITH_NO_DATA_GAS_LIMIT: usize = 180_000;
 
 pub const ERC777_CHANGE_PNETWORK_ABI: &str = "[{\"constant\":false,\"inputs\":[{\"name\":\"newPNetwork\",\"type\":\"address\"}],\"name\":\"changePNetwork\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"signature\":\"0xfd4add66\"}]";
 
@@ -26,14 +31,22 @@ pub const ERC777_MINT_WITH_NO_DATA_ABI: &str = "[{\"constant\":false,\"inputs\":
 
 pub const ERC777_MINT_WITH_DATA_ABI: &str = "[{\"constant\":false,\"inputs\":[{\"name\":\"recipient\",\"type\":\"address\"},{\"name\":\"value\",\"type\":\"uint256\"},{\"name\":\"userData\",\"type\":\"bytes\"},{\"name\":\"operatorData\",\"type\":\"bytes\"}],\"name\":\"mint\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]";
 
+lazy_static! {
+    pub static ref ERC_777_REDEEM_EVENT_TOPIC: EthHash = {
+        EthHash::from_slice(
+            &hex::decode("78e6c3f67f57c26578f2487b930b70d844bcc8dd8f4d629fb4af81252ab5aa65")
+                .expect("✘ Invalid hex in `BTC_ON_ETH_REDEEM_EVENT_TOPIC`"),
+        )
+    };
+}
+
 pub fn encode_erc777_change_pnetwork_fxn_data(new_ptoken_address: EthAddress) -> Result<Bytes> {
-    // TODO Take a reference!
     encode_fxn_call(ERC777_CHANGE_PNETWORK_ABI, "changePNetwork", &[Token::Address(
         new_ptoken_address,
     )])
 }
 
-fn encode_erc777_mint_with_no_data_fxn(recipient: &EthAddress, value: &U256) -> Result<Bytes> {
+pub fn encode_erc777_mint_with_no_data_fxn(recipient: &EthAddress, value: &U256) -> Result<Bytes> {
     encode_fxn_call(ERC777_MINT_WITH_NO_DATA_ABI, "mint", &[
         Token::Address(*recipient),
         Token::Uint(*value),
@@ -75,10 +88,7 @@ pub fn encode_erc777_mint_fxn_maybe_with_data(
     }
 }
 
-pub fn get_signed_erc777_change_pnetwork_tx<D>(db: &D, new_address: EthAddress) -> Result<String>
-where
-    D: DatabaseInterface,
-{
+pub fn get_signed_erc777_change_pnetwork_tx<D: DatabaseInterface>(db: &D, new_address: EthAddress) -> Result<String> {
     const ZERO_ETH_VALUE: usize = 0;
     let nonce_before_incrementing = get_eth_account_nonce_from_db(db)?;
     increment_eth_account_nonce_in_db(db, 1).and(Ok(EthTransaction::new_unsigned(
@@ -94,9 +104,68 @@ where
     .serialize_hex()))
 }
 
+#[derive(Debug, Clone, Constructor, Eq, PartialEq)]
+pub struct Erc777RedeemEvent {
+    pub redeemer: EthAddress,
+    pub value: U256,
+    pub underlying_asset_recipient: String,
+}
+
+impl Erc777RedeemEvent {
+    fn get_redeemer_address_from_redeem_log(log: &EthLog) -> Result<EthAddress> {
+        if log.topics.len() < 2 {
+            Err("Not enough topics to get redeemer address from ERC777 log!".into())
+        } else {
+            Ok(EthAddress::from_slice(&log.topics[1].as_bytes()[12..]))
+        }
+    }
+
+    fn get_redeem_amount_from_redeem_log(log: &EthLog) -> Result<U256> {
+        if log.data.len() >= ETH_WORD_SIZE_IN_BYTES {
+            Ok(U256::from(&log.data[..ETH_WORD_SIZE_IN_BYTES]))
+        } else {
+            Err("Not enough bytes in log data to get redeem amount!".into())
+        }
+    }
+
+    fn get_underlying_asset_address_from_redeem_log(log: &EthLog) -> Result<String> {
+        let start_index = ETH_WORD_SIZE_IN_BYTES * 3;
+        if log.data.len() >= start_index {
+            Ok(log.data[start_index..]
+                .iter()
+                .filter(|byte| *byte != &0u8)
+                .map(|byte| *byte as char)
+                .collect::<String>())
+        } else {
+            Err("Not enough bytes in redeem log data to parse underlying asset string!".into())
+        }
+    }
+
+    fn check_log_is_erc777_redeem_event(log: &EthLog) -> Result<()> {
+        match log.topics[0] == *ERC_777_REDEEM_EVENT_TOPIC {
+            true => Ok(()),
+            false => Err("Log is NOT from an ERC777 redeem event!".into()),
+        }
+    }
+
+    pub fn from_eth_log(log: &EthLog) -> Result<Self> {
+        Erc777RedeemEvent::check_log_is_erc777_redeem_event(log).and_then(|_| {
+            Ok(Erc777RedeemEvent {
+                value: Erc777RedeemEvent::get_redeem_amount_from_redeem_log(log)?,
+                redeemer: Erc777RedeemEvent::get_redeemer_address_from_redeem_log(log)?,
+                underlying_asset_recipient: Erc777RedeemEvent::get_underlying_asset_address_from_redeem_log(log)?,
+            })
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        chains::eth::eth_test_utils::{get_sample_log_with_erc20_peg_in_event, get_sample_log_with_erc777_redeem},
+        errors::AppError,
+    };
 
     #[test]
     fn should_encode_erc777_change_pnetwork_fxn_data() {
@@ -124,5 +193,66 @@ mod tests {
         let operator_data = vec![0xc0, 0xff, 0xee];
         let result = encode_erc777_mint_with_data_fxn(&recipient, &amount, &user_data, &operator_data).unwrap();
         assert_eq!(hex::encode(result), expected_result);
+    }
+
+    #[test]
+    fn should_get_redeemer_address_from_redeem_log() {
+        let log = get_sample_log_with_erc777_redeem();
+        let result = Erc777RedeemEvent::get_redeemer_address_from_redeem_log(&log).unwrap();
+        let expected_result = EthAddress::from_slice(&hex::decode("edb86cd455ef3ca43f0e227e00469c3bdfa40628").unwrap());
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn should_get_redeem_amount_from_redeem_log() {
+        let log = get_sample_log_with_erc777_redeem();
+        let result = Erc777RedeemEvent::get_redeem_amount_from_redeem_log(&log).unwrap();
+        let expected_result = U256::from_dec_str("6660000000000").unwrap();
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn should_get_underlying_asset_address_from_redeem_log() {
+        let log = get_sample_log_with_erc777_redeem();
+        let result = Erc777RedeemEvent::get_underlying_asset_address_from_redeem_log(&log).unwrap();
+        let expected_result = "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM".to_string();
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn should_check_log_is_erc777_redeem_event() {
+        let log = get_sample_log_with_erc777_redeem();
+        let result = Erc777RedeemEvent::check_log_is_erc777_redeem_event(&log);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn non_erc777_log_should_not_pass_erc777_check() {
+        let log = get_sample_log_with_erc20_peg_in_event().unwrap();
+        let result = Erc777RedeemEvent::check_log_is_erc777_redeem_event(&log);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn should_get_redeem_event_params_from_log() {
+        let log = get_sample_log_with_erc777_redeem();
+        let expected_result = Erc777RedeemEvent::new(
+            EthAddress::from_slice(&hex::decode("edb86cd455ef3ca43f0e227e00469c3bdfa40628").unwrap()),
+            U256::from_dec_str("6660000000000").unwrap(),
+            "mudzxCq9aCQ4Una9MmayvJVCF1Tj9fypiM".to_string(),
+        );
+        let result = Erc777RedeemEvent::from_eth_log(&log).unwrap();
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn should_fail_to_get_params_from_non_erc777_redeem_event() {
+        let expected_err = "Log is NOT from an ERC777 redeem event!".to_string();
+        let log = get_sample_log_with_erc20_peg_in_event().unwrap();
+        match Erc777RedeemEvent::from_eth_log(&log) {
+            Ok(_) => panic!("Should not have succeeded!"),
+            Err(AppError::Custom(err)) => assert_eq!(err, expected_err),
+            Err(_) => panic!("Wrong error received!"),
+        }
     }
 }

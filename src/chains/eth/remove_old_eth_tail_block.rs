@@ -1,3 +1,5 @@
+use ethereum_types::H256 as EthHash;
+
 use crate::{
     chains::eth::{
         eth_database_utils::{
@@ -11,7 +13,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use ethereum_types::H256 as EthHash;
 
 fn is_anchor_block<D>(db: &D, eth_block_hash: &EthHash) -> Result<bool>
 where
@@ -63,12 +64,14 @@ where
 mod tests {
     use super::*;
     use crate::{
-        btc_on_eth::eth::eth_test_utils::{
-            get_sequential_eth_blocks_and_receipts,
-            put_eth_anchor_block_in_db,
-            put_eth_tail_block_in_db,
+        chains::eth::{
+            eth_database_utils::{eth_block_exists_in_db, put_eth_submission_material_in_db},
+            eth_test_utils::{
+                get_sequential_eth_blocks_and_receipts,
+                put_eth_anchor_block_in_db,
+                put_eth_tail_block_in_db,
+            },
         },
-        chains::eth::eth_database_utils::{eth_block_exists_in_db, put_eth_submission_material_in_db},
         test_utils::get_test_database,
     };
 

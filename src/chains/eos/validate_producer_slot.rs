@@ -1,10 +1,14 @@
 use crate::{
-    chains::eos::{eos_constants::PRODUCER_REPS, eos_state::EosState},
+    chains::eos::{
+        eos_block_header::EosBlockHeaderV2,
+        eos_constants::PRODUCER_REPS,
+        eos_producer_schedule::EosProducerScheduleV2,
+        eos_state::EosState,
+    },
     constants::{CORE_IS_VALIDATING, DEBUG_MODE, NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR},
     traits::DatabaseInterface,
     types::Result,
 };
-use eos_primitives::{BlockHeader as EosBlockHeader, ProducerScheduleV2 as EosProducerScheduleV2};
 
 fn get_producer_index(num_producers: u64, block_timestamp: u64) -> u64 {
     debug!("  Num producers: {}", num_producers);
@@ -12,7 +16,7 @@ fn get_producer_index(num_producers: u64, block_timestamp: u64) -> u64 {
     (block_timestamp % (num_producers * PRODUCER_REPS)) / PRODUCER_REPS
 }
 
-fn validate_producer_slot(schedule: &EosProducerScheduleV2, block: &EosBlockHeader) -> Result<()> {
+fn validate_producer_slot(schedule: &EosProducerScheduleV2, block: &EosBlockHeaderV2) -> Result<()> {
     let index = get_producer_index(schedule.producers.len() as u64, block.timestamp.as_u32() as u64) as usize;
     match block.producer == schedule.producers[index].producer_name {
         true => Ok(()),
@@ -47,9 +51,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        btc_on_eos::eos::eos_test_utils::get_sample_eos_submission_material_n,
-        chains::eos::parse_eos_schedule::parse_v2_schedule_string_to_v2_schedule,
+    use crate::chains::eos::{
+        eos_test_utils::get_sample_eos_submission_material_n,
+        parse_eos_schedule::parse_v2_schedule_string_to_v2_schedule,
     };
 
     #[test]

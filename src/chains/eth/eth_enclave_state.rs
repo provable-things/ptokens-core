@@ -1,8 +1,11 @@
+use ethereum_types::Address as EthAddress;
+
 use crate::{
     chains::eth::{
         eth_constants::ETH_TAIL_LENGTH,
         eth_database_utils::{
             get_any_sender_nonce_from_db,
+            get_eos_on_eth_smart_contract_address_from_db,
             get_erc20_on_eos_smart_contract_address_from_db,
             get_erc777_contract_address_from_db,
             get_erc777_proxy_contract_address_from_db,
@@ -10,6 +13,7 @@ use crate::{
             get_eth_anchor_block_from_db,
             get_eth_canon_block_from_db,
             get_eth_canon_to_tip_length_from_db,
+            get_eth_chain_id_from_db,
             get_eth_gas_price_from_db,
             get_eth_latest_block_from_db,
             get_eth_tail_block_from_db,
@@ -21,11 +25,11 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use ethereum_types::Address as EthAddress;
 
 #[derive(Serialize, Deserialize)]
 pub struct EthEnclaveState {
     eth_gas_price: u64,
+    eth_chain_id: u8,
     eth_address: String,
     eth_tail_length: u64,
     any_sender_nonce: u64,
@@ -54,6 +58,7 @@ impl EthEnclaveState {
         let eth_latest_block = get_eth_latest_block_from_db(db)?;
         Ok(EthEnclaveState {
             eth_tail_length: ETH_TAIL_LENGTH,
+            eth_chain_id: get_eth_chain_id_from_db(db)?,
             eth_gas_price: get_eth_gas_price_from_db(db)?,
             any_sender_nonce: get_any_sender_nonce_from_db(db)?,
             eth_account_nonce: get_eth_account_nonce_from_db(db)?,
@@ -80,5 +85,9 @@ impl EthEnclaveState {
 
     pub fn new_for_erc20_on_eos<D: DatabaseInterface>(db: &D) -> Result<Self> {
         Self::new(db, &get_erc20_on_eos_smart_contract_address_from_db(db)?)
+    }
+
+    pub fn new_for_eos_on_eth<D: DatabaseInterface>(db: &D) -> Result<Self> {
+        Self::new(db, &get_eos_on_eth_smart_contract_address_from_db(db)?)
     }
 }

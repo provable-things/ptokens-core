@@ -15,10 +15,12 @@
 pub use errors::AppError;
 pub use traits::DatabaseInterface;
 pub use types::{Bytes, Result};
+pub use utils::get_core_version;
 
 pub mod btc_on_eos;
 pub mod btc_on_eth;
 pub mod chains;
+pub mod eos_on_eth;
 pub mod erc20_on_eos;
 pub mod errors;
 pub mod traits;

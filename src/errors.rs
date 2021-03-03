@@ -7,7 +7,7 @@ quick_error! {
             from(err: &str) -> (err.into())
             display("✘ Program Error!\n{}", err)
         }
-        IOError(err: std::io::Error) {
+        IoError(err: std::io::Error) {
             from()
             display("✘ I/O Error!\n✘ {}", err)
         }
@@ -86,6 +86,14 @@ quick_error! {
         FromDecStrErr(err: ethereum_types::FromDecStrErr) {
             from()
             display("✘ Ethereum types `from_dec_str` err: {}", err)
+        }
+        EosParseAssetErr(err: eos_primitives::ParseAssetError) {
+            from()
+            display("✘ EOS parse asset error: {:?}", err)
+        }
+        EosWriteError(err: eos_primitives::WriteError) {
+            from()
+            display("✘ EOS write error: {:?}", err)
         }
         NoneError(err: &'static str) {
             display("✘ None Error!\n✘ {}", err)

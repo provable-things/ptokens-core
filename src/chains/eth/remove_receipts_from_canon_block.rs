@@ -25,7 +25,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{btc_on_eth::eth::eth_test_utils::get_sample_eth_submission_material, test_utils::get_test_database};
+    use crate::{chains::eth::eth_test_utils::get_sample_eth_submission_material, test_utils::get_test_database};
 
     #[test]
     fn should_remove_receipts_from_canon_block() {

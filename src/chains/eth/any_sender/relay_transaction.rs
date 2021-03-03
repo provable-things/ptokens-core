@@ -1,3 +1,7 @@
+use ethabi::{encode, Token};
+use ethereum_types::{Address as EthAddress, Signature as EthSignature, U256};
+use rlp::RlpStream;
+
 use crate::{
     chains::eth::{
         any_sender::{
@@ -11,9 +15,6 @@ use crate::{
     },
     types::{Byte, Bytes, Result},
 };
-use ethabi::{encode, Token};
-use ethereum_types::{Address as EthAddress, Signature as EthSignature, U256};
-use rlp::RlpStream;
 
 pub const ANY_SENDER_GAS_LIMIT: u32 = 300_000;
 pub const ANY_SENDER_MAX_DATA_LEN: usize = 3_000;
@@ -185,7 +186,7 @@ impl RelayTransaction {
         to: EthAddress,
         token_recipient: EthAddress,
     ) -> Result<RelayTransaction> {
-        Ok(RelayTransaction::new_unsigned(
+        RelayTransaction::new_unsigned(
             chain_id,
             from,
             encode_mint_by_proxy_tx_data(eth_private_key, token_recipient, token_amount, any_sender_nonce)?,
@@ -195,7 +196,7 @@ impl RelayTransaction {
             RelayContract::from_eth_chain_id(chain_id)?.address()?,
             to,
         )?
-        .sign(eth_private_key)?)
+        .sign(eth_private_key)
     }
 
     #[cfg(test)]
@@ -236,7 +237,7 @@ impl EthTxInfoCompatible for RelayTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::btc_on_eth::eth::eth_test_utils::get_sample_unsigned_eth_transaction;
+    use crate::chains::eth::eth_test_utils::get_sample_unsigned_eth_transaction;
 
     #[test]
     fn should_create_new_signed_relay_tx_from_data() {
@@ -251,7 +252,7 @@ mod tests {
         let expected_data = hex::decode("f15da729000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000047465737400000000000000000000000000000000000000000000000000000000").unwrap();
 
         // private key without recovery param
-        let eth_private_key = EthPrivateKey::from_slice([
+        let eth_private_key = EthPrivateKey::from_slice(&[
             132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234, 47, 186, 237, 88,
             161, 200, 177, 24, 142, 207, 242, 168, 221,
         ])
@@ -289,7 +290,7 @@ mod tests {
         assert_eq!(relay_transaction, expected_relay_transaction);
 
         // private key with recovery param
-        let eth_private_key = EthPrivateKey::from_slice([
+        let eth_private_key = EthPrivateKey::from_slice(&[
             6, 55, 162, 221, 254, 198, 108, 20, 103, 12, 93, 123, 226, 232, 71, 70, 139, 212, 41, 54, 65, 132, 18, 158,
             202, 14, 137, 226, 174, 63, 11, 45,
         ])
@@ -331,7 +332,7 @@ mod tests {
     fn should_create_new_any_sender_relayed_mint_by_proxy_tx() {
         let eth_transaction = get_sample_unsigned_eth_transaction();
         let chain_id = 3;
-        let eth_private_key = EthPrivateKey::from_slice([
+        let eth_private_key = EthPrivateKey::from_slice(&[
             132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234, 47, 186, 237, 88,
             161, 200, 177, 24, 142, 207, 242, 168, 221,
         ])
@@ -389,7 +390,7 @@ mod tests {
         let relay_transaction: RelayTransaction = serde_json::from_str(json_str).unwrap();
 
         let chain_id = 3;
-        let eth_private_key = EthPrivateKey::from_slice([
+        let eth_private_key = EthPrivateKey::from_slice(&[
             132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234, 47, 186, 237, 88,
             161, 200, 177, 24, 142, 207, 242, 168, 221,
         ])
@@ -440,7 +441,7 @@ mod tests {
         let expected_tx_hex = "f8f394fde83bd51bddaa39f15c1bf50e222a7ae5831d8394736661736533bcfc9cc35649e6324acefb7d32c1b864f15da72900000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004746573740000000000000000000000000000000000000000000000000000000080841dcd6500830186a003949b4fa5a1d9f6812e2b56b36fbde62736fa82c2a7b8415aa14a852439d9f5aa7b22c63a228d79c6822cf644badc9a63117dd7880d9a4c639eccd4aeeee91eaea63e36640d151be71346d785d2bd274fb82351c6bb2c101b";
 
         let chain_id = 3;
-        let eth_private_key = EthPrivateKey::from_slice([
+        let eth_private_key = EthPrivateKey::from_slice(&[
             132, 23, 52, 203, 67, 154, 240, 53, 117, 195, 124, 41, 179, 50, 97, 159, 61, 169, 234, 47, 186, 237, 88,
             161, 200, 177, 24, 142, 207, 242, 168, 221,
         ])

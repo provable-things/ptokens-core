@@ -1,3 +1,5 @@
+use ethereum_types::Address as EthAddress;
+
 use crate::{
     chains::{
         eos::eos_state::EosState,
@@ -19,7 +21,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use ethereum_types::Address as EthAddress;
 
 pub fn get_eth_signed_txs(
     redeem_infos: &Erc20OnEosRedeemInfos,
@@ -74,7 +75,7 @@ pub fn maybe_sign_normal_eth_txs_and_add_to_state<D: DatabaseInterface>(state: E
             {
                 debug!("✔ Signed transactions: {:?}", signed_txs);
             }
-            state.add_erc20_on_eos_signed_txs(signed_txs)
+            state.add_eth_signed_txs(signed_txs)
         })
     }
 }

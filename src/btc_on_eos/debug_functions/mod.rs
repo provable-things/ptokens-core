@@ -1,9 +1,11 @@
+pub use serde_json::json;
+
 use crate::{
     btc_on_eos::{
         btc::{
             get_btc_output_json::{get_btc_output_as_string, get_eos_signed_tx_info_from_eth_txs, BtcOutput},
             minting_params::parse_minting_params_from_p2sh_deposits_and_add_to_state,
-            sign_transactions::get_signed_txs,
+            sign_transactions::get_signed_eos_ptoken_issue_txs,
         },
         check_core_is_initialized::{
             check_core_is_initialized,
@@ -14,7 +16,6 @@ use crate::{
             extract_utxos_from_btc_txs::maybe_extract_btc_utxo_from_btc_tx_in_state,
             get_eos_output::get_eos_output,
             redeem_info::{
-                maybe_filter_out_already_processed_tx_ids_from_state,
                 maybe_filter_value_too_low_redeem_infos_in_state,
                 maybe_parse_redeem_infos_and_put_in_state,
             },
@@ -49,13 +50,8 @@ use crate::{
             validate_btc_proof_of_work::validate_proof_of_work_of_btc_block_in_state,
         },
         eos::{
-            add_global_sequences_to_processed_list::maybe_add_global_sequences_to_processed_list_and_return_state,
-            core_initialization::eos_init_utils::{
-                generate_and_put_incremerkle_in_db,
-                put_eos_latest_block_info_in_db,
-                EosInitJson,
-            },
-            eos_constants::{get_eos_constants_db_keys, EOS_PRIVATE_KEY_DB_KEY as EOS_KEY},
+            core_initialization::eos_init_utils::EosInitJson,
+            eos_constants::{get_eos_constants_db_keys, EOS_PRIVATE_KEY_DB_KEY as EOS_KEY, REDEEM_ACTION_NAME},
             eos_crypto::eos_private_key::EosPrivateKey,
             eos_database_transactions::{
                 end_eos_db_transaction_and_return_state,
@@ -65,31 +61,33 @@ use crate::{
                 get_eos_account_name_string_from_db,
                 get_eos_account_nonce_from_db,
                 get_eos_chain_id_from_db,
-                put_eos_schedule_in_db,
+            },
+            eos_debug_functions::{add_new_eos_schedule, get_processed_actions_list, update_incremerkle},
+            eos_global_sequences::{
+                get_processed_global_sequences_and_add_to_state,
+                maybe_add_global_sequences_to_processed_list_and_return_state,
             },
             eos_state::EosState,
+            eos_submission_material::parse_submission_material_and_add_to_state,
             filter_action_proofs::{
                 maybe_filter_duplicate_proofs_from_state,
                 maybe_filter_out_action_proof_receipt_mismatches_and_return_state,
                 maybe_filter_out_invalid_action_receipt_digests,
-                maybe_filter_out_proofs_for_non_btc_on_eos_accounts,
+                maybe_filter_out_proofs_for_wrong_eos_account_name,
                 maybe_filter_out_proofs_with_invalid_merkle_proofs,
                 maybe_filter_out_proofs_with_wrong_action_mroot,
+                maybe_filter_proofs_for_action_name,
             },
             get_enabled_protocol_features::get_enabled_protocol_features_and_add_to_state,
-            get_processed_tx_ids::get_processed_tx_ids_and_add_to_state,
-            parse_eos_schedule::parse_v2_schedule_string_to_v2_schedule,
-            parse_submission_material::parse_submission_material_and_add_to_state,
         },
     },
     check_debug_mode::check_debug_mode,
-    constants::{DB_KEY_PREFIX, PRIVATE_KEY_DATA_SENSITIVITY_LEVEL, SUCCESS_JSON},
+    constants::{DB_KEY_PREFIX, PRIVATE_KEY_DATA_SENSITIVITY_LEVEL},
     debug_database_utils::{get_key_from_db, set_key_in_db_to_value},
     traits::DatabaseInterface,
     types::Result,
     utils::prepend_debug_output_marker_to_string,
 };
-pub use serde_json::json;
 
 /// # Debug Get All Db Keys
 ///
@@ -122,17 +120,17 @@ where
     parse_submission_material_and_add_to_state(block_json, EosState::init(db))
         .and_then(check_core_is_initialized_and_return_eos_state)
         .and_then(get_enabled_protocol_features_and_add_to_state)
+        .and_then(get_processed_global_sequences_and_add_to_state)
         .and_then(start_eos_db_transaction_and_return_state)
-        .and_then(get_processed_tx_ids_and_add_to_state)
         .and_then(maybe_filter_duplicate_proofs_from_state)
-        .and_then(maybe_filter_out_proofs_for_non_btc_on_eos_accounts)
+        .and_then(maybe_filter_out_proofs_for_wrong_eos_account_name)
         .and_then(maybe_filter_out_action_proof_receipt_mismatches_and_return_state)
         .and_then(maybe_filter_out_invalid_action_receipt_digests)
         .and_then(maybe_filter_out_proofs_with_invalid_merkle_proofs)
         .and_then(maybe_filter_out_proofs_with_wrong_action_mroot)
+        .and_then(|state| maybe_filter_proofs_for_action_name(state, REDEEM_ACTION_NAME))
         .and_then(maybe_parse_redeem_infos_and_put_in_state)
         .and_then(maybe_filter_value_too_low_redeem_infos_in_state)
-        .and_then(maybe_filter_out_already_processed_tx_ids_from_state)
         .and_then(maybe_add_global_sequences_to_processed_list_and_return_state)
         .and_then(maybe_sign_txs_and_add_to_state)
         .and_then(maybe_increment_btc_signature_nonce_and_return_eos_state)
@@ -171,7 +169,7 @@ where
         .and_then(create_btc_block_in_db_format_and_put_in_state)
         .and_then(|state| {
             info!("✔ Maybe signing reprocessed minting txs...");
-            get_signed_txs(
+            get_signed_eos_ptoken_issue_txs(
                 state.get_eos_ref_block_num()?,
                 state.get_eos_ref_block_prefix()?,
                 &get_eos_chain_id_from_db(&state.db)?,
@@ -214,16 +212,7 @@ where
 /// transaction replays. Use with extreme caution and only if you know exactly what you are doing
 /// and why.
 pub fn debug_update_incremerkle<D: DatabaseInterface>(db: &D, eos_init_json: &str) -> Result<String> {
-    info!("✔ Debug updating blockroot merkle...");
-    let init_json = EosInitJson::from_json_string(&eos_init_json)?;
-    check_debug_mode()
-        .and_then(|_| check_core_is_initialized(db))
-        .and_then(|_| put_eos_latest_block_info_in_db(db, &init_json.block))
-        .and_then(|_| db.start_transaction())
-        .and_then(|_| generate_and_put_incremerkle_in_db(db, &init_json.blockroot_merkle))
-        .and_then(|_| db.end_transaction())
-        .map(|_| SUCCESS_JSON.to_string())
-        .map(prepend_debug_output_marker_to_string)
+    check_core_is_initialized(db).and_then(|_| update_incremerkle(db, &EosInitJson::from_json_string(&eos_init_json)?))
 }
 
 /// # Debug Clear All UTXOS
@@ -241,19 +230,9 @@ pub fn debug_clear_all_utxos<D: DatabaseInterface>(db: &D) -> Result<String> {
 
 /// # Debug Add New Eos Schedule
 ///
-/// Does exactly what it says on the tin. It's currently required due to an open ticket on the
-/// validation of EOS blocks containing new schedules. Once that ticket is cleared, new schedules
-/// can be brought in "organically" by syncing to the core up to the block containing said new
-/// schedule. Meanwhile, this function must suffice.
+/// Adds a new EOS schedule to the core's encrypted database.
 pub fn debug_add_new_eos_schedule<D: DatabaseInterface>(db: D, schedule_json: &str) -> Result<String> {
-    info!("✔ Debug adding new EOS schedule...");
-    check_debug_mode()
-        .and_then(|_| db.start_transaction())
-        .and_then(|_| parse_v2_schedule_string_to_v2_schedule(&schedule_json))
-        .and_then(|schedule| put_eos_schedule_in_db(&db, &schedule))
-        .and_then(|_| db.end_transaction())
-        .map(|_| SUCCESS_JSON.to_string())
-        .map(prepend_debug_output_marker_to_string)
+    check_core_is_initialized(&db).and_then(|_| add_new_eos_schedule(&db, schedule_json))
 }
 
 /// # Debug Set Key in DB to Value
@@ -359,4 +338,11 @@ pub fn debug_remove_utxo<D: DatabaseInterface>(db: D, tx_id: &str, v_out: u32) -
 /// Use ONLY if you know exactly what you're doing and why!
 pub fn debug_add_multiple_utxos<D: DatabaseInterface>(db: D, json_str: &str) -> Result<String> {
     check_debug_mode().and_then(|_| add_multiple_utxos(&db, json_str).map(prepend_debug_output_marker_to_string))
+}
+
+/// # Debug Get Processed Actions List
+///
+/// This function returns the list of already-processed action global sequences in JSON format.
+pub fn debug_get_processed_actions_list<D: DatabaseInterface>(db: &D) -> Result<String> {
+    check_core_is_initialized(db).and_then(|_| get_processed_actions_list(db))
 }

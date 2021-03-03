@@ -1,8 +1,9 @@
+use ethereum_types::H256;
+
 use crate::{
     chains::eth::eth_types::TrieHashMap,
     types::{Bytes, Result},
 };
-use ethereum_types::H256;
 
 pub fn get_new_trie_hash_map() -> Result<TrieHashMap> {
     Ok(std::collections::HashMap::new())
@@ -21,16 +22,13 @@ pub fn remove_thing_from_trie_hash_map(mut trie_hash_map: TrieHashMap, key: &H25
 }
 
 pub fn get_thing_from_trie_hash_map(trie_hash_map: &TrieHashMap, key: &H256) -> Option<Bytes> {
-    match trie_hash_map.get(&key) {
-        Some(thing) => Some(thing.to_vec()),
-        None => None,
-    }
+    trie_hash_map.get(&key).map(|thing| thing.to_vec())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::btc_on_eth::eth::eth_test_utils::{
+    use crate::chains::eth::eth_test_utils::{
         get_expected_key_of_thing_in_trie_hash_map,
         get_thing_to_put_in_trie_hash_map,
         get_trie_hash_map_with_thing_in_it,

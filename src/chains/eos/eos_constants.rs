@@ -1,14 +1,16 @@
-use crate::utils::get_prefixed_db_key;
 pub use serde_json::{json, Value as JsonValue};
+
+use crate::utils::get_prefixed_db_key;
 
 pub const MEMO: &str = "";
 pub const PRODUCER_REPS: u64 = 12;
 pub const PUBLIC_KEY_SIZE: usize = 33;
-pub const PBTC_MINT_FXN_NAME: &str = "issue";
+pub const PEGIN_ACTION_NAME: &str = "pegin";
 pub const REDEEM_ACTION_NAME: &str = "redeem";
 pub const PUBLIC_KEY_CHECKSUM_SIZE: usize = 4;
 pub const EOS_SCHEDULE_DB_PREFIX: &str = "EOS_SCHEDULE_";
-pub const PEOS_ACCOUNT_PERMISSION_LEVEL: &str = "active";
+pub const EOS_ACCOUNT_PERMISSION_LEVEL: &str = "active";
+pub const EOS_CORE_IS_INITIALIZED_JSON: &str = "{eos_core_initialized:true}";
 pub const PUBLIC_KEY_WITH_CHECKSUM_SIZE: usize = PUBLIC_KEY_SIZE + PUBLIC_KEY_CHECKSUM_SIZE;
 // NOTE: We use 59 minutes rather than 60 to give a little wiggle room for the clocks on the TEE devices.
 pub const EOS_MAX_EXPIRATION_SECS: u32 = 3540;
@@ -24,7 +26,7 @@ pub fn get_eos_constants_db_keys() -> JsonValue {
         "EOS_ACCOUNT_NONCE_KEY": hex::encode(EOS_ACCOUNT_NONCE_KEY.to_vec()),
         "EOS_SCHEDULE_LIST_KEY": hex::encode(EOS_SCHEDULE_LIST_KEY.to_vec()),
         "EOS_PRIVATE_KEY_DB_KEY": hex::encode(EOS_PRIVATE_KEY_DB_KEY.to_vec()),
-        "EOS_ERC20_DICTIONARY_KEY": hex::encode(EOS_ERC20_DICTIONARY_KEY.to_vec()),
+        "EOS_ETH_DICTIONARY_KEY": hex::encode(EOS_ETH_DICTIONARY_KEY.to_vec()),
         "EOS_PROTOCOL_FEATURES_KEY": hex::encode(EOS_PROTOCOL_FEATURES_KEY.to_vec()),
         "EOS_LAST_SEEN_BLOCK_ID_KEY": hex::encode(EOS_LAST_SEEN_BLOCK_ID_KEY.to_vec()),
         "EOS_LAST_SEEN_BLOCK_NUM_KEY": hex::encode(EOS_LAST_SEEN_BLOCK_NUM_KEY.to_vec()),
@@ -64,11 +66,12 @@ lazy_static! {
 }
 
 lazy_static! {
-    pub static ref EOS_PRIVATE_KEY_DB_KEY: [u8; 32] = get_prefixed_db_key("eos-private-key-db-key");
+    // NOTE: The actual string hashed remains as it was originally for backwards compatibility.
+    pub static ref EOS_ETH_DICTIONARY_KEY: [u8; 32] = get_prefixed_db_key("eos-erc20-dictionary");
 }
 
 lazy_static! {
-    pub static ref EOS_ERC20_DICTIONARY_KEY: [u8; 32] = get_prefixed_db_key("eos-erc20-dictionary");
+    pub static ref EOS_PRIVATE_KEY_DB_KEY: [u8; 32] = get_prefixed_db_key("eos-private-key-db-key");
 }
 
 lazy_static! {

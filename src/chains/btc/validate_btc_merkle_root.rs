@@ -1,10 +1,11 @@
+use bitcoin::blockdata::block::Block as BtcBlock;
+
 use crate::{
     chains::btc::btc_state::BtcState,
     constants::{CORE_IS_VALIDATING, DEBUG_MODE, NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR},
     traits::DatabaseInterface,
     types::Result,
 };
-use bitcoin::blockdata::block::Block as BtcBlock;
 
 fn validate_merkle_root(btc_block: &BtcBlock) -> Result<()> {
     match btc_block.check_merkle_root() {

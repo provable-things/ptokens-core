@@ -1,9 +1,11 @@
+use serde_json::json;
+
 use crate::{
     chains::btc::{
         btc_database_utils::{get_btc_address_from_db, get_btc_fee_from_db, get_btc_private_key_from_db},
         btc_transaction::create_signed_raw_btc_tx_for_n_input_n_outputs,
         btc_utils::{get_btc_tx_id_from_str, get_hex_tx_from_signed_btc_tx, get_pay_to_pub_key_hash_script},
-        extract_utxos_from_op_return_txs::extract_utxos_from_txs,
+        extract_utxos_from_p2pkh_txs::extract_utxos_from_txs,
         utxo_manager::{
             utxo_database_utils::{
                 delete_first_utxo_key,
@@ -25,7 +27,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use serde_json::json;
 
 pub fn clear_all_utxos<D: DatabaseInterface>(db: &D) -> Result<String> {
     db.start_transaction()?;

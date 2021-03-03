@@ -1,3 +1,7 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
+
 use crate::{
     btc_on_eth::eth::redeem_info::{BtcOnEthRedeemInfo, BtcOnEthRedeemInfos},
     chains::{
@@ -7,8 +11,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BtcTxInfo {

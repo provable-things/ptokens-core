@@ -1,3 +1,9 @@
+use bitcoin::{
+    blockdata::transaction::{Transaction as BtcTransaction, TxOut as BtcTxOut},
+    network::constants::Network as BtcNetwork,
+    util::address::Address as BtcAddress,
+};
+
 use crate::{
     chains::btc::{
         btc_database_utils::get_btc_network_from_db,
@@ -8,11 +14,6 @@ use crate::{
     },
     traits::DatabaseInterface,
     types::Result,
-};
-use bitcoin::{
-    blockdata::transaction::{Transaction as BtcTransaction, TxOut as BtcTxOut},
-    network::constants::Network as BtcNetwork,
-    util::address::Address as BtcAddress,
 };
 
 fn maybe_extract_p2sh_utxo(
@@ -98,6 +99,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
     use crate::chains::btc::{
         btc_test_utils::{get_sample_btc_block_n, get_sample_btc_pub_key_slice, get_sample_p2sh_utxo_and_value},
@@ -105,7 +108,6 @@ mod tests {
         filter_p2sh_deposit_txs::filter_p2sh_deposit_txs,
         get_deposit_info_hash_map::create_hash_map_from_deposit_info_list,
     };
-    use std::str::FromStr;
 
     #[test]
     fn should_maybe_extract_p2sh_utxo() {

@@ -1,10 +1,10 @@
-pub mod core_initialization;
 pub mod eth_message_signer;
 
 pub(crate) mod add_block_and_receipts_to_db;
 pub(crate) mod any_sender;
 pub(crate) mod calculate_linker_hash;
 pub(crate) mod check_parent_exists;
+pub(crate) mod core_initialization;
 pub(crate) mod eth_block;
 pub(crate) mod eth_constants;
 pub(crate) mod eth_contracts;
@@ -23,7 +23,6 @@ pub(crate) mod eth_test_utils;
 pub(crate) mod eth_traits;
 pub(crate) mod eth_types;
 pub(crate) mod eth_utils;
-pub(crate) mod filter_receipts_in_state;
 pub(crate) mod get_linker_hash;
 pub(crate) mod get_trie_hash_map;
 pub(crate) mod increment_eos_account_nonce;

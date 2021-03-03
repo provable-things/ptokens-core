@@ -1,8 +1,10 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::{
     chains::{
         eos::{
+            eos_crypto::eos_transaction::EosSignedTransaction,
             eos_database_utils::{get_eos_account_nonce_from_db, get_latest_eos_block_number},
-            eos_types::EosSignedTransaction,
         },
         eth::{eth_database_utils::get_eth_latest_block_from_db, eth_state::EthState},
     },
@@ -10,7 +12,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EosTxInfo {

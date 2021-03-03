@@ -1,5 +1,6 @@
 use crate::{
     chains::eos::{
+        eos_constants::EOS_CORE_IS_INITIALIZED_JSON,
         eos_crypto::eos_private_key::EosPrivateKey,
         eos_database_utils::{
             get_eos_schedule_from_db,
@@ -15,21 +16,21 @@ use crate::{
             put_eos_schedule_in_db,
             put_eos_token_symbol_in_db,
             put_incremerkle_in_db,
-            put_processed_tx_ids_in_db,
         },
-        eos_erc20_dictionary::{EosErc20Dictionary, EosErc20DictionaryJson},
+        eos_eth_token_dictionary::{EosEthTokenDictionary, EosEthTokenDictionaryJson},
+        eos_global_sequences::ProcessedGlobalSequences,
         eos_merkle_utils::Incremerkle,
         eos_state::EosState,
-        eos_types::{Checksum256s, EosBlockHeaderJson, EosKnownSchedules, ProcessedTxIds},
+        eos_submission_material::EosSubmissionMaterial,
+        eos_types::{Checksum256s, EosBlockHeaderJson, EosKnownSchedules},
         eos_utils::convert_hex_to_checksum256,
         parse_eos_schedule::{convert_v2_schedule_json_to_v2_schedule, EosProducerScheduleJsonV2},
-        parse_submission_material::parse_eos_block_header_from_json,
         protocol_features::{EnabledFeatures, WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH},
         validate_signature::check_block_signature_is_valid,
     },
     constants::CORE_IS_VALIDATING,
     traits::DatabaseInterface,
-    types::{Bytes, Result},
+    types::{Bytes, NoneError, Result},
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -38,7 +39,8 @@ pub struct EosInitJson {
     pub blockroot_merkle: Vec<String>,
     pub active_schedule: EosProducerScheduleJsonV2,
     pub maybe_protocol_features_to_enable: Option<Vec<String>>,
-    pub erc20_on_eos_token_dictionary: Option<EosErc20DictionaryJson>,
+    pub eos_eth_token_dictionary: Option<EosEthTokenDictionaryJson>,
+    pub erc20_on_eos_token_dictionary: Option<EosEthTokenDictionaryJson>,
 }
 
 impl EosInitJson {
@@ -57,7 +59,7 @@ impl EosInitJson {
             Some(features) => features.contains(&hex::encode(WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH)),
         };
         let schedule = convert_v2_schedule_json_to_v2_schedule(&self.active_schedule).unwrap();
-        let block_header = parse_eos_block_header_from_json(&self.block).unwrap();
+        let block_header = EosSubmissionMaterial::parse_eos_block_header_from_json(&self.block).unwrap();
         let blockroot_merkle = self
             .blockroot_merkle
             .iter()
@@ -122,7 +124,7 @@ where
                 .is_enabled(&WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH.to_vec()),
             &get_incremerkle_from_db(&state.db)?.get_root().to_bytes().to_vec(),
             &block_json.producer_signature,
-            &parse_eos_block_header_from_json(&block_json)?,
+            &EosSubmissionMaterial::parse_eos_block_header_from_json(&block_json)?,
             &get_eos_schedule_from_db(&state.db, block_json.schedule_version)?,
         )
         .and(Ok(state))
@@ -219,11 +221,8 @@ where
         .and(Ok(state))
 }
 
-pub fn get_eos_init_output<D>(_state: EosState<D>) -> Result<String>
-where
-    D: DatabaseInterface,
-{
-    Ok("{eos_core_initialized:true}".to_string())
+pub fn get_eos_init_output<D: DatabaseInterface>(_state: EosState<D>) -> Result<String> {
+    Ok(EOS_CORE_IS_INITIALIZED_JSON.to_string())
 }
 
 pub fn put_eos_account_name_in_db_and_return_state<D>(account_name: &str, state: EosState<D>) -> Result<EosState<D>>
@@ -250,12 +249,13 @@ where
     put_eos_token_symbol_in_db(&state.db, &token_symbol).and(Ok(state))
 }
 
-pub fn put_empty_processed_tx_ids_in_db_and_return_state<D>(state: EosState<D>) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+pub fn put_empty_processed_tx_ids_in_db_and_return_state<D: DatabaseInterface>(
+    state: EosState<D>,
+) -> Result<EosState<D>> {
     info!("✔ Initializing EOS processed tx ids & putting into db...");
-    put_processed_tx_ids_in_db(&state.db, &ProcessedTxIds::init()).and(Ok(state))
+    ProcessedGlobalSequences::new(vec![])
+        .put_in_db(&state.db)
+        .and(Ok(state))
 }
 
 pub fn put_eos_chain_id_in_db_and_return_state<D>(chain_id: &str, state: EosState<D>) -> Result<EosState<D>>
@@ -265,33 +265,36 @@ where
     info!("✔ Putting EOS chain ID '{}' into db...", chain_id);
     put_eos_chain_id_in_db(&state.db, chain_id).and(Ok(state))
 }
-pub fn maybe_put_erc20_dictionary_in_db_and_return_state<D>(
+pub fn maybe_put_eos_eth_token_dictionary_in_db_and_return_state<D: DatabaseInterface>(
     init_json: &EosInitJson,
     state: EosState<D>,
-) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
-    match init_json.erc20_on_eos_token_dictionary {
-        None => {
-            info!("✔ No `EosErc20DictionaryJson` in `init-json` ∴ doing nothing!");
-            Ok(state)
-        },
-        Some(ref dictionary_json) => {
-            info!("✔ `EosErc20Dictionary` in `init-json` ∴ putting it in db...");
-            EosErc20Dictionary::from_json(dictionary_json)
-                .and_then(|dict| dict.save_to_db(&state.db))
-                .and(Ok(state))
-        },
-    }
+) -> Result<EosState<D>> {
+    let json = if init_json.erc20_on_eos_token_dictionary.is_some() {
+        init_json
+            .erc20_on_eos_token_dictionary
+            .as_ref()
+            .ok_or(NoneError("✘ Could not unwrap `erc20_on_eos_token_dictionary`!"))?
+    } else if init_json.eos_eth_token_dictionary.is_some() {
+        init_json
+            .eos_eth_token_dictionary
+            .as_ref()
+            .ok_or(NoneError("✘ Could not unwrap `eos_eth_token_dictionary`!"))?
+    } else {
+        info!("✔ No `eos_eth_token_dictionary` in `init-json` ∴ doing nothing!");
+        return Ok(state);
+    };
+    info!("✔ `EosEthTokenDictionary` found in `init-json` ∴ putting it in db...");
+    EosEthTokenDictionary::from_json(json)
+        .and_then(|dict| dict.save_to_db(&state.db))
+        .and(Ok(state))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::btc_on_eos::eos::eos_test_utils::{
+    use crate::chains::eos::eos_test_utils::{
         get_j3_init_json_n,
         get_mainnet_init_json_n,
-        get_sample_mainnet_init_json_with_erc20_dictionary,
+        get_sample_mainnet_init_json_with_eos_eth_token_dictionary,
         NUM_J3_INIT_SAMPLES,
         NUM_MAINNET_INIT_SAMPLES,
     };
@@ -313,8 +316,8 @@ mod tests {
     }
 
     #[test]
-    fn should_parse_init_json_with_erc20_dictionary() {
-        let init_json_with_erc20_dictionary = get_sample_mainnet_init_json_with_erc20_dictionary();
-        assert!(init_json_with_erc20_dictionary.is_ok());
+    fn should_parse_init_json_with_eos_eth_token_dictionary() {
+        let init_json_with_eos_eth_token_dictionary = get_sample_mainnet_init_json_with_eos_eth_token_dictionary();
+        assert!(init_json_with_eos_eth_token_dictionary.is_ok());
     }
 }

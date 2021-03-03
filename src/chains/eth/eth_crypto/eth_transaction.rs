@@ -1,3 +1,8 @@
+use std::fs;
+
+use ethereum_types::{Address as EthAddress, U256};
+use rlp::RlpStream;
+
 use crate::{
     chains::eth::{
         any_sender::relay_transaction::RelayTransaction,
@@ -15,9 +20,6 @@ use crate::{
     },
     types::{Byte, Bytes, Result},
 };
-use ethereum_types::{Address as EthAddress, U256};
-use rlp::RlpStream;
-use std::fs;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EthTransaction {
@@ -96,7 +98,7 @@ impl EthTransaction {
     }
 
     fn calculate_v_from_chain_id(sig_v: u8, chain_id: u8) -> u64 {
-        ((chain_id * 2) + (sig_v + 35)).into() // Per EIP155
+        chain_id as u64 * 2 + sig_v as u64 + 35 // Per EIP155
     }
 
     pub fn sign(self, eth_private_key: EthPrivateKey) -> Result<Self> {
@@ -213,7 +215,7 @@ pub fn get_signed_minting_tx(
     user_data: Option<&[Byte]>,
     operator_data: Option<&[Byte]>,
 ) -> Result<EthTransaction> {
-    Ok(get_unsigned_minting_tx(
+    get_unsigned_minting_tx(
         nonce,
         amount,
         chain_id,
@@ -223,13 +225,13 @@ pub fn get_signed_minting_tx(
         user_data,
         operator_data,
     )?
-    .sign(eth_private_key)?)
+    .sign(eth_private_key)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::btc_on_eth::eth::eth_test_utils::{
+    use crate::chains::eth::eth_test_utils::{
         get_sample_eth_address,
         get_sample_eth_private_key,
         get_sample_unsigned_eth_transaction,

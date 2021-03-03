@@ -16,7 +16,7 @@ pub(crate) mod btc_transaction;
 pub(crate) mod btc_types;
 pub(crate) mod check_btc_parent_exists;
 pub(crate) mod core_initialization;
-pub(crate) mod extract_utxos_from_op_return_txs;
+pub(crate) mod extract_utxos_from_p2pkh_txs;
 pub(crate) mod extract_utxos_from_p2sh_txs;
 pub(crate) mod filter_minting_params;
 pub(crate) mod filter_p2sh_deposit_txs;

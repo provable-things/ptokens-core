@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::{
     chains::{
         eos::{eos_database_utils::get_latest_eos_block_number, eos_state::EosState},
@@ -16,7 +18,6 @@ use crate::{
     traits::DatabaseInterface,
     types::{NoneError, Result},
 };
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EosOutput {
@@ -116,10 +117,10 @@ where
     info!("✔ Getting EOS output json...");
     let output = serde_json::to_string(&EosOutput {
         eos_latest_block_number: get_latest_eos_block_number(&state.db)?,
-        eth_signed_transactions: match &state.erc20_on_eos_signed_txs.len() {
+        eth_signed_transactions: match &state.eth_signed_txs.len() {
             0 => vec![],
             _ => get_eth_signed_tx_info_from_eth_txs(
-                &state.erc20_on_eos_signed_txs,
+                &state.eth_signed_txs,
                 &state.erc20_on_eos_redeem_infos,
                 get_eth_account_nonce_from_db(&state.db)?,
                 false, // TODO Get this from state submission material when/if we support AnySender

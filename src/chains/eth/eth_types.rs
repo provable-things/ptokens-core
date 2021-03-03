@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use ethereum_types::{Address, H256};
+
 use crate::{
     chains::eth::{
         any_sender::relay_transaction::RelayTransaction,
@@ -6,8 +10,6 @@ use crate::{
     },
     types::Bytes,
 };
-use ethereum_types::{Address, H256};
-use std::collections::HashMap;
 
 pub type EthHash = H256;
 pub type EthAddress = Address;

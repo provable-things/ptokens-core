@@ -7,10 +7,7 @@ use crate::{
     types::Result,
 };
 
-pub fn generate_and_store_eth_address<D>(state: EthState<D>) -> Result<EthState<D>>
-where
-    D: DatabaseInterface,
-{
+pub fn generate_and_store_eth_address<D: DatabaseInterface>(state: EthState<D>) -> Result<EthState<D>> {
     info!("✔ Generating ETH address...");
     get_eth_private_key_from_db(&state.db)
         .map(|pk| pk.to_public_key().to_address())
