@@ -27,7 +27,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{btc_on_eth::eth::eth_test_utils::get_valid_state_with_block_and_receipts, errors::AppError};
+    use crate::{chains::eth::eth_test_utils::get_valid_state_with_block_and_receipts, errors::AppError};
 
     #[test]
     fn should_validate_block_in_state() {
@@ -40,7 +40,7 @@ mod tests {
     #[cfg(not(feature = "non-validating"))]
     #[test]
     fn should_fail_to_validate_invalid_block_in_state() {
-        use crate::btc_on_eth::eth::eth_test_utils::get_valid_state_with_invalid_block_and_receipts;
+        use crate::chains::eth::eth_test_utils::get_valid_state_with_invalid_block_and_receipts;
         let expected_error = "✘ Not accepting ETH block - header hash not valid!".to_string();
         let state = get_valid_state_with_invalid_block_and_receipts().unwrap();
         match validate_block_in_state(state) {

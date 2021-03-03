@@ -1,5 +1,3 @@
-use bitcoin_hashes::{ripemd160, Hash as HashTrait, HashEngine};
-use rustc_hex::{FromHex, FromHexError, ToHex};
 use std::{
     cmp,
     fmt,
@@ -7,6 +5,9 @@ use std::{
     ops,
     str,
 };
+
+use bitcoin_hashes::{ripemd160, Hash as HashTrait, HashEngine};
+use rustc_hex::{FromHex, FromHexError, ToHex};
 
 macro_rules! impl_hash {
     ($name:ident, $size:expr) => {

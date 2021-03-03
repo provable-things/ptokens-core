@@ -1,26 +1,30 @@
+pub use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
+
 use crate::{
     btc_on_eos::eos::redeem_info::BtcOnEosRedeemInfos,
     chains::{
         btc::utxo_manager::utxo_types::BtcUtxosAndValues,
         eos::{
             eos_action_proofs::EosActionProofs,
-            eos_erc20_dictionary::EosErc20Dictionary,
+            eos_block_header::EosBlockHeaderV2,
+            eos_eth_token_dictionary::EosEthTokenDictionary,
+            eos_global_sequences::{GlobalSequences, ProcessedGlobalSequences},
             eos_merkle_utils::Incremerkle,
-            eos_types::{Checksum256s, GlobalSequences, ProcessedTxIds},
-            parse_submission_material::EosSubmissionMaterial,
+            eos_producer_schedule::EosProducerScheduleV2,
+            eos_submission_material::EosSubmissionMaterial,
+            eos_types::Checksum256s,
             protocol_features::EnabledFeatures,
         },
         eth::eth_types::EthTransactions,
     },
+    eos_on_eth::eos::eos_tx_info::EosOnEthEosTxInfos,
     erc20_on_eos::eos::redeem_info::Erc20OnEosRedeemInfos,
     traits::DatabaseInterface,
     types::Result,
     utils::{get_no_overwrite_state_err, get_not_in_state_err},
 };
-pub use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
-use eos_primitives::{BlockHeader as EosBlockHeader, ProducerScheduleV2 as EosProducerScheduleV2};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct EosState<D: DatabaseInterface> {
     pub db: D,
     pub block_num: Option<u64>,
@@ -28,16 +32,17 @@ pub struct EosState<D: DatabaseInterface> {
     pub producer_signature: String,
     pub action_proofs: EosActionProofs,
     pub interim_block_ids: Checksum256s,
-    pub processed_tx_ids: ProcessedTxIds,
-    pub block_header: Option<EosBlockHeader>,
-    pub erc20_on_eos_signed_txs: EthTransactions,
+    pub eth_signed_txs: EthTransactions,
+    pub block_header: Option<EosBlockHeaderV2>,
+    pub processed_tx_ids: ProcessedGlobalSequences,
     pub btc_on_eos_signed_txs: Vec<BtcTransaction>,
     pub enabled_protocol_features: EnabledFeatures,
+    pub eos_on_eth_eos_tx_infos: EosOnEthEosTxInfos,
     pub btc_on_eos_redeem_infos: BtcOnEosRedeemInfos,
     pub active_schedule: Option<EosProducerScheduleV2>,
     pub btc_utxos_and_values: Option<BtcUtxosAndValues>,
     pub erc20_on_eos_redeem_infos: Erc20OnEosRedeemInfos,
-    pub eos_erc20_dictionary: Option<EosErc20Dictionary>,
+    pub eos_eth_token_dictionary: Option<EosEthTokenDictionary>,
 }
 
 impl<D> EosState<D>
@@ -51,15 +56,16 @@ where
             block_header: None,
             action_proofs: vec![],
             active_schedule: None,
+            eth_signed_txs: vec![],
             interim_block_ids: vec![],
             btc_utxos_and_values: None,
-            eos_erc20_dictionary: None,
+            eos_eth_token_dictionary: None,
             btc_on_eos_signed_txs: vec![],
-            erc20_on_eos_signed_txs: vec![],
             producer_signature: String::new(),
             incremerkle: Incremerkle::default(),
-            processed_tx_ids: ProcessedTxIds::init(),
             enabled_protocol_features: EnabledFeatures::init(),
+            processed_tx_ids: ProcessedGlobalSequences::new(vec![]),
+            eos_on_eth_eos_tx_infos: EosOnEthEosTxInfos::new(vec![]),
             btc_on_eos_redeem_infos: BtcOnEosRedeemInfos::new(vec![]),
             erc20_on_eos_redeem_infos: Erc20OnEosRedeemInfos::new(vec![]),
         }
@@ -93,11 +99,11 @@ where
         Ok(self)
     }
 
-    pub fn add_erc20_on_eos_signed_txs(mut self, erc20_on_eos_signed_txs: EthTransactions) -> Result<EosState<D>>
+    pub fn add_eth_signed_txs(mut self, txs: EthTransactions) -> Result<EosState<D>>
     where
         D: DatabaseInterface,
     {
-        self.erc20_on_eos_signed_txs = erc20_on_eos_signed_txs;
+        self.eth_signed_txs = txs;
         Ok(self)
     }
 
@@ -123,12 +129,17 @@ where
         Ok(self)
     }
 
+    pub fn add_eos_on_eth_eos_tx_info(mut self, infos: EosOnEthEosTxInfos) -> Result<EosState<D>> {
+        self.eos_on_eth_eos_tx_infos = infos;
+        Ok(self)
+    }
+
     pub fn add_erc20_on_eos_redeem_infos(mut self, infos: Erc20OnEosRedeemInfos) -> Result<EosState<D>> {
         self.erc20_on_eos_redeem_infos = infos;
         Ok(self)
     }
 
-    pub fn add_processed_tx_ids(mut self, tx_ids: ProcessedTxIds) -> Result<Self> {
+    pub fn add_processed_tx_ids(mut self, tx_ids: ProcessedGlobalSequences) -> Result<Self> {
         self.processed_tx_ids = tx_ids;
         Ok(self)
     }
@@ -138,27 +149,27 @@ where
         Ok(self)
     }
 
-    pub fn get_eos_block_header(&self) -> Result<&EosBlockHeader> {
+    pub fn get_eos_block_header(&self) -> Result<&EosBlockHeaderV2> {
         match self.block_header {
             Some(ref block_header) => Ok(block_header),
             None => Err(get_not_in_state_err("block_header").into()),
         }
     }
 
-    pub fn add_eos_erc20_dictionary(mut self, dictionary: EosErc20Dictionary) -> Result<EosState<D>> {
-        match self.eos_erc20_dictionary {
-            Some(_) => Err(get_no_overwrite_state_err("eos_erc20_dictionary").into()),
+    pub fn add_eos_eth_token_dictionary(mut self, dictionary: EosEthTokenDictionary) -> Result<EosState<D>> {
+        match self.eos_eth_token_dictionary {
+            Some(_) => Err(get_no_overwrite_state_err("eos_eth_token_dictionary").into()),
             None => {
-                self.eos_erc20_dictionary = Some(dictionary);
+                self.eos_eth_token_dictionary = Some(dictionary);
                 Ok(self)
             },
         }
     }
 
-    pub fn get_eos_erc20_dictionary(&self) -> Result<&EosErc20Dictionary> {
-        match self.eos_erc20_dictionary {
+    pub fn get_eos_eth_token_dictionary(&self) -> Result<&EosEthTokenDictionary> {
+        match self.eos_eth_token_dictionary {
             Some(ref dictionary) => Ok(dictionary),
-            None => Err(get_not_in_state_err("eos_erc20_dictionary").into()),
+            None => Err(get_not_in_state_err("eos_eth_token_dictionary").into()),
         }
     }
 
@@ -182,17 +193,26 @@ where
         Ok(self)
     }
 
+    pub fn replace_eos_on_eth_eos_tx_infos(mut self, replacements: EosOnEthEosTxInfos) -> Result<EosState<D>> {
+        info!("✔ Replacing `EosOnEthEosTxInfos` in state...");
+        self.eos_on_eth_eos_tx_infos = replacements;
+        Ok(self)
+    }
+
     pub fn replace_action_proofs(mut self, replacements: EosActionProofs) -> Result<EosState<D>> {
         info!("✔ Replacing `action_proofs` in state...");
         self.action_proofs = replacements;
         Ok(self)
     }
 
-    pub fn get_global_sequences_from_redeem_info(&self) -> GlobalSequences {
-        match (self.btc_on_eos_redeem_infos.len(), self.erc20_on_eos_redeem_infos.len()) {
-            (0, 0) => vec![],
-            (0, _) => self.erc20_on_eos_redeem_infos.get_global_sequences(),
-            (..) => self.btc_on_eos_redeem_infos.get_global_sequences(),
-        }
+    pub fn get_global_sequences(&self) -> GlobalSequences {
+        GlobalSequences::new(
+            vec![
+                self.eos_on_eth_eos_tx_infos.get_global_sequences().to_vec(),
+                self.btc_on_eos_redeem_infos.get_global_sequences().to_vec(),
+                self.erc20_on_eos_redeem_infos.get_global_sequences().to_vec(),
+            ]
+            .concat(),
+        )
     }
 }

@@ -1,3 +1,5 @@
+use bitcoin_hashes::{sha256d, Hash};
+
 use crate::{
     chains::btc::{
         btc_constants::PTOKEN_GENESIS_HASH_KEY,
@@ -13,7 +15,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use bitcoin_hashes::{sha256d, Hash};
 
 fn calculate_linker_hash(
     hash_to_link_to: &sha256d::Hash,

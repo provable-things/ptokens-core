@@ -73,13 +73,15 @@ where
 mod tests {
     use super::*;
     use crate::{
-        btc_on_eth::eth::eth_test_utils::{
-            get_eth_linker_hash_from_db,
-            get_sequential_eth_blocks_and_receipts,
-            put_eth_anchor_block_in_db,
-            put_eth_tail_block_in_db,
+        chains::eth::{
+            eth_database_utils::put_eth_submission_material_in_db,
+            eth_test_utils::{
+                get_eth_linker_hash_from_db,
+                get_sequential_eth_blocks_and_receipts,
+                put_eth_anchor_block_in_db,
+                put_eth_tail_block_in_db,
+            },
         },
-        chains::eth::eth_database_utils::put_eth_submission_material_in_db,
         test_utils::get_test_database,
     };
 

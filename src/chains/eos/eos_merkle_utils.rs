@@ -1,10 +1,11 @@
+use bitcoin_hashes::{sha256, Hash};
+use eos_primitives::Checksum256;
+
 use crate::{
     chains::eos::eos_utils::convert_hex_to_checksum256,
     errors::AppError,
     types::{Byte, Bytes, NoneError, Result},
 };
-use bitcoin_hashes::{sha256, Hash};
-use eos_primitives::Checksum256;
 
 pub type CanonicalLeft = Bytes;
 pub type CanonicalRight = Bytes;
@@ -260,19 +261,15 @@ impl Incremerkle {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::needless_range_loop)]
-    use super::*;
-    use crate::btc_on_eos::eos::eos_test_utils::{get_sample_action_digests, get_sample_eos_submission_material_n};
-    use eos_primitives::{
-        AccountName,
-        Action,
-        ActionName,
-        ActionReceipt,
-        AuthSequence,
-        PermissionLevel,
-        PermissionName,
-        SerializeData,
-    };
     use std::str::FromStr;
+
+    use eos_primitives::{AccountName, Action, ActionName, PermissionLevel, PermissionName, SerializeData};
+
+    use super::*;
+    use crate::chains::eos::{
+        eos_action_receipt::{AuthSequence, EosActionReceipt},
+        eos_test_utils::{get_sample_action_digests, get_sample_eos_submission_material_n},
+    };
 
     fn get_expected_digest_1() -> &'static str {
         "9b9babebfbdff48ce4002b5f3c7f999c0ee74707b6d121c47ef5db68c6be7262"
@@ -418,7 +415,12 @@ mod tests {
         let data = hex::decode(
             "e0d2b86b1a3962343021cd2a1eb3e9ad672b00000000000004454f53000000002a3078303236644336413433353631444138413641373735353338623139324133653933366330463239422301000000000000"
             ).unwrap();
-        let action = Action::new(account_name, action_name, authorization, data);
+        let action = Action {
+            account: account_name,
+            name: action_name,
+            authorization,
+            data,
+        };
         let serialized_action = action.to_serialize_data();
         let result = sha256::Hash::hash(&serialized_action).to_string();
         assert_eq!(result, get_expected_digest_1());
@@ -456,7 +458,7 @@ mod tests {
     #[test]
     fn should_serialize_a_simple_action_receipt_correctly() {
         let expected_result = "6cd473b189a292bd520cac3430cc7934273da81cc3417376194a5d757b4abdc8".to_string();
-        let result = ActionReceipt::new(
+        let result = EosActionReceipt::new(
             "eosio",
             "a6a370c6569034a4cc41935dd88f83d1c64e0414580872f29d87f69fe7a5d769",
             60725518,
@@ -474,7 +476,7 @@ mod tests {
     fn should_get_merkle_root_for_an_even_number_of_action_receipts() {
         // NOTE: Test vector = https://jungle.bloks.io/block/58316764
         let expected_result = "2f013d3ed57c89f1824772d18a4a74c043574bad47e9c6f088136e7595511810";
-        let action_digest_1 = ActionReceipt::new(
+        let action_digest_1 = EosActionReceipt::new(
             "eosio",
             "8e3e721a497dbae5e5fde0bb43e9086628809efaf102b763a3e9820adce9ce8f",
             62815613,
@@ -485,7 +487,7 @@ mod tests {
         )
         .unwrap()
         .to_digest();
-        let action_digest_2 = ActionReceipt::new(
+        let action_digest_2 = EosActionReceipt::new(
             "provabletokn",
             "4b991cebb3e6667b242aca3fb011623cd8ce2be2e8c24958da551c7b3ba68903",
             2884,
@@ -504,7 +506,7 @@ mod tests {
     fn should_get_merkle_root_for_an_odd_number_of_action_receipts_gt_one() {
         // NOTE: Test vector = https://jungle.bloks.io/block/58319528
         let expected_result = "593f54cbc0b877b30cec5e510838b2b16ca00aca43e21d204d21eb8e8f947aa0";
-        let action_digest_1 = ActionReceipt::new(
+        let action_digest_1 = EosActionReceipt::new(
             "eosio",
             "23ab74b930cceea6061e1c4580ec988bf483a77e225cfca254d832928b4d1b36",
             62818486,
@@ -515,7 +517,7 @@ mod tests {
         )
         .unwrap()
         .to_digest();
-        let action_digest_2 = ActionReceipt::new(
+        let action_digest_2 = EosActionReceipt::new(
             "eosebetbullj",
             "b9243d8513e25705e89d7ccd0491f4a57d07b9866fd89d3446887af852cfed15",
             1440226,
@@ -526,7 +528,7 @@ mod tests {
         )
         .unwrap()
         .to_digest();
-        let action_digest_3 = ActionReceipt::new(
+        let action_digest_3 = EosActionReceipt::new(
             "dvmh1tbb1him",
             "4bd1d3e987cd13e3d108a9a0cd185bf022cb1a826f69f163fcd109db54ba799f",
             804629,
@@ -545,7 +547,7 @@ mod tests {
     fn should_get_action_mroot_when_action_has_gt_one_auth_sequence() {
         // NOTE: Test vector = https://jungle.bloks.io/block/58345436
         let expected_result = "f93a91688d12170c24807d4bd507cf52dcde962ae4a41a86fe55231dee4df348";
-        let action_receipt_1 = ActionReceipt::new(
+        let action_receipt_1 = EosActionReceipt::new(
             "eosio",
             "2d5371b958af052629f3fb62ede1bfcd94703675bc734535bf87fb615284dba3",
             62844592,
@@ -556,7 +558,7 @@ mod tests {
         )
         .unwrap()
         .to_digest();
-        let action_receipt_2 = ActionReceipt::new(
+        let action_receipt_2 = EosActionReceipt::new(
             "authsequence",
             "ae341469a7b3936c70e9684a42ef8fc1975f1bb2fe1f3b0b1105eda7d3a6276a",
             10,

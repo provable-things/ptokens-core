@@ -1,3 +1,5 @@
+use bitcoin::network::constants::Network as BtcNetwork;
+
 use crate::{
     chains::btc::{
         btc_database_utils::{
@@ -13,7 +15,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use bitcoin::network::constants::Network as BtcNetwork;
 
 pub fn put_btc_tail_block_hash_in_db_and_return_state<D>(state: BtcState<D>) -> Result<BtcState<D>>
 where
@@ -39,7 +40,7 @@ where
 }
 
 pub fn get_btc_network_from_arg(network_arg: &str) -> BtcNetwork {
-    match &network_arg[..] {
+    match network_arg {
         "Testnet" => {
             trace!("✔ Using 'TESTNET' for bitcoin network!");
             BtcNetwork::Testnet

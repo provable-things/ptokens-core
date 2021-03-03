@@ -98,13 +98,12 @@ where
     put_eth_gas_price_in_db(&state.db, gas_price).and(Ok(state))
 }
 
-pub fn put_eth_account_nonce_in_db_and_return_state<D>(state: EthState<D>) -> Result<EthState<D>>
-where
-    D: DatabaseInterface,
-{
+pub fn put_eth_account_nonce_in_db_and_return_state<D: DatabaseInterface>(
+    state: EthState<D>,
+    nonce: u64,
+) -> Result<EthState<D>> {
     info!("✔ Putting ETH account nonce of 1 in db...");
-    put_eth_account_nonce_in_db(&state.db, 1) // NOTE: ∵ of the contract tx!
-        .and(Ok(state))
+    put_eth_account_nonce_in_db(&state.db, nonce).and(Ok(state))
 }
 
 pub fn remove_receipts_from_block_in_state<D>(

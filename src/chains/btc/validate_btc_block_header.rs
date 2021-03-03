@@ -1,10 +1,11 @@
+use bitcoin::util::hash::BitcoinHash;
+
 use crate::{
     chains::btc::{btc_block::BtcBlockAndId, btc_state::BtcState},
     constants::{CORE_IS_VALIDATING, DEBUG_MODE, NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR},
     traits::DatabaseInterface,
     types::Result,
 };
-use bitcoin::util::hash::BitcoinHash;
 
 fn validate_btc_block_header(btc_block_and_id: &BtcBlockAndId) -> Result<()> {
     match btc_block_and_id.block.bitcoin_hash() == btc_block_and_id.id {
@@ -34,6 +35,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use bitcoin_hashes::sha256d;
+
     use super::*;
     use crate::{
         chains::btc::{
@@ -43,8 +48,6 @@ mod tests {
         },
         errors::AppError,
     };
-    use bitcoin_hashes::sha256d;
-    use std::str::FromStr;
 
     #[test]
     fn should_validate_btc_block_header() {

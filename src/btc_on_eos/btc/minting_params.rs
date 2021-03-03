@@ -1,18 +1,5 @@
-use crate::{
-    btc_on_eos::utils::{convert_eos_asset_to_u64, convert_u64_to_8_decimal_eos_asset},
-    chains::{
-        btc::{
-            btc_constants::MINIMUM_REQUIRED_SATOSHIS,
-            btc_database_utils::get_btc_network_from_db,
-            btc_state::BtcState,
-            deposit_address_info::DepositInfoHashMap,
-        },
-        eos::eos_database_utils::get_eos_token_symbol_from_db,
-    },
-    constants::SAFE_EOS_ADDRESS,
-    traits::DatabaseInterface,
-    types::{Byte, Bytes, NoneError, Result},
-};
+use std::str::FromStr;
+
 use bitcoin::{
     blockdata::transaction::Transaction as BtcTransaction,
     hashes::sha256d,
@@ -21,7 +8,22 @@ use bitcoin::{
 };
 use derive_more::{Constructor, Deref, DerefMut};
 use eos_primitives::AccountName as EosAccountName;
-use std::str::FromStr;
+
+use crate::{
+    btc_on_eos::utils::convert_u64_to_8_decimal_eos_asset,
+    chains::{
+        btc::{
+            btc_constants::MINIMUM_REQUIRED_SATOSHIS,
+            btc_database_utils::get_btc_network_from_db,
+            btc_state::BtcState,
+            deposit_address_info::DepositInfoHashMap,
+        },
+        eos::{eos_database_utils::get_eos_token_symbol_from_db, eos_unit_conversions::convert_eos_asset_to_u64},
+    },
+    constants::SAFE_EOS_ADDRESS,
+    traits::DatabaseInterface,
+    types::{Byte, Bytes, NoneError, Result},
+};
 
 pub fn parse_minting_params_from_p2sh_deposits_and_add_to_state<D: DatabaseInterface>(
     state: BtcState<D>,
@@ -140,9 +142,7 @@ impl BtcOnEosMintingParams {
                     }
                 })
                 .filter(|maybe_minting_params| maybe_minting_params.is_some())
-                .map(|maybe_minting_params| {
-                    Ok(maybe_minting_params.ok_or(NoneError("Could not unwrap minting params!"))?)
-                })
+                .map(|maybe_minting_params| maybe_minting_params.ok_or(NoneError("Could not unwrap minting params!")))
                 .collect::<Result<Vec<BtcOnEosMintingParamStruct>>>()?,
         ))
     }

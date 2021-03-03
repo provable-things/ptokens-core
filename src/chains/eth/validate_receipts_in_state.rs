@@ -31,7 +31,7 @@ where
 mod tests {
     use super::*;
     use crate::{
-        btc_on_eth::eth::eth_test_utils::{
+        chains::eth::eth_test_utils::{
             get_valid_state_with_block_and_receipts,
             get_valid_state_with_invalid_block_and_receipts,
         },

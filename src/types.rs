@@ -1,7 +1,7 @@
 //! # pToken types.
-use crate::errors::AppError;
 use std::result;
 
+use crate::errors::AppError;
 // NOTE: Temporary, until try_trait is stabilized
 pub(crate) use crate::errors::AppError::NoneError;
 

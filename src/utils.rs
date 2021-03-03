@@ -1,8 +1,9 @@
+use tiny_keccak::keccak256;
+
 use crate::{
-    constants::{DB_KEY_PREFIX, DEBUG_OUTPUT_MARKER, U64_NUM_BYTES},
+    constants::{CORE_VERSION, DB_KEY_PREFIX, DEBUG_OUTPUT_MARKER, U64_NUM_BYTES},
     types::{Byte, Bytes, Result},
 };
-use tiny_keccak::keccak256;
 
 pub fn right_pad_or_truncate(s: &str, width: usize) -> String {
     if s.len() >= width {
@@ -44,37 +45,34 @@ pub fn left_pad_with_zeroes(s: &str, width: usize) -> String {
     format!("{:0>width$}", s, width = width)
 }
 
-fn left_pad_with_zero(string: &str) -> Result<String> {
-    Ok(format!("0{}", string))
+fn left_pad_with_zero(string: &str) -> String {
+    format!("0{}", string)
 }
 
-pub fn maybe_strip_hex_prefix(hex: &str) -> Result<&str> {
-    let lowercase_hex_prefix = "0x";
-    let uppercase_hex_prefix = "0X";
-    match hex.starts_with(lowercase_hex_prefix) || hex.starts_with(uppercase_hex_prefix) {
-        true => Ok(hex
-            .trim_start_matches(lowercase_hex_prefix)
-            .trim_start_matches(uppercase_hex_prefix)),
-        false => Ok(hex),
+pub fn strip_hex_prefix(hex: &str) -> String {
+    const LOWERCASE_HEX_PREFIX: &str = "0x";
+    const UPPERCASE_HEX_PREFIX: &str = "0X";
+    let hex_no_prefix = if hex.starts_with(LOWERCASE_HEX_PREFIX) || hex.starts_with(UPPERCASE_HEX_PREFIX) {
+        hex.trim_start_matches(LOWERCASE_HEX_PREFIX)
+            .trim_start_matches(UPPERCASE_HEX_PREFIX)
+    } else {
+        hex
+    };
+    match hex_no_prefix.len() % 2 {
+        0 => hex_no_prefix.to_string(),
+        _ => left_pad_with_zero(&hex_no_prefix),
     }
 }
 
-pub fn strip_hex_prefix(hex: &str) -> Result<String> {
-    maybe_strip_hex_prefix(hex).and_then(|hex_no_prefix| match hex_no_prefix.len() % 2 {
-        0 => Ok(hex_no_prefix.to_string()),
-        _ => left_pad_with_zero(&hex_no_prefix),
-    })
-}
-
 pub fn decode_hex_with_err_msg(hex: &str, err_msg: &str) -> Result<Bytes> {
-    match hex::decode(strip_hex_prefix(hex)?) {
+    match hex::decode(strip_hex_prefix(hex)) {
         Ok(bytes) => Ok(bytes),
         Err(err) => Err(format!("{} {}", err_msg, err).into()),
     }
 }
 
 pub fn decode_hex_with_no_padding_with_err_msg(hex: &str, err_msg: &str) -> Result<Bytes> {
-    match hex::decode(maybe_strip_hex_prefix(hex)?) {
+    match hex::decode(strip_hex_prefix(hex)) {
         Ok(bytes) => Ok(bytes),
         Err(err) => Err(format!("{} {}", err_msg, err).into()),
     }
@@ -94,6 +92,10 @@ pub fn get_not_in_state_err(substring: &str) -> String {
 
 pub fn get_no_overwrite_state_err(substring: &str) -> String {
     format!("✘ Cannot overwrite {} in state!", substring)
+}
+
+pub fn get_core_version() -> String {
+    CORE_VERSION.unwrap_or("Unknown").to_string()
 }
 
 #[cfg(test)]
@@ -129,7 +131,7 @@ mod tests {
     fn should_not_strip_missing_hex_prefix_correctly() {
         let dummy_hex = "c0ffee";
         let expected_result = "c0ffee".to_string();
-        let result = strip_hex_prefix(dummy_hex).unwrap();
+        let result = strip_hex_prefix(dummy_hex);
         assert_eq!(result, expected_result)
     }
 
@@ -137,7 +139,7 @@ mod tests {
     fn should_left_pad_string_with_zero_correctly() {
         let dummy_hex = "0xc0ffee";
         let expected_result = "00xc0ffee".to_string();
-        let result = left_pad_with_zero(dummy_hex).unwrap();
+        let result = left_pad_with_zero(dummy_hex);
         assert_eq!(result, expected_result);
     }
 
@@ -145,7 +147,7 @@ mod tests {
     fn should_strip_lower_hex_prefix_correctly() {
         let dummy_hex = "0xc0ffee";
         let expected_result = "c0ffee".to_string();
-        let result = strip_hex_prefix(dummy_hex).unwrap();
+        let result = strip_hex_prefix(dummy_hex);
         assert_eq!(result, expected_result)
     }
 
@@ -153,7 +155,7 @@ mod tests {
     fn should_strip_upper_case_hex_prefix_correctly() {
         let dummy_hex = "0Xc0ffee";
         let expected_result = "c0ffee".to_string();
-        let result = strip_hex_prefix(dummy_hex).unwrap();
+        let result = strip_hex_prefix(dummy_hex);
         assert_eq!(result, expected_result)
     }
 

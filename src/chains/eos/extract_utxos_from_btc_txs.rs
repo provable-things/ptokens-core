@@ -3,7 +3,7 @@ use crate::{
         btc_database_utils::get_btc_address_from_db,
         btc_types::BtcTransaction,
         btc_utils::get_pay_to_pub_key_hash_script,
-        extract_utxos_from_op_return_txs::extract_utxos_from_txs,
+        extract_utxos_from_p2pkh_txs::extract_utxos_from_txs,
         utxo_manager::utxo_types::BtcUtxosAndValues,
     },
     traits::DatabaseInterface,

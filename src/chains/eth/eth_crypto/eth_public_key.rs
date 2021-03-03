@@ -1,5 +1,6 @@
-use crate::{chains::eth::eth_crypto_utils::keccak_hash_bytes, types::Bytes};
 use ethereum_types::Address as EthAddress;
+
+use crate::{chains::eth::eth_crypto_utils::keccak_hash_bytes, types::Bytes};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct EthPublicKey {
@@ -21,7 +22,7 @@ impl EthPublicKey {
 
 #[cfg(test)]
 mod tests {
-    use crate::btc_on_eth::eth::eth_test_utils::{
+    use crate::chains::eth::eth_test_utils::{
         get_sample_eth_address_string,
         get_sample_eth_public_key,
         get_sample_eth_public_key_bytes,

@@ -33,7 +33,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{btc_on_eth::eth::eth_test_utils::get_sample_eth_submission_material_n, test_utils::get_test_database};
+    use crate::{chains::eth::eth_test_utils::get_sample_eth_submission_material_n, test_utils::get_test_database};
 
     #[test]
     fn should_maybe_add_block_and_receipts_to_db() {

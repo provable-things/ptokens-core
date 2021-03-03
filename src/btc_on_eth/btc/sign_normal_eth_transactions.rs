@@ -68,12 +68,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use bitcoin::util::address::Address as BtcAddress;
+    use bitcoin_hashes::{sha256d, Hash};
+
     use super::*;
     use crate::{
-        btc_on_eth::{
-            eth::eth_test_utils::{get_sample_eth_address, get_sample_eth_private_key},
-            utils::convert_satoshis_to_ptoken,
-        },
+        btc_on_eth::utils::convert_satoshis_to_ptoken,
         chains::{
             btc::btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
             eth::{
@@ -84,14 +86,12 @@ mod tests {
                     put_eth_gas_price_in_db,
                     put_eth_private_key_in_db,
                 },
+                eth_test_utils::{get_sample_eth_address, get_sample_eth_private_key},
                 eth_types::EthAddress,
             },
         },
         test_utils::get_test_database,
     };
-    use bitcoin::util::address::Address as BtcAddress;
-    use bitcoin_hashes::{sha256d, Hash};
-    use std::str::FromStr;
 
     #[test]
     fn should_get_eth_signing_params() {

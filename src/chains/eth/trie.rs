@@ -1,3 +1,5 @@
+use ethereum_types::H256;
+
 use crate::{
     chains::eth::{
         eth_constants::{EMPTY_NIBBLES, HASHED_NULL_NODE},
@@ -16,7 +18,6 @@ use crate::{
     },
     types::{Bytes, NoneError, Result},
 };
-use ethereum_types::H256;
 
 #[derive(Clone)]
 pub struct Trie {
@@ -140,8 +141,7 @@ impl Trie {
                         )?;
                         new_stack.push(new_branch);
                         new_stack.push(new_leaf);
-                        let mut stack_to_delete = Vec::new();
-                        stack_to_delete.push(current_ext_node);
+                        let stack_to_delete = vec![current_ext_node];
                         Ok((self, target_key, found_stack, new_stack, stack_to_delete))
                     }),
                     _ => split_at_first_nibble(&node_key_remainder).and_then(|(ext_first_nibble, ext_nibbles)| {
@@ -364,9 +364,7 @@ impl Trie {
                 let new_leaf_hash = convert_h256_to_bytes(new_leaf.get_hash()?);
                 let updated_branch = current_branch_node
                     .update_branch_at_index(Some(new_leaf_hash), convert_nibble_to_usize(first_nibble))?;
-                let mut new_stack: NodeStack = Vec::new();
-                new_stack.push(updated_branch);
-                new_stack.push(new_leaf);
+                let new_stack: NodeStack = vec![updated_branch, new_leaf];
                 Ok(new_stack)
             })
             .map(|new_stack| (self, target_key, found_stack, new_stack, Vec::new()))
@@ -739,9 +737,12 @@ pub fn put_in_trie_recursively(trie: Trie, key_value_tuples: Vec<(Nibbles, Bytes
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
+    use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
+
     use super::*;
-    use crate::{
-        btc_on_eth::eth::eth_test_utils::{
+    use crate::chains::eth::{
+        eth_test_utils::{
             convert_h256_to_prefixed_hex,
             convert_hex_string_to_nibbles,
             get_sample_branch_node,
@@ -751,10 +752,9 @@ mod tests {
             get_sample_leaf_node,
             get_valid_state_with_invalid_block_and_receipts,
         },
-        chains::eth::{eth_utils::convert_hex_to_h256, get_trie_hash_map::get_thing_from_trie_hash_map},
+        eth_utils::convert_hex_to_h256,
+        get_trie_hash_map::get_thing_from_trie_hash_map,
     };
-    #[allow(unused_imports)]
-    use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
 
     #[test]
     fn should_get_empty_trie() {
@@ -832,12 +832,12 @@ mod tests {
     fn should_put_valid_sample_receipts_in_trie_correctly() {
         let index = 0;
         let block_and_receipts = get_sample_eth_submission_material();
-        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.get_receipts_root().unwrap()).unwrap();
+        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.get_receipts_root().unwrap());
         let receipts = block_and_receipts.receipts;
         let trie = Trie::get_new_trie().unwrap();
         let key_value_tuples = receipts.get_rlp_encoded_receipts_and_nibble_tuples().unwrap();
         let updated_trie = put_in_trie_recursively(trie, key_value_tuples, index).unwrap();
-        let root_hex = convert_h256_to_prefixed_hex(updated_trie.root).unwrap();
+        let root_hex = convert_h256_to_prefixed_hex(updated_trie.root);
         assert_eq!(root_hex, expected_root_hex);
     }
 
@@ -846,25 +846,25 @@ mod tests {
         let index = 0;
         let state = get_valid_state_with_invalid_block_and_receipts().unwrap();
         let block_and_receipts = state.get_eth_submission_material().unwrap();
-        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.get_receipts_root().unwrap()).unwrap();
+        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.get_receipts_root().unwrap());
         let receipts = block_and_receipts.receipts.clone();
         let trie = Trie::get_new_trie().unwrap();
         let key_value_tuples = receipts.get_rlp_encoded_receipts_and_nibble_tuples().unwrap();
         let updated_trie = put_in_trie_recursively(trie, key_value_tuples, index).unwrap();
-        let root_hex = convert_h256_to_prefixed_hex(updated_trie.root).unwrap();
+        let root_hex = convert_h256_to_prefixed_hex(updated_trie.root);
         assert!(root_hex != expected_root_hex);
     }
 
     #[test]
     fn should_validate_root_hash_correctly() {
         let block_and_receipts = get_sample_eth_submission_material_n(1).unwrap();
-        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.get_receipts_root().unwrap()).unwrap();
+        let expected_root_hex = convert_h256_to_prefixed_hex(block_and_receipts.get_receipts_root().unwrap());
         let start_index = 0;
         let receipts = block_and_receipts.receipts;
         let key_value_tuples = receipts.get_rlp_encoded_receipts_and_nibble_tuples().unwrap();
         let trie = Trie::get_new_trie().unwrap();
         let updated_trie = put_in_trie_recursively(trie, key_value_tuples, start_index).unwrap();
-        let root_hex = convert_h256_to_prefixed_hex(updated_trie.root).unwrap();
+        let root_hex = convert_h256_to_prefixed_hex(updated_trie.root);
         assert_eq!(root_hex, expected_root_hex);
     }
 }

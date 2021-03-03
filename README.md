@@ -279,7 +279,7 @@ Further, the `sensitivity` parameter provides a way for the `core` to signal to 
 - The light __BTC__ client implemented herein currently accepts only _two_ deposit types:
 
 1) `p2sh` deposits made to addresses generated via the __`deposit-address-generator`__ run with the private-key emitted by the core upon BTC initialization.
-2) `OP_RETURN` deposits that include in the transaction a UTXO to the `p2pkh` of the aforementioned private-key.
+2) `P2PKH` deposits that include in the transaction a UTXO to the `p2pkh` of the aforementioned private-key.
 
 :warning: Neither `p2pk` nor `segwit` transactions are currently supported. Deposits made via such transactions will result in lost funds! :warning:
 

@@ -1,3 +1,10 @@
+use bitcoin::{
+    blockdata::transaction::TxIn as BtcUtxo,
+    hashes::{sha256d, Hash},
+};
+use derive_more::{Constructor, Deref, DerefMut, From, Into, IntoIterator};
+use serde_json::json;
+
 use crate::{
     chains::btc::{
         btc_utils::{deserialize_btc_utxo, serialize_btc_utxo},
@@ -5,12 +12,6 @@ use crate::{
     },
     types::{Bytes, Result},
 };
-use bitcoin::{
-    blockdata::transaction::TxIn as BtcUtxo,
-    hashes::{sha256d, Hash},
-};
-use derive_more::{Constructor, Deref, DerefMut, From, Into, IntoIterator};
-use serde_json::json;
 
 #[derive(
     Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Constructor, Deref, DerefMut, From, Into, IntoIterator,

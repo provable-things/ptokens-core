@@ -1,38 +1,43 @@
+pub use serde_json::json;
+
 use crate::{
     chains::{
         eos::{
             add_schedule::maybe_add_new_eos_schedule_to_db_and_return_state,
-            core_initialization::eos_init_utils::{
-                generate_and_put_incremerkle_in_db,
-                put_eos_latest_block_info_in_db,
-                EosInitJson,
-            },
-            eos_constants::{get_eos_constants_db_keys, EOS_PRIVATE_KEY_DB_KEY},
+            core_initialization::eos_init_utils::EosInitJson,
+            eos_constants::{get_eos_constants_db_keys, EOS_PRIVATE_KEY_DB_KEY, REDEEM_ACTION_NAME},
             eos_database_transactions::{
                 end_eos_db_transaction_and_return_state,
                 start_eos_db_transaction_and_return_state,
             },
-            eos_database_utils::put_eos_schedule_in_db,
-            eos_erc20_dictionary::{
-                get_erc20_dictionary_from_db_and_add_to_eos_state,
-                get_erc20_dictionary_from_db_and_add_to_eth_state,
-                EosErc20Dictionary,
-                EosErc20DictionaryEntry,
+            eos_debug_functions::{
+                add_eos_eth_token_dictionary_entry,
+                add_new_eos_schedule,
+                get_processed_actions_list,
+                remove_eos_eth_token_dictionary_entry,
+                update_incremerkle,
+            },
+            eos_eth_token_dictionary::{
+                get_eos_eth_token_dictionary_from_db_and_add_to_eos_state,
+                get_eos_eth_token_dictionary_from_db_and_add_to_eth_state,
+                EosEthTokenDictionary,
+            },
+            eos_global_sequences::{
+                get_processed_global_sequences_and_add_to_state,
+                maybe_add_global_sequences_to_processed_list_and_return_state,
             },
             eos_state::EosState,
+            eos_submission_material::parse_submission_material_and_add_to_state,
             filter_action_proofs::{
                 maybe_filter_duplicate_proofs_from_state,
                 maybe_filter_out_action_proof_receipt_mismatches_and_return_state,
                 maybe_filter_out_invalid_action_receipt_digests,
-                maybe_filter_out_proofs_for_non_erc20_accounts,
+                maybe_filter_out_proofs_for_accounts_not_in_token_dictionary,
                 maybe_filter_out_proofs_with_invalid_merkle_proofs,
                 maybe_filter_out_proofs_with_wrong_action_mroot,
+                maybe_filter_proofs_for_action_name,
             },
-            get_active_schedule::get_active_schedule_from_db_and_add_to_state,
             get_enabled_protocol_features::get_enabled_protocol_features_and_add_to_state,
-            parse_eos_schedule::parse_v2_schedule_string_to_v2_schedule,
-            parse_submission_material::parse_submission_material_and_add_to_state,
-            sign_eos_transactions::maybe_sign_eos_txs_and_add_to_eth_state,
         },
         eth::{
             eth_constants::{get_eth_constants_db_keys, ETH_PRIVATE_KEY_DB_KEY},
@@ -56,7 +61,6 @@ use crate::{
             eth_state::EthState,
             eth_submission_material::parse_eth_submission_material_and_put_in_state,
             eth_utils::get_eth_address_from_str,
-            filter_receipts_in_state::filter_receipts_for_erc20_on_eos_peg_in_events_in_state,
             validate_block_in_state::validate_block_in_state,
             validate_receipts_in_state::validate_receipts_in_state,
         },
@@ -72,17 +76,24 @@ use crate::{
         },
         eos::{
             get_eos_output::get_eos_output,
-            increment_eth_nonce::maybe_increment_eth_nonce_in_db_and_return_state,
+            increment_eth_nonce::maybe_increment_eth_nonce_in_db_and_return_eos_state,
             redeem_info::maybe_parse_redeem_infos_and_put_in_state,
             sign_normal_eth_txs::maybe_sign_normal_eth_txs_and_add_to_state,
         },
-        eth::{get_output_json::get_output_json, peg_in_info::maybe_filter_peg_in_info_in_state},
+        eth::{
+            get_output_json::get_output_json,
+            peg_in_info::{
+                filter_out_zero_value_peg_ins_from_state,
+                filter_submission_material_for_peg_in_events_in_state,
+                Erc20OnEosPegInInfos,
+            },
+            sign_eos_transactions::maybe_sign_eos_txs_and_add_to_eth_state,
+        },
     },
     traits::DatabaseInterface,
     types::Result,
     utils::prepend_debug_output_marker_to_string,
 };
-pub use serde_json::json;
 
 /// # Debug Update Incremerkle
 ///
@@ -95,33 +106,16 @@ pub use serde_json::json;
 /// transaction replays. Use with extreme caution and only if you know exactly what you are doing
 /// and why.
 pub fn debug_update_incremerkle<D: DatabaseInterface>(db: &D, eos_init_json: &str) -> Result<String> {
-    info!("✔ Debug updating blockroot merkle...");
-    let init_json = EosInitJson::from_json_string(&eos_init_json)?;
-    check_debug_mode()
-        .and_then(|_| check_core_is_initialized(db))
-        .and_then(|_| put_eos_latest_block_info_in_db(db, &init_json.block))
-        .and_then(|_| db.start_transaction())
-        .and_then(|_| generate_and_put_incremerkle_in_db(db, &init_json.blockroot_merkle))
-        .and_then(|_| db.end_transaction())
-        .and(Ok("{debug_update_blockroot_merkle_success:true}".to_string()))
+    check_core_is_initialized(db)
+        .and_then(|_| update_incremerkle(db, &EosInitJson::from_json_string(&eos_init_json)?))
         .map(prepend_debug_output_marker_to_string)
 }
 
 /// # Debug Add New Eos Schedule
 ///
-/// Does exactly what it says on the tin. It's currently required due to an open ticket on the
-/// validation of EOS blocks containing new schedules. Once that ticket is cleared, new schedules
-/// can be brought in "organically" by syncing to the core up to the block containing said new
-/// schedule. Meanwhile, this function must suffice.
+/// Adds a new EOS schedule to the core's encrypted database.
 pub fn debug_add_new_eos_schedule<D: DatabaseInterface>(db: D, schedule_json: &str) -> Result<String> {
-    info!("✔ Debug adding new EOS schedule...");
-    check_debug_mode()
-        .and_then(|_| db.start_transaction())
-        .and_then(|_| parse_v2_schedule_string_to_v2_schedule(&schedule_json))
-        .and_then(|schedule| put_eos_schedule_in_db(&db, &schedule))
-        .and_then(|_| db.end_transaction())
-        .and(Ok("{debug_adding_eos_schedule_succeeded:true}".to_string()))
-        .map(prepend_debug_output_marker_to_string)
+    check_core_is_initialized(&db).and_then(|_| add_new_eos_schedule(&db, schedule_json))
 }
 
 /// # Debug Set Key in DB to Value
@@ -169,7 +163,7 @@ pub fn debug_get_all_db_keys() -> Result<String> {
 
 /// # Debug Add ERC20 Dictionary Entry
 ///
-/// This function will add an entry to the `EosErc20Dictionary` held in the encrypted database. The
+/// This function will add an entry to the `EosEthTokenDictionary` held in the encrypted database. The
 /// dictionary defines the relationship between ERC20 etheruem addresses and their pToken EOS
 /// address counterparts.
 ///
@@ -182,40 +176,25 @@ pub fn debug_get_all_db_keys() -> Result<String> {
 ///     "eth_token_decimals": <num-decimals>,
 ///     "eos_token_decimals": <num-decimals>,
 /// }
-pub fn debug_add_erc20_dictionary_entry<D>(db: D, dictionary_entry_json_string: &str) -> Result<String>
-where
-    D: DatabaseInterface,
-{
-    info!("✔ Debug adding entry to `EosErc20Dictionary`...");
-    let dictionary = EosErc20Dictionary::get_from_db(&db)?;
-    check_debug_mode()
-        .and_then(|_| check_core_is_initialized(&db))
-        .and_then(|_| db.start_transaction())
-        .and_then(|_| EosErc20DictionaryEntry::from_str(dictionary_entry_json_string))
-        .and_then(|entry| dictionary.add_and_update_in_db(entry, &db))
-        .and_then(|_| db.end_transaction())
-        .and(Ok(json!({"adding_dictionary_entry_sucess":true}).to_string()))
+pub fn debug_add_eos_eth_token_dictionary_entry<D: DatabaseInterface>(
+    db: D,
+    dictionary_entry_json_string: &str,
+) -> Result<String> {
+    check_core_is_initialized(&db).and_then(|_| add_eos_eth_token_dictionary_entry(&db, dictionary_entry_json_string))
 }
 
 /// # Debug Remove ERC20 Dictionary Entry
 ///
 /// This function will remove an entry pertaining to the passed in ETH address from the
-/// `EosErc20Dictionary` held in the encrypted database, should that entry exist. If it is
+/// `EosEthTokenDictionary` held in the encrypted database, should that entry exist. If it is
 /// not extant, nothing is changed.
-pub fn debug_remove_erc20_dictionary_entry<D>(db: D, eth_address_str: &str) -> Result<String>
-where
-    D: DatabaseInterface,
-{
-    info!("✔ Debug removing entry from `EosErc20Dictionary`...");
-    let dictionary = EosErc20Dictionary::get_from_db(&db)?;
-    check_debug_mode()
-        .and_then(|_| check_core_is_initialized(&db))
-        .and_then(|_| db.start_transaction())
-        .and_then(|_| get_eth_address_from_str(eth_address_str))
-        .and_then(|eth_address| dictionary.remove_entry_via_eth_address_and_update_in_db(&eth_address, &db))
-        .and_then(|_| db.end_transaction())
-        .and(Ok(json!({"removing_dictionary_entry_sucess":true}).to_string()))
+pub fn debug_remove_eos_eth_token_dictionary_entry<D: DatabaseInterface>(
+    db: D,
+    eth_address_str: &str,
+) -> Result<String> {
+    check_core_is_initialized(&db).and_then(|_| remove_eos_eth_token_dictionary_entry(&db, eth_address_str))
 }
+
 /// # Debug Get PERC20 Migration Transaction
 ///
 /// This function will create and sign a transaction that calls the `migrate` function on the
@@ -376,9 +355,9 @@ pub fn debug_reprocess_eth_block<D: DatabaseInterface>(db: D, block_json_string:
     parse_eth_submission_material_and_put_in_state(block_json_string, EthState::init(db))
         .and_then(check_core_is_initialized_and_return_eth_state)
         .and_then(validate_block_in_state)
-        .and_then(get_erc20_dictionary_from_db_and_add_to_eth_state)
+        .and_then(get_eos_eth_token_dictionary_from_db_and_add_to_eth_state)
         .and_then(validate_receipts_in_state)
-        .and_then(filter_receipts_for_erc20_on_eos_peg_in_events_in_state)
+        .and_then(filter_submission_material_for_peg_in_events_in_state)
         .and_then(|state| {
             let submission_material = state.get_eth_submission_material()?.clone();
             match submission_material.receipts.is_empty() {
@@ -391,13 +370,15 @@ pub fn debug_reprocess_eth_block<D: DatabaseInterface>(db: D, block_json_string:
                         "✔ {} receipts in block ∴ parsing info...",
                         submission_material.get_block_number()?
                     );
-                    EosErc20Dictionary::get_from_db(&state.db)
-                        .and_then(|accounts| submission_material.get_erc20_on_eos_peg_in_infos(&accounts))
+                    EosEthTokenDictionary::get_from_db(&state.db)
+                        .and_then(|token_dictionary| {
+                            Erc20OnEosPegInInfos::from_submission_material(&submission_material, &token_dictionary)
+                        })
                         .and_then(|peg_in_infos| state.add_erc20_on_eos_peg_in_infos(peg_in_infos))
                 },
             }
         })
-        .and_then(maybe_filter_peg_in_info_in_state)
+        .and_then(filter_out_zero_value_peg_ins_from_state)
         .and_then(maybe_sign_eos_txs_and_add_to_eth_state)
         .and_then(get_output_json)
 }
@@ -422,20 +403,29 @@ where
     parse_submission_material_and_add_to_state(block_json, EosState::init(db))
         .and_then(check_core_is_initialized_and_return_eos_state)
         .and_then(get_enabled_protocol_features_and_add_to_state)
-        .and_then(get_active_schedule_from_db_and_add_to_state)
         .and_then(start_eos_db_transaction_and_return_state)
-        .and_then(get_erc20_dictionary_from_db_and_add_to_eos_state)
+        .and_then(get_processed_global_sequences_and_add_to_state)
+        .and_then(get_eos_eth_token_dictionary_from_db_and_add_to_eos_state)
         .and_then(maybe_add_new_eos_schedule_to_db_and_return_state)
         .and_then(maybe_filter_duplicate_proofs_from_state)
-        .and_then(maybe_filter_out_proofs_for_non_erc20_accounts)
+        .and_then(maybe_filter_out_proofs_for_accounts_not_in_token_dictionary)
         .and_then(maybe_filter_out_action_proof_receipt_mismatches_and_return_state)
         .and_then(maybe_filter_out_invalid_action_receipt_digests)
         .and_then(maybe_filter_out_proofs_with_invalid_merkle_proofs)
         .and_then(maybe_filter_out_proofs_with_wrong_action_mroot)
+        .and_then(|state| maybe_filter_proofs_for_action_name(state, REDEEM_ACTION_NAME))
         .and_then(maybe_parse_redeem_infos_and_put_in_state)
         .and_then(maybe_sign_normal_eth_txs_and_add_to_state)
-        .and_then(maybe_increment_eth_nonce_in_db_and_return_state)
+        .and_then(maybe_add_global_sequences_to_processed_list_and_return_state)
+        .and_then(maybe_increment_eth_nonce_in_db_and_return_eos_state)
         .and_then(end_eos_db_transaction_and_return_state)
         .and_then(get_eos_output)
         .map(prepend_debug_output_marker_to_string)
+}
+
+/// # Debug Get Processed Actions List
+///
+/// This function returns the list of already-processed action global sequences in JSON format.
+pub fn debug_get_processed_actions_list<D: DatabaseInterface>(db: &D) -> Result<String> {
+    check_core_is_initialized(db).and_then(|_| get_processed_actions_list(db))
 }

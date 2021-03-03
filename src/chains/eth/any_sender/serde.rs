@@ -1,8 +1,9 @@
+use std::fmt;
+
 use serde::{
     de::{self, Deserializer, Visitor},
     ser::Serializer,
 };
-use std::fmt;
 
 pub mod data {
     use super::*;

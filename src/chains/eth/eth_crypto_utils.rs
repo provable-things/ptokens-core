@@ -1,9 +1,10 @@
-use crate::{chains::eth::eth_types::EthSignature, types::Byte};
 use ethereum_types::H256;
 use tiny_keccak::keccak256;
 
+use crate::{chains::eth::eth_types::EthSignature, types::Byte};
+
 pub fn keccak_hash_bytes(bytes: &[Byte]) -> H256 {
-    H256::from(keccak256(&bytes[..]))
+    H256::from(keccak256(bytes))
 }
 
 pub fn set_eth_signature_recovery_param(signature: &mut EthSignature) {

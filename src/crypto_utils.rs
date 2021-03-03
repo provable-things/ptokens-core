@@ -1,6 +1,7 @@
-use crate::types::Result;
 use rand::{thread_rng, RngCore};
 use secp256k1::key::SecretKey;
+
+use crate::types::Result;
 
 fn get_x_random_bytes(num_bytes: usize) -> Vec<u8> {
     let mut bytes = vec![0u8; num_bytes];

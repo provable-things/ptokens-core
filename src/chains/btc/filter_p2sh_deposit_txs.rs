@@ -1,3 +1,9 @@
+use bitcoin::{
+    blockdata::transaction::TxOut as BtcTxOut,
+    network::constants::Network as BtcNetwork,
+    util::address::Address as BtcAddress,
+};
+
 use crate::{
     chains::btc::{
         btc_database_utils::{get_btc_network_from_db, get_btc_public_key_slice_from_db},
@@ -8,11 +14,6 @@ use crate::{
     },
     traits::DatabaseInterface,
     types::Result,
-};
-use bitcoin::{
-    blockdata::transaction::TxOut as BtcTxOut,
-    network::constants::Network as BtcNetwork,
-    util::address::Address as BtcAddress,
 };
 
 fn is_address_locked_to_pub_key(
@@ -125,17 +126,19 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use bitcoin::{
+        blockdata::transaction::{Transaction as BtcTransaction, TxOut as BtcTxOut},
+        util::address::Address as BtcAddress,
+    };
+
     use super::*;
     use crate::chains::btc::{
         btc_block::BtcBlockAndId,
         btc_test_utils::{get_sample_btc_block_n, get_sample_btc_pub_key_slice, SAMPLE_TARGET_BTC_ADDRESS},
         get_deposit_info_hash_map::create_hash_map_from_deposit_info_list,
     };
-    use bitcoin::{
-        blockdata::transaction::{Transaction as BtcTransaction, TxOut as BtcTxOut},
-        util::address::Address as BtcAddress,
-    };
-    use std::str::FromStr;
 
     fn get_sample_btc_deposit_address() -> BtcAddress {
         BtcAddress::from_str("2N2LHYbt8K1KDBogd6XUG9VBv5YM6xefdM2").unwrap()

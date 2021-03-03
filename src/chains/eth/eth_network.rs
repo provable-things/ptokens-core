@@ -1,5 +1,6 @@
-use crate::types::{Byte, Result};
 use std::fmt;
+
+use crate::types::{Byte, Result};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum EthNetwork {

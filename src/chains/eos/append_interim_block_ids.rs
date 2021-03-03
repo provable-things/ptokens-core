@@ -1,5 +1,7 @@
+use eos_primitives::Checksum256;
+
 use crate::{
-    chains::eos::{eos_merkle_utils::Incremerkle, eos_state::EosState, eos_types::Checksum256},
+    chains::eos::{eos_merkle_utils::Incremerkle, eos_state::EosState},
     traits::DatabaseInterface,
     types::Result,
 };

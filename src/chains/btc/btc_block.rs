@@ -1,3 +1,16 @@
+use std::str::FromStr;
+
+pub use bitcoin::{
+    blockdata::{
+        block::{Block as BtcBlock, BlockHeader as BtcBlockHeader},
+        transaction::Transaction as BtcTransaction,
+    },
+    consensus::encode::{deserialize as btc_deserialize, serialize as btc_serialize},
+    hashes::{sha256d, Hash},
+    util::address::Address as BtcAddress,
+};
+use derive_more::Constructor;
+
 use crate::{
     btc_on_eos::btc::minting_params::BtcOnEosMintingParams,
     btc_on_eth::btc::minting_params::BtcOnEthMintingParams,
@@ -10,17 +23,6 @@ use crate::{
     types::{Byte, Bytes, NoneError, Result},
     utils::{convert_bytes_to_u64, convert_u64_to_bytes},
 };
-pub use bitcoin::{
-    blockdata::{
-        block::{Block as BtcBlock, BlockHeader as BtcBlockHeader},
-        transaction::Transaction as BtcTransaction,
-    },
-    consensus::encode::{deserialize as btc_deserialize, serialize as btc_serialize},
-    hashes::{sha256d, Hash},
-    util::address::Address as BtcAddress,
-};
-use derive_more::Constructor;
-use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BtcBlockAndId {
@@ -293,14 +295,15 @@ impl SerializedBlockInDbFormatLegacy {
 
 #[cfg(test)]
 mod tests {
+    use bitcoin::{
+        blockdata::transaction::Transaction as BtcTransaction,
+        consensus::encode::deserialize as btc_deserialize,
+    };
+
     use super::*;
     use crate::chains::btc::btc_test_utils::{
         get_sample_btc_block_in_db_format,
         get_sample_btc_submission_material_json,
-    };
-    use bitcoin::{
-        blockdata::transaction::Transaction as BtcTransaction,
-        consensus::encode::deserialize as btc_deserialize,
     };
 
     #[test]

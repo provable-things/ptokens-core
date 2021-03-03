@@ -1,8 +1,5 @@
-use crate::{
-    chains::btc::{btc_constants::BTC_PUB_KEY_SLICE_LENGTH, deposit_address_info::DepositAddressInfoJson},
-    constants::SAFE_BTC_ADDRESS,
-    types::{Byte, Bytes, Result},
-};
+use std::str::FromStr;
+
 pub use bitcoin::{
     blockdata::{
         block::{Block as BtcBlock, BlockHeader as BtcBlockHeader},
@@ -12,7 +9,12 @@ pub use bitcoin::{
     hashes::sha256d,
     util::address::Address as BtcAddress,
 };
-use std::str::FromStr;
+
+use crate::{
+    chains::btc::{btc_constants::BTC_PUB_KEY_SLICE_LENGTH, deposit_address_info::DepositAddressInfoJson},
+    constants::SAFE_BTC_ADDRESS,
+    types::{Byte, Bytes, Result},
+};
 
 pub type BtcTransactions = Vec<BtcTransaction>;
 pub type BtcPubKeySlice = [Byte; BTC_PUB_KEY_SLICE_LENGTH];

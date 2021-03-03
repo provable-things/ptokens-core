@@ -1,3 +1,5 @@
+use bitcoin_hashes::{sha256d, Hash};
+
 use crate::{
     chains::btc::utxo_manager::{
         utxo_constants::{UTXO_BALANCE, UTXO_FIRST, UTXO_LAST, UTXO_NONCE},
@@ -9,7 +11,6 @@ use crate::{
     types::{Byte, Bytes, Result},
     utils::{convert_bytes_to_u64, convert_u64_to_bytes},
 };
-use bitcoin_hashes::{sha256d, Hash};
 
 pub fn get_x_utxos<D: DatabaseInterface>(db: &D, num_utxos_to_get: usize) -> Result<BtcUtxosAndValues> {
     let total_num_utxos = get_total_number_of_utxos_from_db(db);
@@ -86,8 +87,7 @@ where
     utxos_and_values
         .0
         .iter()
-        .map(|utxo_and_value| save_new_utxo_and_value(db, utxo_and_value))
-        .collect()
+        .try_for_each(|utxo_and_value| save_new_utxo_and_value(db, utxo_and_value))
 }
 
 pub fn get_all_utxo_db_keys<D>(db: &D) -> Vec<Bytes>
@@ -118,10 +118,7 @@ where
 {
     match maybe_get_utxo_from_db(db, &utxo_pointer) {
         None => None,
-        Some(utxo) => match utxo.maybe_pointer {
-            Some(pointer) => Some(pointer.to_vec()),
-            None => None,
-        },
+        Some(utxo) => utxo.maybe_pointer.map(|pointer| pointer.to_vec()),
     }
 }
 
@@ -390,7 +387,7 @@ mod tests {
     use crate::{
         chains::btc::{
             btc_database_utils::key_exists_in_db,
-            btc_test_utils::{get_sample_op_return_utxo_and_value, get_sample_utxo_and_values},
+            btc_test_utils::{get_sample_p2pkh_utxo_and_value, get_sample_utxo_and_values},
         },
         errors::AppError,
         test_utils::get_test_database,
@@ -459,7 +456,7 @@ mod tests {
     #[test]
     fn should_put_and_get_utxo_in_db() {
         let db = get_test_database();
-        let utxo = get_sample_op_return_utxo_and_value();
+        let utxo = get_sample_p2pkh_utxo_and_value();
         let key = get_utxo_and_value_db_key(1);
         put_utxo_in_db(&db, &key, &utxo).unwrap();
         let result = get_utxo_from_db(&db, &key).unwrap();
@@ -469,7 +466,7 @@ mod tests {
     #[test]
     fn should_update_pointer_in_utxo_in_db() {
         let db = get_test_database();
-        let utxo = get_sample_op_return_utxo_and_value();
+        let utxo = get_sample_p2pkh_utxo_and_value();
         let key = get_utxo_and_value_db_key(1);
         let pointer = sha256d::Hash::hash(&[6u8, 6u8, 6u8]);
         assert_eq!(utxo.maybe_pointer, None);
@@ -566,7 +563,7 @@ mod tests {
     #[test]
     fn should_save_gt_one_utxo() {
         let db = get_test_database();
-        let utxo1 = get_sample_op_return_utxo_and_value();
+        let utxo1 = get_sample_p2pkh_utxo_and_value();
         let hash1 = get_utxo_and_value_db_key(1);
         let mut utxo2 = utxo1.clone();
         let hash2 = get_utxo_and_value_db_key(2);
@@ -595,7 +592,7 @@ mod tests {
     #[test]
     fn should_remove_1_utxo_correctly_when_gt_1_exist() {
         let db = get_test_database();
-        let utxo1 = get_sample_op_return_utxo_and_value();
+        let utxo1 = get_sample_p2pkh_utxo_and_value();
         let hash1 = get_utxo_and_value_db_key(1);
         let mut utxo2 = utxo1.clone();
         let hash2 = get_utxo_and_value_db_key(2);
@@ -623,7 +620,7 @@ mod tests {
     #[test]
     fn should_remove_last_utxo_correctly() {
         let db = get_test_database();
-        let utxo1 = get_sample_op_return_utxo_and_value();
+        let utxo1 = get_sample_p2pkh_utxo_and_value();
         save_new_utxo_and_value(&db, &utxo1).unwrap();
         let first_pointer_before = get_first_utxo_pointer(&db).unwrap();
         let last_pointer_before = get_last_utxo_pointer(&db).unwrap();

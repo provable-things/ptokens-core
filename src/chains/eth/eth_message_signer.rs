@@ -1,14 +1,15 @@
+use serde_json::{json, Value as JsonValue};
+
 use crate::{
     chains::eth::{eth_database_utils::get_eth_private_key_from_db, eth_types::EthSignature},
     traits::DatabaseInterface,
     types::Result,
     utils::decode_hex_with_err_msg,
 };
-use serde_json::{json, Value as JsonValue};
 
-fn encode_eth_signed_message_as_json(message: &str, signature: &EthSignature) -> Result<JsonValue> {
+fn encode_eth_signed_message_as_json(message: &str, signature: &EthSignature) -> JsonValue {
     info!("✔ Encoding eth signed message as json...");
-    Ok(json!({"message": message, "signature": format!("0x{}", hex::encode(&signature[..]))}))
+    json!({"message": message, "signature": format!("0x{}", hex::encode(&signature[..]))})
 }
 
 /// # Sign ASCII Message With ETH Key
@@ -23,8 +24,7 @@ pub fn sign_ascii_msg_with_eth_key_with_no_prefix<D: DatabaseInterface>(db: &D, 
     }
     get_eth_private_key_from_db(db)
         .and_then(|key| key.sign_message_bytes(message.as_bytes()))
-        .and_then(|signature| encode_eth_signed_message_as_json(&message, &signature))
-        .map(|json| json.to_string())
+        .map(|signature| encode_eth_signed_message_as_json(&message, &signature).to_string())
 }
 
 /// # Sign HEX Message With ETH Key
@@ -44,8 +44,7 @@ pub fn sign_hex_msg_with_eth_key_with_prefix<D: DatabaseInterface>(db: &D, messa
             let key = get_eth_private_key_from_db(db)?;
             key.sign_eth_prefixed_msg_bytes(&bytes)
         })
-        .and_then(|signature| encode_eth_signed_message_as_json(&message, &signature))
-        .map(|json| json.to_string())
+        .map(|signature| encode_eth_signed_message_as_json(&message, &signature).to_string())
 }
 
 #[deprecated(
@@ -67,8 +66,7 @@ where
 mod tests {
     use super::*;
     use crate::{
-        btc_on_eth::eth::eth_test_utils::get_sample_eth_private_key,
-        chains::eth::eth_database_utils::put_eth_private_key_in_db,
+        chains::eth::{eth_database_utils::put_eth_private_key_in_db, eth_test_utils::get_sample_eth_private_key},
         errors::AppError,
         test_utils::get_test_database,
     };
@@ -100,7 +98,7 @@ mod tests {
             "message": "Arbitrary message",
             "signature": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
         });
-        let result = encode_eth_signed_message_as_json("Arbitrary message", &[0u8; 65]).unwrap();
+        let result = encode_eth_signed_message_as_json("Arbitrary message", &[0u8; 65]);
         assert_eq!(result, expected_result, "✘ Message signature json is invalid!")
     }
 

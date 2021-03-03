@@ -1,9 +1,11 @@
+use std::{collections::HashMap, sync::Mutex};
+
+use rand::Rng;
+
 use crate::{
     traits::DatabaseInterface,
     types::{Bytes, DataSensitivity, Result},
 };
-use rand::Rng;
-use std::{collections::HashMap, sync::Mutex};
 
 pub static DB_LOCK_ERRROR: &str = "✘ Cannot get lock on DB!";
 

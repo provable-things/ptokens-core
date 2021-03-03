@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     chains::btc::{
         btc_state::BtcState,
@@ -6,7 +8,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use std::collections::HashMap;
 
 pub fn create_hash_map_from_deposit_info_list(deposit_info_list: &[DepositAddressInfo]) -> Result<DepositInfoHashMap> {
     let mut hash_map = HashMap::new();

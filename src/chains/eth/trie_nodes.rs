@@ -1,3 +1,6 @@
+use ethereum_types::H256;
+use rlp::{Rlp, RlpStream};
+
 use crate::{
     chains::eth::{
         eth_constants::{BRANCH_NODE_STRING, EMPTY_NIBBLES, EXTENSION_NODE_STRING, LEAF_NODE_STRING},
@@ -13,8 +16,6 @@ use crate::{
     },
     types::{Bytes, Result},
 };
-use ethereum_types::H256;
-use rlp::{Rlp, RlpStream};
 
 static NO_NODE_IN_STRUCT_ERR: &str = "✘ No node present in struct to rlp-encode!";
 
@@ -58,8 +59,8 @@ impl Node {
             leaf: Some(LeafNode {
                 raw,
                 value,
-                path_nibbles,
                 encoded_path,
+                path_nibbles,
             }),
         })
     }
@@ -74,8 +75,8 @@ impl Node {
             extension: Some(ExtensionNode {
                 raw,
                 value,
-                path_nibbles,
                 encoded_path,
+                path_nibbles,
             }),
         })
     }
@@ -98,7 +99,7 @@ impl Node {
                 extension: None,
                 branch: Some(BranchNode {
                     value: branch.value,
-                    branches: update_child_nodes(branch.branches, new_value, index)?,
+                    branches: update_child_nodes(branch.branches, new_value, index),
                 }),
             })
         } else {
@@ -229,9 +230,9 @@ fn get_empty_child_nodes() -> ChildNodes {
     ]
 }
 
-fn update_child_nodes(mut child_nodes: ChildNodes, new_value: Option<Bytes>, index: usize) -> Result<ChildNodes> {
+fn update_child_nodes(mut child_nodes: ChildNodes, new_value: Option<Bytes>, index: usize) -> ChildNodes {
     child_nodes[index] = new_value;
-    Ok(child_nodes)
+    child_nodes
 }
 
 pub fn get_node_from_trie_hash_map(trie_hash_map: &TrieHashMap, key: &H256) -> Result<Option<Node>> {
@@ -245,8 +246,8 @@ pub fn get_node_from_trie_hash_map(trie_hash_map: &TrieHashMap, key: &H256) -> R
 mod tests {
     use super::*;
     use crate::{
-        btc_on_eth::eth::eth_test_utils::{get_sample_branch_node, get_sample_extension_node, get_sample_leaf_node},
         chains::eth::{
+            eth_test_utils::{get_sample_branch_node, get_sample_extension_node, get_sample_leaf_node},
             eth_utils::convert_hex_to_h256,
             get_trie_hash_map::{get_new_trie_hash_map, put_thing_in_trie_hash_map},
             nibble_utils::{get_length_in_nibbles, get_nibbles_from_bytes},

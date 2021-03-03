@@ -1,3 +1,5 @@
+use bitcoin::{blockdata::transaction::Transaction as BtcTransaction, network::constants::Network as BtcNetwork};
+
 use crate::{
     btc_on_eth::eth::redeem_info::BtcOnEthRedeemInfos,
     chains::{
@@ -17,7 +19,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use bitcoin::{blockdata::transaction::Transaction as BtcTransaction, network::constants::Network as BtcNetwork};
 
 fn get_enough_utxos_to_cover_total<D>(
     db: &D,

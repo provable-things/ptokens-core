@@ -1,3 +1,6 @@
+use ethabi::{encode, Token};
+use ethereum_types::{Address as EthAddress, U256};
+
 use crate::{
     chains::eth::{
         eth_contracts::{encode_fxn_call, erc777::ERC777_CHANGE_PNETWORK_GAS_LIMIT},
@@ -14,8 +17,6 @@ use crate::{
     traits::DatabaseInterface,
     types::{Bytes, Result},
 };
-use ethabi::{encode, Token};
-use ethereum_types::{Address as EthAddress, U256};
 
 pub const ERC777_CHANGE_PNETWORK_BY_PROXY_GAS_LIMIT: usize = 33_000;
 
@@ -96,7 +97,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::btc_on_eth::eth::eth_test_utils::{get_sample_eth_address, get_sample_eth_private_key};
+    use crate::chains::eth::eth_test_utils::{get_sample_eth_address, get_sample_eth_private_key};
 
     #[test]
     fn should_encode_mint_by_proxy_tx_data() {

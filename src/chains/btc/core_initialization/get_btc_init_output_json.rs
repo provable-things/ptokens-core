@@ -1,3 +1,5 @@
+use derive_more::Constructor;
+
 use crate::{
     chains::btc::{
         btc_database_utils::{get_btc_address_from_db, get_latest_btc_block_number},
@@ -6,7 +8,6 @@ use crate::{
     traits::DatabaseInterface,
     types::Result,
 };
-use derive_more::Constructor;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Constructor)]
 pub struct BtcInitializationOutput {

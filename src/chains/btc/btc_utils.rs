@@ -1,15 +1,3 @@
-use crate::{
-    base58::{encode_slice as base58_encode_slice, from as from_base58},
-    chains::{
-        btc::{
-            btc_constants::{BTC_PUB_KEY_SLICE_LENGTH, DEFAULT_BTC_SEQUENCE, PTOKEN_P2SH_SCRIPT_BYTES},
-            btc_types::BtcPubKeySlice,
-        },
-        eth::eth_utils::{convert_bytes_to_u64, convert_u64_to_bytes},
-    },
-    types::{Byte, Bytes, Result},
-    utils::strip_hex_prefix,
-};
 use bitcoin::{
     blockdata::{
         opcodes,
@@ -22,6 +10,19 @@ use bitcoin::{
     util::key::PrivateKey,
 };
 use secp256k1::key::ONE_KEY;
+
+use crate::{
+    base58::{encode_slice as base58_encode_slice, from as from_base58},
+    chains::{
+        btc::{
+            btc_constants::{BTC_PUB_KEY_SLICE_LENGTH, DEFAULT_BTC_SEQUENCE, PTOKEN_P2SH_SCRIPT_BYTES},
+            btc_types::BtcPubKeySlice,
+        },
+        eth::eth_utils::{convert_bytes_to_u64, convert_u64_to_bytes},
+    },
+    types::{Byte, Bytes, Result},
+    utils::strip_hex_prefix,
+};
 
 pub fn convert_bytes_to_btc_pub_key_slice(bytes: &[Byte]) -> Result<BtcPubKeySlice> {
     match bytes.len() {
@@ -37,7 +38,7 @@ pub fn convert_bytes_to_btc_pub_key_slice(bytes: &[Byte]) -> Result<BtcPubKeySli
 }
 
 pub fn convert_hex_to_sha256_hash(hex: &str) -> Result<sha256d::Hash> {
-    Ok(sha256d::Hash::from_slice(&hex::decode(strip_hex_prefix(&hex)?)?)?)
+    Ok(sha256d::Hash::from_slice(&hex::decode(strip_hex_prefix(&hex))?)?)
 }
 
 pub fn get_btc_one_key() -> PrivateKey {
@@ -181,6 +182,14 @@ pub fn get_tx_id_from_signed_btc_tx(signed_btc_tx: &BtcTransaction) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use bitcoin::{
+        hashes::{sha256d, Hash},
+        util::address::Address as BtcAddress,
+    };
+    use ethereum_types::Address as EthAddress;
+
     use super::*;
     use crate::{
         btc_on_eth::{
@@ -189,12 +198,12 @@ mod tests {
         },
         chains::btc::{
             btc_test_utils::{
-                create_op_return_btc_utxo_and_value_from_tx_output,
+                create_p2pkh_btc_utxo_and_value_from_tx_output,
                 get_sample_btc_block_and_id,
                 get_sample_btc_private_key,
                 get_sample_btc_pub_key_slice,
                 get_sample_btc_utxo,
-                get_sample_op_return_utxo_and_value_n,
+                get_sample_p2pkh_utxo_and_value_n,
                 get_sample_p2sh_redeem_script_sig,
                 get_sample_testnet_block_and_txs,
                 SAMPLE_OUTPUT_INDEX_OF_UTXO,
@@ -206,12 +215,6 @@ mod tests {
         },
         errors::AppError,
     };
-    use bitcoin::{
-        hashes::{sha256d, Hash},
-        util::address::Address as BtcAddress,
-    };
-    use ethereum_types::Address as EthAddress;
-    use std::str::FromStr;
 
     #[test]
     fn should_create_new_pay_to_pub_key_hash_output() {
@@ -316,9 +319,9 @@ mod tests {
     fn should_get_total_value_of_utxos_and_values() {
         let expected_result = 1942233;
         let utxos = BtcUtxosAndValues::new(vec![
-            get_sample_op_return_utxo_and_value_n(2).unwrap(),
-            get_sample_op_return_utxo_and_value_n(3).unwrap(),
-            get_sample_op_return_utxo_and_value_n(4).unwrap(),
+            get_sample_p2pkh_utxo_and_value_n(2).unwrap(),
+            get_sample_p2pkh_utxo_and_value_n(3).unwrap(),
+            get_sample_p2pkh_utxo_and_value_n(4).unwrap(),
         ]);
         let result = utxos.iter().fold(0, |acc, utxo_and_value| acc + utxo_and_value.value);
         assert_eq!(result, expected_result);
@@ -392,12 +395,12 @@ mod tests {
     }
 
     #[test]
-    fn should_create_op_return_btc_utxo_and_value_from_tx_output() {
+    fn should_create_p2pkh_btc_utxo_and_value_from_tx_output() {
         let expected_value = 1261602424;
         let expected_utxo = "f80c2f7c35f5df8441a5a5b52e2820793fc7e69f4603d38ba7217be41c20691d0000000016001497cfc76442fe717f2a3f0cc9c175f7561b661997ffffffff";
         let index = 0;
         let tx = get_sample_btc_block_and_id().unwrap().block.txdata[0].clone();
-        let result = create_op_return_btc_utxo_and_value_from_tx_output(&tx, index);
+        let result = create_p2pkh_btc_utxo_and_value_from_tx_output(&tx, index);
         assert_eq!(result.maybe_pointer, None);
         assert_eq!(result.value, expected_value);
         assert_eq!(result.maybe_extra_data, None);
