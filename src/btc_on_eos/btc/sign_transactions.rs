@@ -3,11 +3,13 @@ use crate::{
     chains::{
         btc::{btc_database_utils::get_btc_canon_block_from_db, btc_state::BtcState},
         eos::{
+            eos_chain_id::EosChainId,
             eos_crypto::{
                 eos_private_key::EosPrivateKey,
                 eos_transaction::{get_signed_eos_ptoken_issue_tx, EosSignedTransaction, EosSignedTransactions},
             },
             eos_database_utils::{get_eos_account_name_string_from_db, get_eos_chain_id_from_db},
+            eos_utils::get_eos_tx_expiration_timestamp_with_offset,
         },
     },
     traits::DatabaseInterface,
@@ -17,7 +19,7 @@ use crate::{
 pub fn get_signed_eos_ptoken_issue_txs(
     ref_block_num: u16,
     ref_block_prefix: u32,
-    chain_id: &str,
+    chain_id: &EosChainId,
     pk: &EosPrivateKey,
     account: &str,
     minting_params: &BtcOnEosMintingParams,
@@ -26,7 +28,8 @@ pub fn get_signed_eos_ptoken_issue_txs(
     Ok(EosSignedTransactions::new(
         minting_params
             .iter()
-            .map(|params| {
+            .enumerate()
+            .map(|(i, params)| {
                 get_signed_eos_ptoken_issue_tx(
                     ref_block_num,
                     ref_block_prefix,
@@ -35,6 +38,8 @@ pub fn get_signed_eos_ptoken_issue_txs(
                     chain_id,
                     pk,
                     account,
+                    get_eos_tx_expiration_timestamp_with_offset(i as u32)?,
+                    None,
                 )
             })
             .collect::<Result<Vec<EosSignedTransaction>>>()?,

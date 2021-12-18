@@ -1,10 +1,10 @@
 #![cfg(test)]
 use std::{fs::read_to_string, path::Path};
 
-use bitcoin_hashes::{sha256, Hash as HashTrait};
-use eos_primitives::{NumBytes, Write};
-use ethereum_types::Address as EthAddress;
+use bitcoin::hashes::{sha256, Hash as HashTrait};
+use eos_chain::{NumBytes, Write};
 use secp256k1::Message as Secp256k1Message;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     chains::eos::{
@@ -12,22 +12,18 @@ use crate::{
         eos_action_proofs::{EosActionProof, EosActionProofs},
         eos_action_receipt::{AuthSequence, EosActionReceipt},
         eos_block_header::EosBlockHeaderV2,
+        eos_chain_id::EosChainId,
         eos_crypto::{eos_private_key::EosPrivateKey, eos_public_key::EosPublicKey, eos_signature::EosSignature},
-        eos_eth_token_dictionary::{EosEthTokenDictionary, EosEthTokenDictionaryEntry, EosEthTokenDictionaryJson},
         eos_merkle_utils::Incremerkle,
-        eos_producer_schedule::{EosProducerScheduleV1, EosProducerScheduleV2},
+        eos_producer_schedule::{
+            EosProducerScheduleJsonV1,
+            EosProducerScheduleJsonV2,
+            EosProducerScheduleV1,
+            EosProducerScheduleV2,
+        },
         eos_submission_material::{EosSubmissionMaterial, EosSubmissionMaterialJson},
         eos_types::{Checksum256s, EosBlockHeaderJson},
         eos_utils::convert_hex_to_checksum256,
-        parse_eos_schedule::{
-            convert_v1_schedule_json_to_v1_schedule,
-            convert_v1_schedule_to_v2,
-            convert_v2_schedule_json_to_v2_schedule,
-            parse_v1_schedule_string_to_v1_schedule_json,
-            parse_v2_schedule_string_to_v2_schedule_json,
-            EosProducerScheduleJsonV1,
-            EosProducerScheduleJsonV2,
-        },
         protocol_features::WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH,
     },
     errors::AppError,
@@ -58,6 +54,9 @@ pub const SAMPLE_EOS_BLOCK_AND_ACTION_JSON_PATH_9: &str =
 pub const SAMPLE_EOS_BLOCK_AND_ACTION_JSON_PATH_10: &str =
     "src/chains/eos/eos_test_utils/mainnet-submission-material-with-perc20-redeem.json";
 
+pub const SAMPLE_EOS_BLOCK_AND_ACTION_JSON_PATH_11: &str =
+    "src/chains/eos/eos_test_utils/sample-submission-material-with-bad-account-name-parsing.json";
+
 pub const SAMPLE_J3_INIT_BLOCK_JSON_PATH_1: &str = "src/chains/eos/eos_test_utils/jungle-3-init-block-10857380.json";
 
 pub const SAMPLE_J3_INIT_BLOCK_JSON_PATH_2: &str = "src/chains/eos/eos_test_utils/jungle-3-init-block-11879805.json";
@@ -82,7 +81,10 @@ pub const SAMPLE_INIT_AND_SUBSEQUENT_BLOCKS_JUNGLE_3_JSON_1: &str =
 pub const SAMPLE_INIT_AND_SUBSEQUENT_BLOCKS_MAINNET_JSON_1: &str =
     "src/chains/eos/eos_test_utils/eos-init-and-subsequent-blocks-mainnet-1.json";
 
-pub const EOS_JUNGLE_CHAIN_ID: &str = "e70aaab8997e1dfce58fbfac80cbbb8fecec7b99cf982a9444273cbc64c41473";
+pub const SAMPLE_INIT_BLOCK_WITH_V1_SCHEDULE: &str =
+    "src/chains/eos/eos_test_utils/sample_init_block_with_v1_schedule.json";
+
+pub const EOS_JUNGLE_CHAIN_ID: EosChainId = EosChainId::EosJungleTestnet;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EosInitAndSubsequentBlocksJson {
@@ -126,10 +128,6 @@ impl EosInitAndSubsequentBlocksJson {
                 .map(convert_hex_to_checksum256)
                 .collect::<Result<Checksum256s>>()?,
         ))
-    }
-
-    pub fn get_active_schedule(&self) -> Result<EosProducerScheduleV2> {
-        convert_v2_schedule_json_to_v2_schedule(&self.init_block.active_schedule)
     }
 
     pub fn get_block_json_n(&self, n: usize) -> Result<EosBlockHeaderJson> {
@@ -230,6 +228,10 @@ pub fn get_mainnet_init_json_n(num: usize) -> Result<EosInitJson> {
     }
 }
 
+pub fn get_sample_init_block_with_v1_schedule() -> Result<String> {
+    Ok(read_to_string(SAMPLE_INIT_BLOCK_WITH_V1_SCHEDULE)?)
+}
+
 pub fn get_sample_mainnet_init_json_with_eos_eth_token_dictionary() -> Result<EosInitJson> {
     get_mainnet_init_json_n(4)
 }
@@ -251,37 +253,35 @@ pub fn get_sample_v2_schedule_json_string() -> Result<String> {
 }
 
 pub fn get_sample_mainnet_schedule_1713() -> Result<EosProducerScheduleV2> {
-    parse_v1_schedule_string_to_v1_schedule_json(&read_to_string(
+    EosProducerScheduleJsonV1::from(&read_to_string(
         "src/chains/eos/eos_test_utils/sample-schedule-1713-v1.json",
     )?)
-    .and_then(|v1_json| convert_v1_schedule_json_to_v1_schedule(&v1_json))
-    .map(|v1_schedule| convert_v1_schedule_to_v2(&v1_schedule))
+    .and_then(|v1_json| EosProducerScheduleV1::from_schedule_json(&v1_json))
+    .map(|v1_schedule| EosProducerScheduleV2::from(v1_schedule))
 }
 
 pub fn get_sample_j3_schedule_37() -> Result<EosProducerScheduleV2> {
-    parse_v1_schedule_string_to_v1_schedule_json(&read_to_string(
+    EosProducerScheduleJsonV1::from(&read_to_string(
         "src/chains/eos/eos_test_utils/sample-j3-schedule-37.json",
     )?)
-    .and_then(|v1_json| convert_v1_schedule_json_to_v1_schedule(&v1_json))
-    .map(|v1_schedule| convert_v1_schedule_to_v2(&v1_schedule))
+    .and_then(|v1_json| EosProducerScheduleV1::from_schedule_json(&v1_json))
+    .map(|v1_schedule| EosProducerScheduleV2::from(v1_schedule))
 }
 
 pub fn get_sample_v1_schedule_json() -> Result<EosProducerScheduleJsonV1> {
-    get_sample_v1_schedule_json_string()
-        .and_then(|json_string| parse_v1_schedule_string_to_v1_schedule_json(&json_string))
+    get_sample_v1_schedule_json_string().and_then(|json_string| EosProducerScheduleJsonV1::from(&json_string))
 }
 
 pub fn get_sample_v1_schedule() -> Result<EosProducerScheduleV1> {
-    get_sample_v1_schedule_json().and_then(|json| convert_v1_schedule_json_to_v1_schedule(&json))
+    get_sample_v1_schedule_json().and_then(|json| EosProducerScheduleV1::from_schedule_json(&json))
 }
 
 pub fn get_sample_v2_schedule_json() -> Result<EosProducerScheduleJsonV2> {
-    get_sample_v2_schedule_json_string()
-        .and_then(|json_string| parse_v2_schedule_string_to_v2_schedule_json(&json_string))
+    get_sample_v2_schedule_json_string().and_then(|json_string| EosProducerScheduleJsonV2::from(&json_string))
 }
 
 pub fn get_sample_v2_schedule() -> Result<EosProducerScheduleV2> {
-    get_sample_v2_schedule_json().and_then(|json| convert_v2_schedule_json_to_v2_schedule(&json))
+    get_sample_v2_schedule_json().and_then(|json| EosProducerScheduleV2::from_schedule_json(&json))
 }
 
 pub fn get_sample_eos_submission_material_n(n: usize) -> EosSubmissionMaterial {
@@ -304,6 +304,7 @@ pub fn get_sample_eos_submission_material_string_n(num: usize) -> Result<String>
         8 => Ok(SAMPLE_EOS_BLOCK_AND_ACTION_JSON_PATH_8),
         9 => Ok(SAMPLE_EOS_BLOCK_AND_ACTION_JSON_PATH_9),
         10 => Ok(SAMPLE_EOS_BLOCK_AND_ACTION_JSON_PATH_10),
+        11 => Ok(SAMPLE_EOS_BLOCK_AND_ACTION_JSON_PATH_11),
         _ => Err(AppError::Custom(format!("Cannot find sample block num: {}", num))),
     }?;
     match Path::new(&path).exists() {
@@ -383,7 +384,7 @@ fn get_sample_action_receipts() -> Vec<EosActionReceipt> {
     ]
 }
 
-pub fn get_sample_action_digests() -> Vec<Bytes> {
+pub fn get_sample_action_digests() -> Result<Vec<Bytes>> {
     get_sample_action_receipts()
         .into_iter()
         .map(|receipt| receipt.to_digest())
@@ -396,41 +397,6 @@ fn get_sample_action_proofs_n(n: usize) -> EosActionProofs {
 
 pub fn get_sample_action_proof_n(n: usize) -> EosActionProof {
     get_sample_action_proofs_n(n)[0].clone()
-}
-
-pub fn get_sample_eos_eth_token_dictionary_entry_1() -> EosEthTokenDictionaryEntry {
-    let token_address_hex = "9f57CB2a4F462a5258a49E88B4331068a391DE66".to_string();
-    EosEthTokenDictionaryEntry::new(
-        18,
-        9,
-        "SAM1".to_string(),
-        "SAM1".to_string(),
-        "SampleToken_1".to_string(),
-        EthAddress::from_slice(&hex::decode(&token_address_hex).unwrap()),
-    )
-}
-
-pub fn get_sample_eos_eth_token_dictionary_entry_2() -> EosEthTokenDictionaryEntry {
-    let token_address_hex = "9e57CB2a4F462a5258a49E88B4331068a391DE66".to_string();
-    EosEthTokenDictionaryEntry::new(
-        18,
-        9,
-        "SAM2".to_string(),
-        "SAM2".to_string(),
-        "sampletokens".to_string(),
-        EthAddress::from_slice(&hex::decode(&token_address_hex).unwrap()),
-    )
-}
-
-pub fn get_sample_eos_eth_token_dictionary() -> EosEthTokenDictionary {
-    EosEthTokenDictionary::new(vec![
-        get_sample_eos_eth_token_dictionary_entry_1(),
-        get_sample_eos_eth_token_dictionary_entry_2(),
-    ])
-}
-
-pub fn get_sample_eos_eth_token_dictionary_json() -> EosEthTokenDictionaryJson {
-    get_sample_eos_eth_token_dictionary().to_json().unwrap()
 }
 
 pub fn serialize_block_header_v2(header: &EosBlockHeaderV2) -> Result<Bytes> {

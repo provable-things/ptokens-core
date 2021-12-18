@@ -1,4 +1,4 @@
-use eos_primitives::Checksum256;
+use eos_chain::Checksum256;
 
 use crate::{
     chains::eos::{eos_merkle_utils::Incremerkle, eos_state::EosState},

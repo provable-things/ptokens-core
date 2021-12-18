@@ -1,4 +1,4 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     btc_on_eth::btc::minting_params::BtcOnEthMintingParamStruct,
@@ -17,6 +17,7 @@ use crate::{
     },
     traits::DatabaseInterface,
     types::Result,
+    utils::get_unix_timestamp,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,7 +55,7 @@ impl EthTxInfo {
             eth_tx_amount: minting_param_struct.amount.to_string(),
             originating_tx_hash: minting_param_struct.originating_tx_hash.to_string(),
             eth_tx_recipient: format!("0x{}", hex::encode(minting_param_struct.eth_address.as_bytes())),
-            signature_timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+            signature_timestamp: get_unix_timestamp()?,
             any_sender_tx: tx.any_sender_tx(),
             any_sender_nonce: if tx.is_any_sender() { nonce } else { None },
         })
@@ -96,10 +97,10 @@ where
     info!("✔ Getting BTC output json and putting in state...");
     Ok(serde_json::to_string(&BtcOutput {
         btc_latest_block_number: get_btc_latest_block_from_db(&state.db)?.height,
-        eth_signed_transactions: match &state.eth_signed_txs {
-            None => vec![],
-            Some(txs) => get_eth_signed_tx_info_from_eth_txs(
-                txs,
+        eth_signed_transactions: match &state.eth_signed_txs.len() {
+            0 => vec![],
+            _ => get_eth_signed_tx_info_from_eth_txs(
+                &state.eth_signed_txs,
                 &get_btc_canon_block_from_db(&state.db)?.get_eth_minting_params(),
                 get_eth_account_nonce_from_db(&state.db)?,
                 state.use_any_sender_tx_type(),

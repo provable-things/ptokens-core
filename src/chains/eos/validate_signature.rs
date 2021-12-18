@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use bitcoin_hashes::{sha256, Hash};
-use eos_primitives::{AccountName as EosAccountName, PublicKey as EosProducerKey};
+use bitcoin::hashes::{sha256, Hash};
+use eos_chain::{AccountName as EosAccountName, PublicKey as EosProducerKey};
 use secp256k1::Message;
 
 use crate::{
@@ -124,9 +124,9 @@ fn recover_block_signer_public_key(
     EosPublicKey::recover_from_digest(
         &Message::from_slice(&get_signing_digest(
             msig_enabled,
-            &block_mroot,
-            &block_header,
-            &v2_schedule,
+            block_mroot,
+            block_header,
+            v2_schedule,
         )?)?,
         &EosSignature::from_str(producer_signature)?,
     )
@@ -183,7 +183,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use eos_primitives::Checksum256;
+    use eos_chain::Checksum256;
 
     use super::*;
     use crate::chains::eos::{
@@ -205,7 +205,7 @@ mod tests {
         let msig_enabled = blocks_json.is_msig_enabled();
         let producer_signature = blocks_json.get_producer_signature_for_block_n(block_num).unwrap();
         let block_header = blocks_json.get_block_n(block_num).unwrap();
-        let active_schedule = blocks_json.get_active_schedule().unwrap();
+        let active_schedule = blocks_json.init_block.active_schedule.clone();
         let block_mroot = blocks_json.get_block_mroot_for_block_n(block_num).unwrap();
         if let Err(e) = check_block_signature_is_valid(
             msig_enabled,

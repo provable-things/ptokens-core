@@ -1,5 +1,3 @@
-use bitcoin::util::hash::BitcoinHash;
-
 use crate::{
     chains::btc::{btc_block::BtcBlockAndId, btc_state::BtcState},
     constants::{CORE_IS_VALIDATING, DEBUG_MODE, NOT_VALIDATING_WHEN_NOT_IN_DEBUG_MODE_ERROR},
@@ -8,7 +6,7 @@ use crate::{
 };
 
 fn validate_btc_block_header(btc_block_and_id: &BtcBlockAndId) -> Result<()> {
-    match btc_block_and_id.block.bitcoin_hash() == btc_block_and_id.id {
+    match btc_block_and_id.block.block_hash() == btc_block_and_id.id {
         true => {
             info!("✔ BTC block header valid!");
             Ok(())
@@ -37,7 +35,7 @@ where
 mod tests {
     use std::str::FromStr;
 
-    use bitcoin_hashes::sha256d;
+    use bitcoin::BlockHash;
 
     use super::*;
     use crate::{
@@ -66,7 +64,7 @@ mod tests {
             height: 1,
             block: block_and_id.block,
             deposit_address_list: DepositInfoList::new(vec![]),
-            id: sha256d::Hash::from_str(&wrong_block_id).unwrap(),
+            id: BlockHash::from_str(&wrong_block_id).unwrap(),
         };
         match validate_btc_block_header(&invalid_block_and_id) {
             Err(AppError::Custom(e)) => assert_eq!(e, expected_error),

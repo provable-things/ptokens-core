@@ -1,15 +1,46 @@
-use tiny_keccak::keccak256;
+use std::{
+    convert::TryFrom,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
+use chrono::{prelude::DateTime, Utc};
+use serde_json::Value as JsonValue;
+use tiny_keccak::{Hasher, Keccak};
 
 use crate::{
     constants::{CORE_VERSION, DB_KEY_PREFIX, DEBUG_OUTPUT_MARKER, U64_NUM_BYTES},
     types::{Byte, Bytes, Result},
 };
 
+pub fn add_key_and_value_to_json(key: &str, value: JsonValue, json: JsonValue) -> Result<JsonValue> {
+    match json {
+        JsonValue::Object(mut map) => {
+            map.insert(key.to_string(), value);
+            Ok(JsonValue::Object(map))
+        },
+        _ => Err("Error adding field to json!".into()),
+    }
+}
+
+pub fn get_unix_timestamp() -> Result<u64> {
+    Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
+}
+
+pub fn get_unix_timestamp_as_u32() -> Result<u32> {
+    Ok(u32::try_from(get_unix_timestamp()?)?)
+}
+
+pub fn convert_unix_timestamp_to_human_readable(timestamp: u64) -> String {
+    DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_secs(timestamp))
+        .format("%d/%m/%Y,%H:%M:%S")
+        .to_string()
+}
+
 pub fn right_pad_or_truncate(s: &str, width: usize) -> String {
     if s.len() >= width {
-        truncate_str(&s, width).to_string()
+        truncate_str(s, width).to_string()
     } else {
-        right_pad_with_zeroes(&s, width)
+        right_pad_with_zeroes(s, width)
     }
 }
 
@@ -21,7 +52,11 @@ pub fn truncate_str(s: &str, num_chars: usize) -> &str {
 }
 
 pub fn get_prefixed_db_key(suffix: &str) -> [u8; 32] {
-    keccak256(format!("{}{}", DB_KEY_PREFIX.to_string(), suffix).as_bytes())
+    let mut keccak = Keccak::v256();
+    let mut hashed = [0u8; 32];
+    keccak.update(format!("{}{}", DB_KEY_PREFIX.to_string(), suffix).as_bytes());
+    keccak.finalize(&mut hashed);
+    hashed
 }
 
 pub fn convert_bytes_to_u64(bytes: &[Byte]) -> Result<u64> {
@@ -34,6 +69,19 @@ pub fn convert_bytes_to_u64(bytes: &[Byte]) -> Result<u64> {
             Ok(u64::from_le_bytes(arr))
         },
         _ => Err("✘ Too many bytes to convert to u64 without overflowing!".into()),
+    }
+}
+
+pub fn convert_bytes_to_u8(bytes: &[Byte]) -> Result<u8> {
+    match bytes.len() {
+        0 => Err("✘ Not enough bytes to convert to u8!".into()),
+        1 => {
+            let mut arr = [0u8; 1];
+            let bytes = &bytes[..1];
+            arr.copy_from_slice(bytes);
+            Ok(u8::from_le_bytes(arr))
+        },
+        _ => Err("✘ Too many bytes to convert to u8 without overflowing!".into()),
     }
 }
 
@@ -60,7 +108,7 @@ pub fn strip_hex_prefix(hex: &str) -> String {
     };
     match hex_no_prefix.len() % 2 {
         0 => hex_no_prefix.to_string(),
-        _ => left_pad_with_zero(&hex_no_prefix),
+        _ => left_pad_with_zero(hex_no_prefix),
     }
 }
 
@@ -98,8 +146,14 @@ pub fn get_core_version() -> String {
     CORE_VERSION.unwrap_or("Unknown").to_string()
 }
 
+pub fn is_hex(string: &str) -> bool {
+    hex::decode(strip_hex_prefix(string)).is_ok()
+}
+
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
     use crate::errors::AppError;
 
@@ -249,5 +303,50 @@ mod tests {
         let width = s.len() + 3;
         let result = right_pad_or_truncate(s, width);
         assert_eq!(result, "some string000");
+    }
+
+    #[test]
+    fn should_get_unix_timestamp() {
+        let result = get_unix_timestamp();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn should_get_unix_timestamp_as_u32() {
+        let result = get_unix_timestamp_as_u32();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn should_check_if_string_is_hex() {
+        let hex = "0x5A0b54D5dc17e0AadC383d2db43B0a0D3E029c4c";
+        let hex_no_prefix = "4d261b7d3101e9ff7e37f63449be8a9a1affef87e4952900dbb84ee3c29f45f3";
+        let string_no_hex = "Arbitrary string";
+        let string_containing_hex = "the address is 0x82a59eA2B64B2A6FF0B8A778D0B3f3A1945d36Dd";
+        assert_eq!(is_hex(hex), true);
+        assert_eq!(is_hex(hex_no_prefix), true);
+        assert_eq!(is_hex(string_no_hex), false);
+        assert_eq!(is_hex(string_containing_hex), false);
+    }
+
+    #[test]
+    fn should_convert_unix_timestamp_to_human_readable() {
+        let timestamp = 1618406537;
+        let result = convert_unix_timestamp_to_human_readable(timestamp);
+        let expected_result = "14/04/2021,13:22:17";
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn should_add_key_and_value_to_json() {
+        let key = "c";
+        let value = json!("d");
+        let json = json!({"a":"b"});
+        let expected_result = json!({
+            "a": "b",
+            "c": "d",
+        });
+        let result = add_key_and_value_to_json(key, value, json).unwrap();
+        assert_eq!(result, expected_result);
     }
 }

@@ -1,5 +1,6 @@
-use bitcoin_hashes::{sha256, Hash};
-use eos_primitives::Checksum256;
+use bitcoin::hashes::{sha256, Hash};
+use eos_chain::Checksum256;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     chains::eos::eos_utils::convert_hex_to_checksum256,
@@ -9,7 +10,7 @@ use crate::{
 
 pub type CanonicalLeft = Bytes;
 pub type CanonicalRight = Bytes;
-pub type Sha256Hash = bitcoin_hashes::sha256::Hash;
+pub type Sha256Hash = bitcoin::hashes::sha256::Hash;
 pub type CanonicalPair = (CanonicalLeft, CanonicalRight);
 
 fn set_first_bit_of_byte_to_zero(mut byte: Byte) -> Byte {
@@ -74,12 +75,12 @@ pub fn verify_merkle_proof(merkle_proof: &[String]) -> Result<bool> {
         .map(|hex| Ok(hex::decode(hex)?))
         .collect::<Result<Vec<Bytes>>>()?;
     for leaf in leaves.iter().skip(1) {
-        match is_canonical_right(&leaf) {
+        match is_canonical_right(leaf) {
             true => {
-                node = make_and_hash_canonical_pair(&node, &leaf);
+                node = make_and_hash_canonical_pair(&node, leaf);
             },
             false => {
-                node = make_and_hash_canonical_pair(&leaf, &node);
+                node = make_and_hash_canonical_pair(leaf, &node);
             },
         }
     }
@@ -263,7 +264,7 @@ mod tests {
     #![allow(clippy::needless_range_loop)]
     use std::str::FromStr;
 
-    use eos_primitives::{AccountName, Action, ActionName, PermissionLevel, PermissionName, SerializeData};
+    use eos_chain::{AccountName, Action, ActionName, PermissionLevel, PermissionName, SerializeData};
 
     use super::*;
     use crate::chains::eos::{
@@ -421,7 +422,7 @@ mod tests {
             authorization,
             data,
         };
-        let serialized_action = action.to_serialize_data();
+        let serialized_action = action.to_serialize_data().unwrap();
         let result = sha256::Hash::hash(&serialized_action).to_string();
         assert_eq!(result, get_expected_digest_1());
     }
@@ -468,7 +469,8 @@ mod tests {
             vec![AuthSequence::new("eosio", 59191700).unwrap()],
         )
         .unwrap()
-        .to_digest();
+        .to_digest()
+        .unwrap();
         assert_eq!(hex::encode(result), expected_result);
     }
 
@@ -486,7 +488,8 @@ mod tests {
             vec![AuthSequence::new("eosio", 61275209).unwrap()],
         )
         .unwrap()
-        .to_digest();
+        .to_digest()
+        .unwrap();
         let action_digest_2 = EosActionReceipt::new(
             "provabletokn",
             "4b991cebb3e6667b242aca3fb011623cd8ce2be2e8c24958da551c7b3ba68903",
@@ -497,7 +500,8 @@ mod tests {
             vec![AuthSequence::new("provabletokn", 3090).unwrap()],
         )
         .unwrap()
-        .to_digest();
+        .to_digest()
+        .unwrap();
         let result = get_merkle_digest(vec![action_digest_1, action_digest_2]);
         assert_eq!(hex::encode(result), expected_result);
     }
@@ -516,7 +520,8 @@ mod tests {
             vec![AuthSequence::new("eosio", 61277973).unwrap()],
         )
         .unwrap()
-        .to_digest();
+        .to_digest()
+        .unwrap();
         let action_digest_2 = EosActionReceipt::new(
             "eosebetbullj",
             "b9243d8513e25705e89d7ccd0491f4a57d07b9866fd89d3446887af852cfed15",
@@ -527,7 +532,8 @@ mod tests {
             vec![AuthSequence::new("eosebetbullj", 1440687).unwrap()],
         )
         .unwrap()
-        .to_digest();
+        .to_digest()
+        .unwrap();
         let action_digest_3 = EosActionReceipt::new(
             "dvmh1tbb1him",
             "4bd1d3e987cd13e3d108a9a0cd185bf022cb1a826f69f163fcd109db54ba799f",
@@ -538,7 +544,8 @@ mod tests {
             vec![AuthSequence::new("dvmh1tbb1him", 804649).unwrap()],
         )
         .unwrap()
-        .to_digest();
+        .to_digest()
+        .unwrap();
         let result = get_merkle_digest(vec![action_digest_1, action_digest_2, action_digest_3]);
         assert_eq!(hex::encode(result), expected_result);
     }
@@ -557,7 +564,8 @@ mod tests {
             vec![AuthSequence::new("eosio", 61303891).unwrap()],
         )
         .unwrap()
-        .to_digest();
+        .to_digest()
+        .unwrap();
         let action_receipt_2 = EosActionReceipt::new(
             "authsequence",
             "ae341469a7b3936c70e9684a42ef8fc1975f1bb2fe1f3b0b1105eda7d3a6276a",
@@ -571,14 +579,15 @@ mod tests {
             ],
         )
         .unwrap()
-        .to_digest();
+        .to_digest()
+        .unwrap();
         let result = get_merkle_digest(vec![action_receipt_1, action_receipt_2]);
         assert_eq!(hex::encode(result), expected_result);
     }
 
     #[test]
     fn should_get_action_mroot_for_four_actions_correctly() {
-        let digests = get_sample_action_digests();
+        let digests = get_sample_action_digests().unwrap();
         let expected_result = "8b4e5e5d3e7587065896d0076d65c72e03c11a9159d414eb3a2363b59108116a";
         let result = get_merkle_digest(digests);
         assert_eq!(hex::encode(result), expected_result);

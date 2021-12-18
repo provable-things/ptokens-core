@@ -10,7 +10,7 @@ use crate::{
             utxo_manager::utxo_types::BtcUtxosAndValues,
         },
         eos::eos_crypto::eos_transaction::EosSignedTransactions,
-        eth::eth_types::{EthTransactions, RelayTransactions},
+        eth::{eth_crypto::eth_transaction::EthTransactions, eth_types::RelayTransactions},
     },
     traits::DatabaseInterface,
     types::{NoneError, Result},
@@ -23,17 +23,17 @@ pub struct BtcState<D: DatabaseInterface> {
     pub any_sender: Option<bool>,
     pub ref_block_num: Option<u16>,
     pub ref_block_prefix: Option<u32>,
+    pub eth_signed_txs: EthTransactions,
     pub signed_txs: EosSignedTransactions,
     pub output_json_string: Option<String>,
     pub utxos_and_values: BtcUtxosAndValues,
-    pub eth_signed_txs: Option<EthTransactions>,
     pub btc_block_and_id: Option<BtcBlockAndId>,
     pub p2sh_deposit_txs: Option<BtcTransactions>,
     pub p2pkh_deposit_txs: Option<BtcTransactions>,
     pub btc_on_eos_minting_params: BtcOnEosMintingParams,
     pub btc_on_eth_minting_params: BtcOnEthMintingParams,
-    pub deposit_info_hash_map: Option<DepositInfoHashMap>,
     pub any_sender_signed_txs: Option<RelayTransactions>,
+    pub deposit_info_hash_map: Option<DepositInfoHashMap>,
     pub btc_block_in_db_format: Option<BtcBlockInDbFormat>,
     pub submission_json: Option<BtcSubmissionMaterialJson>,
 }
@@ -47,7 +47,6 @@ where
             db,
             any_sender: None,
             ref_block_num: None,
-            eth_signed_txs: None,
             submission_json: None,
             btc_block_and_id: None,
             ref_block_prefix: None,
@@ -58,6 +57,7 @@ where
             deposit_info_hash_map: None,
             btc_block_in_db_format: None,
             utxos_and_values: vec![].into(),
+            eth_signed_txs: EthTransactions::new(vec![]),
             signed_txs: EosSignedTransactions::new(vec![]),
             btc_on_eos_minting_params: BtcOnEosMintingParams::new(vec![]),
             btc_on_eth_minting_params: BtcOnEthMintingParams::new(vec![]),
@@ -103,24 +103,19 @@ where
     }
 
     pub fn add_eth_signed_txs(mut self, eth_signed_txs: EthTransactions) -> Result<BtcState<D>> {
-        match self.eth_signed_txs {
-            Some(_) => Err(get_no_overwrite_state_err("eth_signed_txs").into()),
-            None => {
+        match self.eth_signed_txs.len() {
+            0 => {
                 info!("✔ Adding ETH signed txs to BTC state...");
-                self.eth_signed_txs = Some(eth_signed_txs);
+                self.eth_signed_txs = eth_signed_txs;
                 Ok(self)
             },
+            _ => Err(get_no_overwrite_state_err("eth_signed_txs").into()),
         }
     }
 
     pub fn get_eth_signed_txs(&self) -> Result<&EthTransactions> {
-        match self.eth_signed_txs {
-            Some(ref eth_signed_txs) => {
-                info!("✔ Getting ETH signed txs from BTC state...");
-                Ok(eth_signed_txs)
-            },
-            None => Err(get_not_in_state_err("eth_signed_txs").into()),
-        }
+        info!("✔ Getting ETH signed txs from BTC state...");
+        Ok(&self.eth_signed_txs)
     }
 
     pub fn add_btc_submission_material(mut self, submission_material: BtcSubmissionMaterial) -> Result<BtcState<D>> {
@@ -202,8 +197,17 @@ where
         mut self,
         replacement_params: BtcOnEthMintingParams,
     ) -> Result<BtcState<D>> {
-        info!("✔ Replacing `btc-on-eth` minting params in state...");
+        info!("✔ Replacing `BtcOnEth` minting params in state...");
         self.btc_on_eth_minting_params = replacement_params;
+        Ok(self)
+    }
+
+    pub fn replace_btc_on_eos_minting_params(
+        mut self,
+        replacement_params: BtcOnEosMintingParams,
+    ) -> Result<BtcState<D>> {
+        info!("✔ Replacing `BtcOnEos` minting params in state...");
+        self.btc_on_eos_minting_params = replacement_params;
         Ok(self)
     }
 
@@ -228,7 +232,7 @@ where
         match &self.btc_block_and_id {
             Some(btc_block_and_id) => {
                 info!("✔ Getting BTC block & ID from BTC state...");
-                Ok(&btc_block_and_id)
+                Ok(btc_block_and_id)
             },
             None => Err(get_not_in_state_err("btc_block_and_id").into()),
         }
@@ -243,7 +247,7 @@ where
         match &self.deposit_info_hash_map {
             Some(deposit_info_hash_map) => {
                 info!("✔ Getting deposit info hash map from BTC state...");
-                Ok(&deposit_info_hash_map)
+                Ok(deposit_info_hash_map)
             },
             None => Err(get_not_in_state_err("deposit_info_hash_map").into()),
         }
@@ -253,7 +257,7 @@ where
         match &self.p2sh_deposit_txs {
             Some(p2sh_deposit_txs) => {
                 info!("✔ Getting `p2sh` deposit txs from BTC state...");
-                Ok(&p2sh_deposit_txs)
+                Ok(p2sh_deposit_txs)
             },
             None => Err(get_not_in_state_err("p2sh_deposit_txs").into()),
         }
@@ -263,7 +267,7 @@ where
         match &self.btc_block_in_db_format {
             Some(btc_block_in_db_format) => {
                 info!("✔ Getting BTC block in DB format from BTC state...");
-                Ok(&btc_block_in_db_format)
+                Ok(btc_block_in_db_format)
             },
             None => Err(get_not_in_state_err("btc_block_in_db_format").into()),
         }
@@ -273,7 +277,7 @@ where
         match &self.output_json_string {
             Some(output_json_string) => {
                 info!("✔ Getting BTC output json string from state...");
-                Ok(&output_json_string)
+                Ok(output_json_string)
             },
             None => Err(get_not_in_state_err("output_json_string").into()),
         }

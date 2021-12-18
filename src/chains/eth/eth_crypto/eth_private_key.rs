@@ -11,11 +11,12 @@ use crate::{
     chains::eth::{
         eth_constants::{ETH_MESSAGE_PREFIX, PREFIXED_MESSAGE_HASH_LEN},
         eth_crypto::eth_public_key::EthPublicKey,
-        eth_crypto_utils::{keccak_hash_bytes, set_eth_signature_recovery_param},
+        eth_crypto_utils::set_eth_signature_recovery_param,
+        eth_traits::EthSigningCapabilities,
         eth_types::EthSignature,
     },
     constants::PRIVATE_KEY_DATA_SENSITIVITY_LEVEL,
-    crypto_utils::generate_random_private_key,
+    crypto_utils::{generate_random_private_key, keccak_hash_bytes},
     traits::DatabaseInterface,
     types::{Byte, Result},
 };
@@ -25,44 +26,11 @@ pub struct EthPrivateKey(SecretKey);
 
 impl EthPrivateKey {
     pub fn from_slice(slice: &[Byte]) -> Result<Self> {
-        Ok(Self(SecretKey::from_slice(&slice)?))
+        Ok(Self(SecretKey::from_slice(slice)?))
     }
 
     pub fn generate_random() -> Result<Self> {
         Ok(Self(generate_random_private_key()?))
-    }
-
-    pub fn sign_hash(&self, hash: H256) -> Result<EthSignature> {
-        let msg = match Message::from_slice(hash.as_bytes()) {
-            Ok(msg) => msg,
-            Err(err) => return Err(err.into()),
-        };
-        let sig = Secp256k1::sign_recoverable(&Secp256k1::new(), &msg, &self.0);
-        let (rec_id, data) = sig.serialize_compact();
-        let mut data_arr = [0; 65];
-        data_arr[0..64].copy_from_slice(&data[0..64]);
-        data_arr[64] = rec_id.to_i32() as u8;
-        Ok(data_arr)
-    }
-
-    pub fn sign_message_bytes(&self, message: &[Byte]) -> Result<EthSignature> {
-        self.sign_hash(keccak_hash_bytes(message))
-    }
-
-    pub fn sign_eth_prefixed_msg_bytes(&self, message: &[Byte]) -> Result<EthSignature> {
-        let message_hash = keccak_hash_bytes(&message);
-
-        let message_bytes = [
-            ETH_MESSAGE_PREFIX,
-            PREFIXED_MESSAGE_HASH_LEN.as_ref(),
-            message_hash.as_bytes(),
-        ]
-        .concat();
-
-        let mut signature = self.sign_message_bytes(&message_bytes)?;
-        set_eth_signature_recovery_param(&mut signature);
-
-        Ok(signature)
     }
 
     pub fn to_public_key(&self) -> EthPublicKey {
@@ -77,6 +45,38 @@ impl EthPrivateKey {
         D: DatabaseInterface,
     {
         db.put(key.to_vec(), self.0[..].to_vec(), PRIVATE_KEY_DATA_SENSITIVITY_LEVEL)
+    }
+}
+
+impl EthSigningCapabilities for EthPrivateKey {
+    fn sign_hash(&self, hash: H256) -> Result<EthSignature> {
+        let msg = match Message::from_slice(hash.as_bytes()) {
+            Ok(msg) => msg,
+            Err(err) => return Err(err.into()),
+        };
+        let sig = Secp256k1::sign_recoverable(&Secp256k1::new(), &msg, &self.0);
+        let (rec_id, data) = sig.serialize_compact();
+        let mut data_arr = [0; 65];
+        data_arr[0..64].copy_from_slice(&data[0..64]);
+        data_arr[64] = rec_id.to_i32() as u8;
+        Ok(data_arr)
+    }
+
+    fn sign_message_bytes(&self, message: &[Byte]) -> Result<EthSignature> {
+        self.sign_hash(keccak_hash_bytes(message))
+    }
+
+    fn sign_eth_prefixed_msg_bytes(&self, message: &[Byte]) -> Result<EthSignature> {
+        let message_hash = keccak_hash_bytes(message);
+        let message_bytes = [
+            ETH_MESSAGE_PREFIX,
+            PREFIXED_MESSAGE_HASH_LEN.as_ref(),
+            message_hash.as_bytes(),
+        ]
+        .concat();
+        let mut signature = self.sign_message_bytes(&message_bytes)?;
+        set_eth_signature_recovery_param(&mut signature);
+        Ok(signature)
     }
 }
 

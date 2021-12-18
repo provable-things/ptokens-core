@@ -1,6 +1,6 @@
+pub(crate) mod erc20_vault;
 pub(crate) mod erc777;
 pub(crate) mod erc777_proxy;
-pub(crate) mod perc20;
 
 use ethabi::{Contract as EthContract, Token};
 
@@ -13,7 +13,7 @@ pub fn instantiate_contract_from_abi(abi: &str) -> Result<EthContract> {
 pub fn encode_fxn_call(abi: &str, fxn_name: &str, param_tokens: &[Token]) -> Result<Bytes> {
     Ok(instantiate_contract_from_abi(abi)?
         .function(fxn_name)?
-        .encode_input(&param_tokens)?)
+        .encode_input(param_tokens)?)
 }
 
 #[cfg(test)]

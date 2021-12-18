@@ -1,9 +1,9 @@
-use bitcoin::network::constants::Network as BtcNetwork;
-use bitcoin_hashes::{sha256d, Hash};
+use bitcoin::{hashes::Hash, network::constants::Network as BtcNetwork, BlockHash};
 
 use crate::{
     chains::btc::{
         btc_block::BtcBlockInDbFormat,
+        btc_chain_id::BtcChainId,
         btc_constants::{
             BTC_ACCOUNT_NONCE_KEY,
             BTC_ADDRESS_KEY,
@@ -22,13 +22,7 @@ use crate::{
         btc_crypto::btc_private_key::BtcPrivateKey,
         btc_state::BtcState,
         btc_types::BtcPubKeySlice,
-        btc_utils::{
-            convert_btc_address_to_bytes,
-            convert_btc_network_to_bytes,
-            convert_bytes_to_btc_address,
-            convert_bytes_to_btc_network,
-            convert_bytes_to_btc_pub_key_slice,
-        },
+        btc_utils::{convert_btc_address_to_bytes, convert_bytes_to_btc_address, convert_bytes_to_btc_pub_key_slice},
     },
     constants::MIN_DATA_SENSITIVITY_LEVEL,
     database_utils::{get_u64_from_db, put_u64_in_db},
@@ -97,14 +91,15 @@ pub fn put_btc_fee_in_db<D: DatabaseInterface>(db: &D, fee: u64) -> Result<()> {
 
 pub fn get_btc_network_from_db<D: DatabaseInterface>(db: &D) -> Result<BtcNetwork> {
     db.get(BTC_NETWORK_KEY.to_vec(), MIN_DATA_SENSITIVITY_LEVEL)
-        .and_then(|bytes| convert_bytes_to_btc_network(&bytes))
+        .and_then(|ref bytes| BtcChainId::from_bytes(bytes))
+        .map(|chain_id| chain_id.to_btc_network())
 }
 
 pub fn put_btc_network_in_db<D: DatabaseInterface>(db: &D, network: BtcNetwork) -> Result<()> {
-    trace!("✔ Adding BTC '{}' network to database...", network);
+    info!("✔ Adding BTC '{}' network to database...", network);
     db.put(
         BTC_NETWORK_KEY.to_vec(),
-        convert_btc_network_to_bytes(network)?,
+        BtcChainId::from_btc_network(&network)?.to_bytes(),
         MIN_DATA_SENSITIVITY_LEVEL,
     )
 }
@@ -133,7 +128,7 @@ pub fn get_special_btc_block_from_db<D: DatabaseInterface>(db: &D, block_type: &
     get_special_hash_from_db(db, block_type).and_then(|block_hash| get_btc_block_from_db(db, &block_hash))
 }
 
-pub fn get_special_hash_from_db<D: DatabaseInterface>(db: &D, hash_type: &str) -> Result<sha256d::Hash> {
+pub fn get_special_hash_from_db<D: DatabaseInterface>(db: &D, hash_type: &str) -> Result<BlockHash> {
     let key = match hash_type {
         "tail" => Ok(BTC_TAIL_BLOCK_HASH_KEY.to_vec()),
         "canon" => Ok(BTC_CANON_BLOCK_HASH_KEY.to_vec()),
@@ -154,10 +149,10 @@ pub fn put_special_btc_block_in_db<D: DatabaseInterface>(
     block_type: &str,
 ) -> Result<()> {
     trace!("✔ Putting special BTC block in db of type: {}", block_type);
-    put_btc_block_in_db(db, &block_and_id).and_then(|_| put_special_btc_hash_in_db(db, &block_type, &block_and_id.id))
+    put_btc_block_in_db(db, block_and_id).and_then(|_| put_special_btc_hash_in_db(db, block_type, &block_and_id.id))
 }
 
-pub fn put_special_btc_hash_in_db<D: DatabaseInterface>(db: &D, hash_type: &str, hash: &sha256d::Hash) -> Result<()> {
+pub fn put_special_btc_hash_in_db<D: DatabaseInterface>(db: &D, hash_type: &str, hash: &BlockHash) -> Result<()> {
     let key = match hash_type {
         "tail" => Ok(BTC_TAIL_BLOCK_HASH_KEY.to_vec()),
         "canon" => Ok(BTC_CANON_BLOCK_HASH_KEY.to_vec()),
@@ -171,7 +166,7 @@ pub fn put_special_btc_hash_in_db<D: DatabaseInterface>(db: &D, hash_type: &str,
     put_btc_hash_in_db(db, &key, hash)
 }
 
-pub fn btc_block_exists_in_db<D: DatabaseInterface>(db: &D, btc_block_id: &sha256d::Hash) -> bool {
+pub fn btc_block_exists_in_db<D: DatabaseInterface>(db: &D, btc_block_id: &BlockHash) -> bool {
     info!(
         "✔ Checking for existence of BTC block: {}",
         hex::encode(btc_block_id.to_vec())
@@ -232,61 +227,58 @@ pub fn get_btc_canon_block_from_db<D: DatabaseInterface>(db: &D) -> Result<BtcBl
     get_special_btc_block_from_db(db, "canon")
 }
 
-pub fn get_btc_anchor_block_hash_from_db<D: DatabaseInterface>(db: &D) -> Result<sha256d::Hash> {
+pub fn get_btc_anchor_block_hash_from_db<D: DatabaseInterface>(db: &D) -> Result<BlockHash> {
     trace!("✔ Getting BTC anchor block hash from db...");
     get_btc_hash_from_db(db, &BTC_ANCHOR_BLOCK_HASH_KEY.to_vec())
 }
 
-pub fn put_btc_anchor_block_hash_in_db<D: DatabaseInterface>(db: &D, hash: &sha256d::Hash) -> Result<()> {
+pub fn put_btc_anchor_block_hash_in_db<D: DatabaseInterface>(db: &D, hash: &BlockHash) -> Result<()> {
     trace!("✔ Putting BTC anchor block hash in db...");
     put_btc_hash_in_db(db, &BTC_ANCHOR_BLOCK_HASH_KEY.to_vec(), hash)
 }
 
-pub fn put_btc_latest_block_hash_in_db<D: DatabaseInterface>(db: &D, hash: &sha256d::Hash) -> Result<()> {
+pub fn put_btc_latest_block_hash_in_db<D: DatabaseInterface>(db: &D, hash: &BlockHash) -> Result<()> {
     trace!("✔ Putting BTC latest block hash in db...");
     put_btc_hash_in_db(db, &BTC_LATEST_BLOCK_HASH_KEY.to_vec(), hash)
 }
 
-pub fn put_btc_tail_block_hash_in_db<D: DatabaseInterface>(db: &D, hash: &sha256d::Hash) -> Result<()> {
+pub fn put_btc_tail_block_hash_in_db<D: DatabaseInterface>(db: &D, hash: &BlockHash) -> Result<()> {
     trace!("✔ Putting BTC tail block hash in db...");
     put_btc_hash_in_db(db, &BTC_TAIL_BLOCK_HASH_KEY.to_vec(), hash)
 }
 
-pub fn put_btc_canon_block_hash_in_db<D: DatabaseInterface>(db: &D, hash: &sha256d::Hash) -> Result<()> {
+pub fn put_btc_canon_block_hash_in_db<D: DatabaseInterface>(db: &D, hash: &BlockHash) -> Result<()> {
     trace!("✔ Putting BTC canon block hash in db...");
     put_btc_hash_in_db(db, &BTC_CANON_BLOCK_HASH_KEY.to_vec(), hash)
 }
 
-pub fn get_btc_linker_hash_from_db<D: DatabaseInterface>(db: &D) -> Result<sha256d::Hash> {
+pub fn get_btc_linker_hash_from_db<D: DatabaseInterface>(db: &D) -> Result<BlockHash> {
     trace!("✔ Getting BTC linker hash from db...");
     get_btc_hash_from_db(db, &BTC_LINKER_HASH_KEY.to_vec())
 }
 
-pub fn put_btc_linker_hash_in_db<D: DatabaseInterface>(db: &D, hash: &sha256d::Hash) -> Result<()> {
+pub fn put_btc_linker_hash_in_db<D: DatabaseInterface>(db: &D, hash: &BlockHash) -> Result<()> {
     trace!("✔ Putting BTC linker hash in db...");
     put_btc_hash_in_db(db, &BTC_LINKER_HASH_KEY.to_vec(), hash)
 }
 
-pub fn put_btc_hash_in_db<D: DatabaseInterface>(db: &D, key: &[Byte], hash: &sha256d::Hash) -> Result<()> {
+pub fn put_btc_hash_in_db<D: DatabaseInterface>(db: &D, key: &[Byte], hash: &BlockHash) -> Result<()> {
     db.put(key.to_vec(), hash.to_vec(), MIN_DATA_SENSITIVITY_LEVEL)
 }
 
-pub fn get_btc_hash_from_db<D: DatabaseInterface>(db: &D, key: &[Byte]) -> Result<sha256d::Hash> {
+pub fn get_btc_hash_from_db<D: DatabaseInterface>(db: &D, key: &[Byte]) -> Result<BlockHash> {
     db.get(key.to_vec(), MIN_DATA_SENSITIVITY_LEVEL)
-        .and_then(|bytes| Ok(sha256d::Hash::from_slice(&bytes)?))
+        .and_then(|bytes| Ok(BlockHash::from_slice(&bytes)?))
 }
 
-pub fn maybe_get_parent_btc_block_and_id<D: DatabaseInterface>(
-    db: &D,
-    id: &sha256d::Hash,
-) -> Option<BtcBlockInDbFormat> {
+pub fn maybe_get_parent_btc_block_and_id<D: DatabaseInterface>(db: &D, id: &BlockHash) -> Option<BtcBlockInDbFormat> {
     trace!("✔ Maybe getting BTC parent block for id: {}", id);
     maybe_get_nth_ancestor_btc_block_and_id(db, id, 1)
 }
 
 pub fn maybe_get_nth_ancestor_btc_block_and_id<D: DatabaseInterface>(
     db: &D,
-    id: &sha256d::Hash,
+    id: &BlockHash,
     n: u64,
 ) -> Option<BtcBlockInDbFormat> {
     debug!(
@@ -328,7 +320,7 @@ pub fn put_btc_block_in_db<D: DatabaseInterface>(db: &D, block: &BtcBlockInDbFor
         .and_then(|bytes| db.put(block.get_db_key(), bytes, MIN_DATA_SENSITIVITY_LEVEL))
 }
 
-pub fn maybe_get_btc_block_from_db<D: DatabaseInterface>(db: &D, id: &sha256d::Hash) -> Option<BtcBlockInDbFormat> {
+pub fn maybe_get_btc_block_from_db<D: DatabaseInterface>(db: &D, id: &BlockHash) -> Option<BtcBlockInDbFormat> {
     trace!("✔ Maybe getting BTC block of id: {}", hex::encode(id.to_vec()));
     match get_btc_block_from_db(db, id) {
         Ok(block_and_id) => {
@@ -342,7 +334,7 @@ pub fn maybe_get_btc_block_from_db<D: DatabaseInterface>(db: &D, id: &sha256d::H
     }
 }
 
-pub fn get_btc_block_from_db<D: DatabaseInterface>(db: &D, id: &sha256d::Hash) -> Result<BtcBlockInDbFormat> {
+pub fn get_btc_block_from_db<D: DatabaseInterface>(db: &D, id: &BlockHash) -> Result<BtcBlockInDbFormat> {
     trace!("✔ Getting BTC block from db via id: {}", hex::encode(id.to_vec()));
     db.get(id.to_vec(), MIN_DATA_SENSITIVITY_LEVEL)
         .and_then(|bytes| BtcBlockInDbFormat::from_bytes(&bytes))

@@ -1,6 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use bitcoin::blockdata::transaction::Transaction as BtcTransaction;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     btc_on_eth::eth::redeem_info::{BtcOnEthRedeemInfo, BtcOnEthRedeemInfos},
@@ -29,8 +30,8 @@ impl BtcTxInfo {
         Ok(BtcTxInfo {
             btc_account_nonce,
             btc_tx_hash: btc_tx.txid().to_string(),
-            btc_tx_amount: redeem_info.amount.as_u64(),
-            btc_tx_hex: get_hex_tx_from_signed_btc_tx(&btc_tx),
+            btc_tx_amount: redeem_info.amount_in_satoshis,
+            btc_tx_hex: get_hex_tx_from_signed_btc_tx(btc_tx),
             btc_tx_recipient: redeem_info.recipient.clone(),
             originating_address: format!("0x{}", hex::encode(redeem_info.from.as_bytes())),
             originating_tx_hash: format!("0x{}", hex::encode(redeem_info.originating_tx_hash.as_bytes())),
@@ -50,7 +51,7 @@ pub fn get_btc_signed_tx_info_from_btc_txs(
     btc_txs: Vec<BtcTransaction>,
     redeem_info: &BtcOnEthRedeemInfos,
 ) -> Result<Vec<BtcTxInfo>> {
-    info!("✔ Getting BTC tx info from BTC txs...");
+    info!("✔ Getting BTC tx info from {} BTC tx(s)...", btc_txs.len());
     let start_nonce = btc_account_nonce - btc_txs.len() as u64;
     btc_txs
         .iter()

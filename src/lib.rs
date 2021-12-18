@@ -20,13 +20,17 @@ pub use utils::get_core_version;
 pub mod btc_on_eos;
 pub mod btc_on_eth;
 pub mod chains;
+pub(crate) mod core_type;
+pub(crate) mod dictionaries;
 pub mod eos_on_eth;
 pub mod erc20_on_eos;
+pub mod erc20_on_evm;
 pub mod errors;
+pub(crate) mod fees;
+pub(crate) mod metadata;
 pub mod traits;
 pub mod types;
 
-mod base58;
 mod check_debug_mode;
 mod constants;
 mod crypto_utils;
@@ -44,7 +48,5 @@ extern crate simple_logger;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate serde_derive;
 #[macro_use]
 extern crate quick_error;

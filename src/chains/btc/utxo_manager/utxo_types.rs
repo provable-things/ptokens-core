@@ -1,8 +1,10 @@
 use bitcoin::{
     blockdata::transaction::TxIn as BtcUtxo,
+    hash_types::Txid,
     hashes::{sha256d, Hash},
 };
 use derive_more::{Constructor, Deref, DerefMut, From, Into, IntoIterator};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
@@ -31,7 +33,7 @@ impl BtcUtxosAndValues {
         let jsons: Vec<BtcUtxoAndValueJson> = serde_json::from_str(s)?;
         let structs = jsons
             .iter()
-            .map(|json| BtcUtxoAndValue::from_json(&json))
+            .map(|json| BtcUtxoAndValue::from_json(json))
             .collect::<Result<Vec<BtcUtxoAndValue>>>()?;
         Ok(Self::new(structs))
     }
@@ -76,7 +78,7 @@ impl BtcUtxoAndValue {
         self
     }
 
-    pub fn get_tx_id(&self) -> Result<sha256d::Hash> {
+    pub fn get_tx_id(&self) -> Result<Txid> {
         Ok(self.get_utxo()?.previous_output.txid)
     }
 

@@ -6,7 +6,7 @@ use std::{
     str,
 };
 
-use bitcoin_hashes::{ripemd160, Hash as HashTrait, HashEngine};
+use bitcoin::hashes::{ripemd160, Hash as HashTrait, HashEngine};
 use rustc_hex::{FromHex, FromHexError, ToHex};
 
 macro_rules! impl_hash {
@@ -168,7 +168,7 @@ impl_hash!(H520, 65);
 
 impl H256 {
     #[inline]
-    pub fn to_reversed_str(&self) -> String {
+    pub fn to_reversed_str(self) -> String {
         self.reversed().to_string()
     }
 }

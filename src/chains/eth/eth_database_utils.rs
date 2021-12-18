@@ -2,11 +2,13 @@ use ethereum_types::{Address as EthAddress, H256 as EthHash};
 
 use crate::{
     chains::eth::{
+        eth_chain_id::EthChainId,
         eth_constants::{
             ANY_SENDER_NONCE_KEY,
             BTC_ON_ETH_SMART_CONTRACT_ADDRESS_KEY,
             EOS_ON_ETH_SMART_CONTRACT_ADDRESS_KEY,
             ERC20_ON_EOS_SMART_CONTRACT_ADDRESS_KEY,
+            ERC20_ON_EVM_SMART_CONTRACT_ADDRESS_KEY,
             ERC777_PROXY_CONTACT_ADDRESS_KEY,
             ETH_ACCOUNT_NONCE_KEY,
             ETH_ADDRESS_KEY,
@@ -36,8 +38,8 @@ use crate::{
 pub fn get_signing_params_from_db<D: DatabaseInterface>(db: &D) -> Result<EthSigningParams> {
     trace!("✔ Getting signing params from db...");
     Ok(EthSigningParams {
-        chain_id: get_eth_chain_id_from_db(db)?,
         gas_price: get_eth_gas_price_from_db(db)?,
+        chain_id: get_eth_chain_id_from_db(db)?,
         eth_private_key: get_eth_private_key_from_db(db)?,
         eth_account_nonce: get_eth_account_nonce_from_db(db)?,
         smart_contract_address: get_erc777_contract_address_from_db(db)?,
@@ -109,8 +111,8 @@ pub fn put_special_eth_block_in_db<D: DatabaseInterface>(
     block_type: &str,
 ) -> Result<()> {
     trace!("✔ Putting ETH special block in db of type: {}", block_type);
-    put_eth_submission_material_in_db(db, &eth_submission_material)
-        .and_then(|_| put_special_eth_hash_in_db(db, &block_type, &eth_submission_material.get_block_hash()?))
+    put_eth_submission_material_in_db(db, eth_submission_material)
+        .and_then(|_| put_special_eth_hash_in_db(db, block_type, &eth_submission_material.get_block_hash()?))
 }
 
 pub fn put_special_eth_hash_in_db<D: DatabaseInterface>(db: &D, hash_type: &str, hash: &EthHash) -> Result<()> {
@@ -322,27 +324,19 @@ pub fn increment_eth_account_nonce_in_db<D: DatabaseInterface>(db: &D, amount_to
     get_eth_account_nonce_from_db(db).and_then(|nonce| put_eth_account_nonce_in_db(db, nonce + amount_to_increment_by))
 }
 
-pub fn put_eth_chain_id_in_db<D: DatabaseInterface>(db: &D, chain_id: u8) -> Result<()> {
-    trace!("✔ Putting ETH `chain_id` in db of {} in db...", chain_id);
+pub fn put_eth_chain_id_in_db<D: DatabaseInterface>(db: &D, chain_id: &EthChainId) -> Result<()> {
+    info!("✔ Putting `EthChainId` in db: {}", chain_id);
     db.put(
         ETH_CHAIN_ID_KEY.to_vec(),
-        chain_id.to_le_bytes().to_vec(),
+        chain_id.to_bytes()?,
         MIN_DATA_SENSITIVITY_LEVEL,
     )
 }
 
-pub fn get_eth_chain_id_from_db<D: DatabaseInterface>(db: &D) -> Result<u8> {
+pub fn get_eth_chain_id_from_db<D: DatabaseInterface>(db: &D) -> Result<EthChainId> {
     trace!("✔ Getting ETH `chain_id` from db...");
     db.get(ETH_CHAIN_ID_KEY.to_vec(), MIN_DATA_SENSITIVITY_LEVEL)
-        .and_then(|bytes| match bytes.len() == 1 {
-            true => {
-                let mut array = [0; 1];
-                let bytes = &bytes[..array.len()];
-                array.copy_from_slice(bytes);
-                Ok(u8::from_le_bytes(array))
-            },
-            false => Err("✘ Wrong number of bytes to convert to usize!".into()),
-        })
+        .and_then(|ref bytes| EthChainId::from_bytes(bytes))
 }
 
 pub fn put_eth_private_key_in_db<D: DatabaseInterface>(db: &D, pk: &EthPrivateKey) -> Result<()> {
@@ -360,22 +354,26 @@ pub fn get_eth_private_key_from_db<D: DatabaseInterface>(db: &D) -> Result<EthPr
 }
 
 pub fn get_erc777_contract_address_from_db<D: DatabaseInterface>(db: &D) -> Result<EthAddress> {
-    trace!("✔ Getting ETH smart-contract address from db...");
-    db.get(
-        BTC_ON_ETH_SMART_CONTRACT_ADDRESS_KEY.to_vec(),
-        MIN_DATA_SENSITIVITY_LEVEL,
-    )
-    .map(|address_bytes| EthAddress::from_slice(&address_bytes[..]))
+    info!("✔ Getting ETH ERC777 smart-contract address from db...");
+    get_eth_address_from_db(db, &*BTC_ON_ETH_SMART_CONTRACT_ADDRESS_KEY)
+        .map_err(|_| "No ERC777 contract address in DB! Did you forget to set it?".into())
 }
 
 pub fn get_erc20_on_eos_smart_contract_address_from_db<D: DatabaseInterface>(db: &D) -> Result<EthAddress> {
     info!("✔ Getting `pERC20-on-EOS` smart-contract address from db...");
     get_eth_address_from_db(db, &*ERC20_ON_EOS_SMART_CONTRACT_ADDRESS_KEY)
+        .map_err(|_| "No `erc20-on-eos` vault contract address in DB! Did you forget to set it?".into())
 }
 
 pub fn get_eos_on_eth_smart_contract_address_from_db<D: DatabaseInterface>(db: &D) -> Result<EthAddress> {
     info!("✔ Getting 'EOS_ON_ETH' smart-contract address from db...");
     Ok(get_eth_address_from_db(db, &*EOS_ON_ETH_SMART_CONTRACT_ADDRESS_KEY).unwrap_or_else(|_| EthAddress::zero()))
+}
+
+pub fn get_erc20_on_evm_smart_contract_address_from_db<D: DatabaseInterface>(db: &D) -> Result<EthAddress> {
+    info!("✔ Getting `ERC20_ON_EVM` smart-contract address from db...");
+    get_eth_address_from_db(db, &*ERC20_ON_EVM_SMART_CONTRACT_ADDRESS_KEY)
+        .map_err(|_| "No `erc20-on-evm` vault contract address in DB! Did you forget to set it?".into())
 }
 
 fn get_eth_address_from_db<D: DatabaseInterface>(db: &D, key: &[Byte]) -> Result<EthAddress> {
@@ -403,24 +401,35 @@ pub fn put_erc777_proxy_contract_address_in_db<D: DatabaseInterface>(
     put_eth_address_in_db(db, &ERC777_PROXY_CONTACT_ADDRESS_KEY.to_vec(), proxy_contract_address)
 }
 
-pub fn put_btc_on_eth_smart_contract_address_in_db<D: DatabaseInterface>(
-    db: &D,
-    smart_contract_address: &EthAddress,
-) -> Result<()> {
-    trace!("✔ Putting ETH smart-contract address in db...");
-    put_eth_address_in_db(db, &*BTC_ON_ETH_SMART_CONTRACT_ADDRESS_KEY, smart_contract_address)
+pub fn put_btc_on_eth_smart_contract_address_in_db<D: DatabaseInterface>(db: &D, address: &EthAddress) -> Result<()> {
+    match get_erc777_contract_address_from_db(db) {
+        Ok(address) => Err(format!("ERC777 address already set to 0x{}!", hex::encode(address)).into()),
+        _ => {
+            info!("✔ Putting ETH smart-contract address in db...");
+            put_eth_address_in_db(db, &*BTC_ON_ETH_SMART_CONTRACT_ADDRESS_KEY, address)
+        },
+    }
 }
 
 pub fn put_erc20_on_eos_smart_contract_address_in_db<D: DatabaseInterface>(
     db: &D,
     smart_contract_address: &EthAddress,
 ) -> Result<()> {
-    trace!("✔ Putting 'ERC20-on-EOS` smart-contract address in db...");
-    put_eth_address_in_db(
-        db,
-        &ERC20_ON_EOS_SMART_CONTRACT_ADDRESS_KEY.to_vec(),
-        smart_contract_address,
-    )
+    match get_erc20_on_eos_smart_contract_address_from_db(db) {
+        Ok(address) => Err(format!(
+            "`erc20-on-eos` vault address is already set to {}!",
+            hex::encode(address)
+        )
+        .into()),
+        _ => {
+            info!("✔ Putting 'ERC20-on-EOS` smart-contract address in db...");
+            put_eth_address_in_db(
+                db,
+                &ERC20_ON_EOS_SMART_CONTRACT_ADDRESS_KEY.to_vec(),
+                smart_contract_address,
+            )
+        },
+    }
 }
 
 pub fn put_eos_on_eth_smart_contract_address_in_db<D: DatabaseInterface>(
@@ -433,6 +442,15 @@ pub fn put_eos_on_eth_smart_contract_address_in_db<D: DatabaseInterface>(
         &EOS_ON_ETH_SMART_CONTRACT_ADDRESS_KEY.to_vec(),
         smart_contract_address,
     )
+}
+
+pub fn put_erc20_on_evm_smart_contract_address_in_db<D: DatabaseInterface>(db: &D, address: &EthAddress) -> Result<()> {
+    if get_erc20_on_evm_smart_contract_address_from_db(db).is_ok() {
+        Err("`ERC20-on-EVM`Vault contract address already set!".into())
+    } else {
+        info!("✔ Putting `ERC20-on-EVM` vault contract address in db...");
+        put_eth_address_in_db(db, &ERC20_ON_EVM_SMART_CONTRACT_ADDRESS_KEY.to_vec(), address)
+    }
 }
 
 pub fn get_public_eth_address_from_db<D: DatabaseInterface>(db: &D) -> Result<EthAddress> {
@@ -522,8 +540,8 @@ mod tests {
     #[test]
     fn should_put_chain_id_in_db() {
         let db = get_test_database();
-        let chain_id = 6;
-        put_eth_chain_id_in_db(&db, chain_id).unwrap();
+        let chain_id = EthChainId::Rinkeby;
+        put_eth_chain_id_in_db(&db, &chain_id).unwrap();
         let result = get_eth_chain_id_from_db(&db).unwrap();
         assert_eq!(result, chain_id);
     }

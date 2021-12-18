@@ -1,17 +1,18 @@
 use derive_more::{Constructor, Deref};
 use ethereum_types::{Address as EthAddress, Bloom, BloomInput, H256 as EthHash};
 use rlp::{Encodable, RlpStream};
+use serde::Deserialize;
 use serde_json::{json, Value as JsonValue};
 
 use crate::{
     chains::eth::{
         eth_receipt::EthReceiptJson,
+        eth_traits::EthLogCompatible,
         eth_utils::{convert_hex_strings_to_h256s, convert_hex_to_address, convert_hex_to_bytes},
     },
     types::{Bytes, Result},
 };
 
-#[allow(non_snake_case)]
 #[derive(Clone, Debug, Deserialize)]
 pub struct EthLogJson {
     pub data: String,
@@ -24,6 +25,16 @@ pub struct EthLog {
     pub address: EthAddress,
     pub topics: Vec<EthHash>,
     pub data: Bytes,
+}
+
+impl EthLogCompatible for EthLog {
+    fn get_topics(&self) -> Vec<EthHash> {
+        self.topics.clone()
+    }
+
+    fn get_data(&self) -> Bytes {
+        self.data.clone()
+    }
 }
 
 impl EthLog {

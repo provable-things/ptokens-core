@@ -1,5 +1,6 @@
 #![allow(clippy::manual_map)]
 use ethereum_types::{Address as EthAddress, H256 as EthHash, U256};
+use serde::Deserialize;
 use serde_json::{json, Value as JsonValue};
 
 use crate::{
@@ -250,31 +251,34 @@ pub struct EthSubmissionMaterialJson {
 
 impl EthSubmissionMaterialJson {
     pub fn from_str(json_str: &str) -> Result<Self> {
-        match serde_json::from_str(&json_str) {
+        match serde_json::from_str(json_str) {
             Ok(result) => Ok(result),
             Err(e) => Err(e.into()),
         }
     }
 }
 
-pub fn parse_eth_submission_material_and_put_in_state<D>(block_json: &str, state: EthState<D>) -> Result<EthState<D>>
-where
-    D: DatabaseInterface,
-{
+pub fn parse_eth_submission_material_and_put_in_state<D: DatabaseInterface>(
+    block_json: &str,
+    state: EthState<D>,
+) -> Result<EthState<D>> {
     info!("✔ Parsing ETH block & receipts...");
-    EthSubmissionMaterial::from_str(&block_json).and_then(|result| state.add_eth_submission_material(result))
+    EthSubmissionMaterial::from_str(block_json).and_then(|result| state.add_eth_submission_material(result))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::chains::eth::{
-        eth_constants::BTC_ON_ETH_REDEEM_EVENT_TOPIC_HEX,
+        eth_contracts::erc777::ERC_777_REDEEM_EVENT_TOPIC_WITHOUT_USER_DATA_HEX,
         eth_test_utils::{
             get_expected_block,
             get_expected_receipt,
             get_sample_contract_address,
             get_sample_contract_topics,
+            get_sample_eip1559_mainnet_submission_material,
+            get_sample_eip1559_ropsten_submission_material,
+            get_sample_eip2718_ropsten_submission_material,
             get_sample_eth_submission_material,
             get_sample_eth_submission_material_n,
             get_sample_eth_submission_material_string,
@@ -362,7 +366,7 @@ mod tests {
         let num_receipts_before = block_and_receipts.receipts.len();
         let address = EthAddress::from_slice(&hex::decode("74630cfbc4066726107a4efe73956e219bbb46ab").unwrap());
         let topics = vec![EthHash::from_slice(
-            &hex::decode(BTC_ON_ETH_REDEEM_EVENT_TOPIC_HEX).unwrap(),
+            &hex::decode(ERC_777_REDEEM_EVENT_TOPIC_WITHOUT_USER_DATA_HEX).unwrap(),
         )];
         let result = block_and_receipts
             .get_receipts_containing_log_from_address_and_with_topics(&address, &topics)
@@ -396,5 +400,41 @@ mod tests {
         let result = block_and_receipts.remove_receipts();
         let num_receipts_after = result.receipts.len();
         assert_eq!(num_receipts_after, 0);
+    }
+
+    #[test]
+    fn mainnet_eip1559_blocks_receipts_should_be_valid() {
+        let submission_material = get_sample_eip1559_mainnet_submission_material();
+        let result = submission_material.receipts_are_valid().unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn ropsten_eip1559_blocks_receipts_should_be_valid() {
+        let submission_material = get_sample_eip1559_ropsten_submission_material();
+        let result = submission_material.receipts_are_valid().unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn ropsten_block_with_one_eip2718_tx_should_be_valid() {
+        let submission_material = get_sample_eip2718_ropsten_submission_material();
+        println!(
+            "receipts_root: {}",
+            hex::encode(submission_material.block.clone().unwrap().receipts_root.as_bytes())
+        );
+        let result = submission_material.receipts_are_valid().unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn receipts_roots_of_eth_submission_material_should_be_valid() {
+        for i in 0..15 {
+            let submission_material = get_sample_eth_submission_material_n(i).unwrap();
+            let receipts = submission_material.receipts.clone();
+            let expected_root = submission_material.block.unwrap().receipts_root;
+            let calculated_root = receipts.get_merkle_root().unwrap();
+            assert_eq!(expected_root, calculated_root);
+        }
     }
 }

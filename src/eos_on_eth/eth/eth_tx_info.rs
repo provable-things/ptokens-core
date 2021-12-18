@@ -1,33 +1,36 @@
 use derive_more::{Constructor, Deref};
-use eos_primitives::{
-    AccountName as EosAccountName,
-    Action as EosAction,
-    PermissionLevel,
-    Transaction as EosTransaction,
-};
+use eos_chain::{AccountName as EosAccountName, Action as EosAction, PermissionLevel, Transaction as EosTransaction};
 use ethereum_types::{Address as EthAddress, H256 as EthHash, U256};
 
 use crate::{
     chains::{
         eos::{
             eos_actions::PTokenPegOutAction,
-            eos_constants::{EOS_ACCOUNT_PERMISSION_LEVEL, EOS_MAX_EXPIRATION_SECS},
+            eos_chain_id::EosChainId,
+            eos_constants::EOS_ACCOUNT_PERMISSION_LEVEL,
             eos_crypto::{
                 eos_private_key::EosPrivateKey,
                 eos_transaction::{EosSignedTransaction, EosSignedTransactions},
             },
             eos_database_utils::{get_eos_account_name_from_db, get_eos_chain_id_from_db},
-            eos_eth_token_dictionary::EosEthTokenDictionary,
+            eos_utils::{
+                get_eos_tx_expiration_timestamp_with_offset,
+                parse_eos_account_name_or_default_to_safe_address,
+            },
         },
         eth::{
-            eth_constants::EOS_ON_ETH_ETH_TX_INFO_EVENT_TOPIC,
-            eth_contracts::erc777::Erc777RedeemEvent,
+            eth_contracts::erc777::{
+                Erc777RedeemEvent,
+                ERC_777_REDEEM_EVENT_TOPIC_WITHOUT_USER_DATA,
+                ERC_777_REDEEM_EVENT_TOPIC_WITH_USER_DATA,
+            },
             eth_database_utils::get_eth_canon_block_from_db,
             eth_log::EthLog,
             eth_state::EthState,
             eth_submission_material::EthSubmissionMaterial,
         },
     },
+    dictionaries::eos_eth::EosEthTokenDictionary,
     eos_on_eth::constants::MINIMUM_WEI_AMOUNT,
     traits::DatabaseInterface,
     types::{Byte, Result},
@@ -55,20 +58,24 @@ impl EosOnEthEthTxInfos {
         material: &EthSubmissionMaterial,
         token_dictionary: &EosEthTokenDictionary,
     ) -> Result<Self> {
-        let topic = &EOS_ON_ETH_ETH_TX_INFO_EVENT_TOPIC[0];
         let eth_contract_addresses = token_dictionary.to_eth_addresses();
         debug!("Addresses from dict: {:?}", eth_contract_addresses);
-        debug!("The topic: {}", hex::encode(EOS_ON_ETH_ETH_TX_INFO_EVENT_TOPIC[0]));
         Ok(Self(
             material
                 .receipts
-                .get_receipts_containing_log_from_addresses_and_with_topics(&eth_contract_addresses, &[*topic])
+                .get_receipts_containing_log_from_addresses_and_with_topics(&eth_contract_addresses, &[
+                    *ERC_777_REDEEM_EVENT_TOPIC_WITHOUT_USER_DATA,
+                    *ERC_777_REDEEM_EVENT_TOPIC_WITH_USER_DATA,
+                ])
                 .iter()
                 .map(|receipt| {
                     receipt
-                        .get_logs_from_addresses_with_topic(&eth_contract_addresses, topic)
+                        .get_logs_from_addresses_with_topics(&eth_contract_addresses, &[
+                            *ERC_777_REDEEM_EVENT_TOPIC_WITHOUT_USER_DATA,
+                            *ERC_777_REDEEM_EVENT_TOPIC_WITH_USER_DATA,
+                        ])
                         .iter()
-                        .map(|log| EosOnEthEthTxInfo::from_eth_log(&log, &receipt.transaction_hash, token_dictionary))
+                        .map(|log| EosOnEthEthTxInfo::from_eth_log(log, &receipt.transaction_hash, token_dictionary))
                         .collect::<Result<Vec<EosOnEthEthTxInfo>>>()
                 })
                 .collect::<Result<Vec<Vec<EosOnEthEthTxInfo>>>>()?
@@ -97,22 +104,24 @@ impl EosOnEthEthTxInfos {
         &self,
         ref_block_num: u16,
         ref_block_prefix: u32,
-        chain_id: &str,
+        chain_id: &EosChainId,
         pk: &EosPrivateKey,
         eos_smart_contract: &EosAccountName,
     ) -> Result<EosSignedTransactions> {
         info!("✔ Signing {} EOS txs from `EosOnEthEthTxInfos`...", self.len());
         Ok(EosSignedTransactions::new(
             self.iter()
-                .map(|tx_info| {
+                .enumerate()
+                .map(|(i, tx_info)| {
                     info!("✔ Signing EOS tx from `EosOnEthEthTxInfo`: {:?}", tx_info);
                     tx_info.to_eos_signed_tx(
                         ref_block_num,
                         ref_block_prefix,
-                        &eos_smart_contract,
+                        eos_smart_contract,
                         ZERO_ETH_ASSET_STR,
                         chain_id,
                         pk,
+                        get_eos_tx_expiration_timestamp_with_offset(i as u32)?,
                     )
                 })
                 .collect::<Result<Vec<EosSignedTransaction>>>()?,
@@ -161,9 +170,10 @@ impl EosOnEthEthTxInfo {
                 originating_tx_hash: *tx_hash,
                 token_sender: params.redeemer,
                 eth_token_address: log.address,
-                eos_address: params.underlying_asset_recipient,
                 eos_token_address: token_dictionary.get_eos_account_name_from_eth_token_address(&log.address)?,
                 eos_asset_amount: token_dictionary.convert_u256_to_eos_asset_string(&log.address, &params.value)?,
+                eos_address: parse_eos_account_name_or_default_to_safe_address(&params.underlying_asset_recipient)?
+                    .to_string(),
             })
         })
     }
@@ -195,13 +205,16 @@ impl EosOnEthEthTxInfo {
         ref_block_prefix: u32,
         eos_smart_contract: &EosAccountName,
         amount: &str,
-        chain_id: &str,
+        chain_id: &EosChainId,
         pk: &EosPrivateKey,
+        timestamp: u32,
     ) -> Result<EosSignedTransaction> {
         info!("✔ Signing eos tx...");
         debug!(
             "smart-contract: {}\namount: {}\nchain ID: {}",
-            &eos_smart_contract, &amount, &chain_id
+            &eos_smart_contract,
+            &amount,
+            &chain_id.to_hex()
         );
         Self::get_eos_ptoken_peg_out_action(
             &eos_smart_contract.to_string(),
@@ -212,7 +225,7 @@ impl EosOnEthEthTxInfo {
             &self.eos_address,
             &[], // NOTE: Empty metadata for now.
         )
-        .map(|action| EosTransaction::new(EOS_MAX_EXPIRATION_SECS, ref_block_num, ref_block_prefix, vec![action]))
+        .map(|action| EosTransaction::new(timestamp, ref_block_num, ref_block_prefix, vec![action]))
         .and_then(|ref unsigned_tx| {
             EosSignedTransaction::from_unsigned_tx(&eos_smart_contract.to_string(), amount, chain_id, pk, unsigned_tx)
         })
@@ -274,9 +287,21 @@ mod tests {
 
     use super::*;
     use crate::{
-        chains::eos::eos_eth_token_dictionary::EosEthTokenDictionaryEntry,
-        eos_on_eth::test_utils::{get_eth_submission_material_n, get_sample_eos_eth_token_dictionary},
+        dictionaries::eos_eth::EosEthTokenDictionaryEntry,
+        eos_on_eth::test_utils::{
+            get_eth_submission_material_n,
+            get_eth_submission_material_with_bad_eos_account_name,
+            get_eth_submission_material_with_two_peg_ins,
+            get_sample_eos_eth_token_dictionary,
+        },
     };
+
+    fn get_sample_eos_private_key() -> EosPrivateKey {
+        EosPrivateKey::from_slice(
+            &hex::decode("17b116e5e55af3b9985ff6c6e0320578176b83ca55570a66683d3b36d9deca64").unwrap(),
+        )
+        .unwrap()
+    }
 
     #[test]
     fn should_get_tx_info_from_eth_submission_material() {
@@ -311,14 +336,11 @@ mod tests {
         let tx_infos = EosOnEthEthTxInfos::from_eth_submission_material(&material, &dictionary).unwrap();
         let ref_block_num = 1;
         let ref_block_prefix = 1;
-        let chain_id = "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906";
-        let pk = EosPrivateKey::from_slice(
-            &hex::decode("17b116e5e55af3b9985ff6c6e0320578176b83ca55570a66683d3b36d9deca64").unwrap(),
-        )
-        .unwrap();
+        let chain_id = EosChainId::EosMainnet;
+        let pk = get_sample_eos_private_key();
         let eos_smart_contract = EosAccountName::from_str("11ppntoneos").unwrap();
         let result = tx_infos
-            .to_eos_signed_txs(ref_block_num, ref_block_prefix, chain_id, &pk, &eos_smart_contract)
+            .to_eos_signed_txs(ref_block_num, ref_block_prefix, &chain_id, &pk, &eos_smart_contract)
             .unwrap()[0]
             .transaction
             .clone();
@@ -342,5 +364,41 @@ mod tests {
         assert_eq!(result_before[0].eos_asset_amount, "0.0000 EOS");
         let result_after = result_before.filter_out_those_with_zero_eos_asset_amount(&dictionary);
         assert_eq!(result_after.len(), expected_result_after);
+    }
+
+    #[test]
+    fn should_default_to_safe_address_when_signing_tx_with_bad_eos_account_name_in_submission_material() {
+        let token_dictionary_entry_str = "{\"eth_token_decimals\":18,\"eos_token_decimals\":4,\"eth_symbol\":\"TLOS\",\"eos_symbol\":\"TLOS\",\"eth_address\":\"b6c53431608e626ac81a9776ac3e999c5556717c\",\"eos_address\":\"eosio.token\"}";
+        let token_dictionary =
+            EosEthTokenDictionary::new(vec![
+                EosEthTokenDictionaryEntry::from_str(&token_dictionary_entry_str).unwrap()
+            ]);
+        let submission_material = get_eth_submission_material_with_bad_eos_account_name();
+        let tx_infos =
+            EosOnEthEthTxInfos::from_eth_submission_material(&submission_material, &token_dictionary).unwrap();
+        let ref_block_num = 1;
+        let ref_block_prefix = 2;
+        let chain_id = EosChainId::EosMainnet;
+        let eos_smart_contract = EosAccountName::from_str("11ppntoneos").unwrap();
+        let pk = get_sample_eos_private_key();
+        let result = tx_infos.to_eos_signed_txs(ref_block_num, ref_block_prefix, &chain_id, &pk, &eos_smart_contract);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn same_param_tx_infos_should_not_create_same_signatures() {
+        let submission_material = get_eth_submission_material_with_two_peg_ins();
+        let dictionary = get_sample_eos_eth_token_dictionary();
+        let tx_infos = EosOnEthEthTxInfos::from_eth_submission_material(&submission_material, &dictionary).unwrap();
+        let ref_block_num = 1;
+        let ref_block_prefix = 2;
+        let chain_id = EosChainId::EosMainnet;
+        let eos_smart_contract = EosAccountName::from_str("11ppntoneos").unwrap();
+        let pk = get_sample_eos_private_key();
+        let result = tx_infos
+            .to_eos_signed_txs(ref_block_num, ref_block_prefix, &chain_id, &pk, &eos_smart_contract)
+            .unwrap();
+        assert_eq!(result.len(), 2);
+        assert_ne!(result[0], result[1]);
     }
 }

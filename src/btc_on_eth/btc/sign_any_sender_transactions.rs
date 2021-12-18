@@ -29,7 +29,7 @@ pub fn get_any_sender_signed_txs(
             let any_sender_nonce = signing_params.any_sender_nonce + i as u64;
 
             RelayTransaction::new_mint_by_proxy_tx(
-                signing_params.chain_id,
+                &signing_params.chain_id,
                 signing_params.public_eth_address,
                 minting_param_struct.amount,
                 any_sender_nonce,
@@ -69,15 +69,15 @@ where
 mod tests {
     use std::str::FromStr;
 
-    use bitcoin::util::address::Address as BtcAddress;
-    use bitcoin_hashes::{sha256d, Hash};
+    use bitcoin::{hashes::Hash, util::address::Address as BtcAddress, Txid};
 
     use super::*;
     use crate::{
-        btc_on_eth::{btc::minting_params::BtcOnEthMintingParamStruct, utils::convert_satoshis_to_ptoken},
+        btc_on_eth::{btc::minting_params::BtcOnEthMintingParamStruct, utils::convert_satoshis_to_wei},
         chains::{
             btc::btc_test_utils::SAMPLE_TARGET_BTC_ADDRESS,
             eth::{
+                eth_chain_id::EthChainId,
                 eth_test_utils::{get_sample_eth_address, get_sample_eth_private_key},
                 eth_types::EthAddress,
             },
@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn should_get_any_sender_signatures() {
         let signing_params = AnySenderSigningParams {
-            chain_id: 1,
+            chain_id: EthChainId::Mainnet,
             any_sender_nonce: 0,
             eth_private_key: get_sample_eth_private_key(),
             public_eth_address: get_sample_eth_address(),
@@ -98,16 +98,16 @@ mod tests {
         let recipient_2 = EthAddress::from_slice(&hex::decode("9360a5C047e8Eb44647f17672638c3bB8e2B8a53").unwrap());
         let minting_params = vec![
             BtcOnEthMintingParamStruct::new(
-                convert_satoshis_to_ptoken(1337),
+                convert_satoshis_to_wei(1337),
                 hex::encode(recipient_1),
-                sha256d::Hash::hash(&[0xc0]),
+                Txid::from_hash(Hash::hash(&[0xc0])),
                 originating_address.clone(),
             )
             .unwrap(),
             BtcOnEthMintingParamStruct::new(
-                convert_satoshis_to_ptoken(666),
+                convert_satoshis_to_wei(666),
                 hex::encode(recipient_2),
-                sha256d::Hash::hash(&[0xc0]),
+                Txid::from_hash(Hash::hash(&[0xc0])),
                 originating_address,
             )
             .unwrap(),

@@ -1,7 +1,8 @@
 use std::str::from_utf8;
 
 use derive_more::{Constructor, Deref};
-use eos_primitives::{AccountName as EosAccountName, Checksum256};
+use eos_chain::{AccountName as EosAccountName, Checksum256};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     chains::{
@@ -12,6 +13,8 @@ use crate::{
             eos_state::EosState,
         },
     },
+    constants::FEE_BASIS_POINTS_DIVISOR,
+    fees::fee_utils::sanity_check_basis_points_value,
     traits::DatabaseInterface,
     types::Result,
     utils::convert_bytes_to_u64,
@@ -21,6 +24,29 @@ use crate::{
 pub struct BtcOnEosRedeemInfos(pub Vec<BtcOnEosRedeemInfo>);
 
 impl BtcOnEosRedeemInfos {
+    pub fn subtract_fees(&self, fee_basis_points: u64) -> Result<Self> {
+        let (fees, _) = self.calculate_fees(sanity_check_basis_points_value(fee_basis_points)?);
+        info!("`BtcOnEosRedeemInfos` fees: {:?}", fees);
+        Ok(Self::new(
+            fees.iter()
+                .zip(self.iter())
+                .map(|(fee, redeem_info)| redeem_info.subtract_amount(*fee))
+                .collect::<Result<Vec<BtcOnEosRedeemInfo>>>()?,
+        ))
+    }
+
+    pub fn calculate_fees(&self, basis_points: u64) -> (Vec<u64>, u64) {
+        info!("✔ Calculating fees in `BtcOnEosRedeemInfos`...");
+        let fees = self
+            .iter()
+            .map(|redeem_info| redeem_info.calculate_fee(basis_points))
+            .collect::<Vec<u64>>();
+        let total_fee = fees.iter().sum();
+        info!("✔      Fees: {:?}", fees);
+        info!("✔ Total fee: {:?}", fees);
+        (fees, total_fee)
+    }
+
     pub fn sum(&self) -> u64 {
         self.0.iter().fold(0, |acc, infos| acc + infos.amount)
     }
@@ -38,7 +64,7 @@ impl BtcOnEosRedeemInfos {
         Ok(BtcOnEosRedeemInfos::new(
             action_proofs
                 .iter()
-                .map(|ref action_proof| BtcOnEosRedeemInfo::from_action_proof(action_proof))
+                .map(|action_proof| BtcOnEosRedeemInfo::from_action_proof(action_proof))
                 .collect::<Result<Vec<BtcOnEosRedeemInfo>>>()?,
         ))
     }
@@ -66,6 +92,30 @@ pub struct BtcOnEosRedeemInfo {
 }
 
 impl BtcOnEosRedeemInfo {
+    pub fn subtract_amount(&self, subtrahend: u64) -> Result<Self> {
+        info!("✔ Subtracting {} from `BtcOnEosRedeemInfo`...", subtrahend);
+        if subtrahend > self.amount {
+            Err(format!("Cannot subtract {} from {}!", subtrahend, self.amount).into())
+        } else {
+            let new_amount = self.amount - subtrahend;
+            info!(
+                "Subtracted amount of {} from current redeem info amount of {} to get final amount of {}",
+                subtrahend, self.amount, new_amount
+            );
+            Ok(Self {
+                from: self.from,
+                amount: new_amount,
+                recipient: self.recipient.clone(),
+                global_sequence: self.global_sequence,
+                originating_tx_id: self.originating_tx_id,
+            })
+        }
+    }
+
+    pub fn calculate_fee(&self, basis_points: u64) -> u64 {
+        (self.amount * basis_points) / FEE_BASIS_POINTS_DIVISOR
+    }
+
     pub fn get_eos_amount_from_proof(proof: &EosActionProof) -> Result<u64> {
         proof
             .check_proof_action_data_length(15, "Not enough data to parse `BtcOnEosRedeemInfo` amount from proof!")
@@ -101,7 +151,7 @@ impl BtcOnEosRedeemInfo {
 }
 
 pub fn maybe_parse_redeem_infos_and_put_in_state<D: DatabaseInterface>(state: EosState<D>) -> Result<EosState<D>> {
-    info!("✔ Parsing redeem params from actions data...");
+    info!("✔ Parsing redeem infos from actions data...");
     BtcOnEosRedeemInfos::from_action_proofs(&state.action_proofs).and_then(|redeem_infos| {
         info!("✔ Parsed {} sets of redeem info!", redeem_infos.len());
         state.add_btc_on_eos_redeem_infos(redeem_infos)
@@ -151,9 +201,10 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
-    use crate::chains::eos::{
-        eos_test_utils::get_sample_eos_submission_material_n,
-        eos_utils::convert_hex_to_checksum256,
+    use crate::{
+        btc_on_eos::test_utils::{get_sample_redeem_info, get_sample_redeem_infos},
+        chains::eos::{eos_test_utils::get_sample_eos_submission_material_n, eos_utils::convert_hex_to_checksum256},
+        errors::AppError,
     };
 
     #[test]
@@ -246,5 +297,55 @@ mod tests {
         let action_proof = get_sample_eos_submission_material_n(1).action_proofs[0].clone();
         let result = BtcOnEosRedeemInfo::from_action_proof(&action_proof).unwrap();
         assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn should_calculate_fee_in_btc_on_eos_redeem_param() {
+        let infos = get_sample_redeem_info();
+        let basis_points = 25;
+        let result = infos.calculate_fee(basis_points);
+        let expected_result = 12;
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn should_calculate_fee_in_btc_on_eos_redeem_infos() {
+        let infos = get_sample_redeem_infos();
+        let basis_points = 25;
+        let (fees, total_fee) = infos.calculate_fees(basis_points);
+        let expected_fees = vec![12, 12];
+        let expected_total_fee: u64 = expected_fees.iter().sum();
+        assert_eq!(total_fee, expected_total_fee);
+        assert_eq!(fees, expected_fees);
+    }
+
+    #[test]
+    fn should_subtract_amount_from_btc_on_eos_redeem_infos() {
+        let infos = get_sample_redeem_info();
+        let subtrahend = 1337;
+        let result = infos.subtract_amount(subtrahend).unwrap();
+        let expected_result = 3774;
+        assert_eq!(result.amount, expected_result)
+    }
+
+    #[test]
+    fn should_subtract_fees_from_btc_on_eos_redeem_infos() {
+        let infos = get_sample_redeem_infos();
+        let basis_points = 25;
+        let result = infos.subtract_fees(basis_points).unwrap();
+        let expected_amount = 5099;
+        result.iter().for_each(|info| assert_eq!(info.amount, expected_amount));
+    }
+
+    #[test]
+    fn should_fail_to_subtact_too_large_an_amount_from_btc_on_eos_redeem_info() {
+        let info = get_sample_redeem_infos()[0].clone();
+        let subtrahend = info.amount + 1;
+        let expected_err = format!("Cannot subtract {} from {}!", subtrahend, info.amount);
+        match info.subtract_amount(subtrahend) {
+            Ok(_) => panic!("Should not have suceeded!"),
+            Err(AppError::Custom(err)) => assert_eq!(err, expected_err),
+            Err(_) => panic!("Wrong error received!"),
+        };
     }
 }

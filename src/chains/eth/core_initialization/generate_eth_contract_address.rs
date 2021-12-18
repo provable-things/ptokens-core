@@ -1,15 +1,10 @@
 use ethereum_types::Address as EthAddress;
 use rlp::RlpStream;
-use tiny_keccak::keccak256;
+use tiny_keccak::{Hasher, Keccak};
 
 use crate::{
     chains::eth::{
-        eth_database_utils::{
-            get_public_eth_address_from_db,
-            put_btc_on_eth_smart_contract_address_in_db,
-            put_eos_on_eth_smart_contract_address_in_db,
-            put_erc20_on_eos_smart_contract_address_in_db,
-        },
+        eth_database_utils::{get_public_eth_address_from_db, put_eos_on_eth_smart_contract_address_in_db},
         eth_state::EthState,
     },
     traits::DatabaseInterface,
@@ -24,7 +19,10 @@ fn calculate_contract_address(eth_address: EthAddress, nonce: usize) -> EthAddre
     rlp_stream.append(&eth_address);
     rlp_stream.append(&nonce);
     let encoded = rlp_stream.out();
-    let hashed = keccak256(&encoded);
+    let mut keccak = Keccak::v256();
+    let mut hashed = [0u8; 32];
+    keccak.update(&encoded);
+    keccak.finalize(&mut hashed);
     EthAddress::from_slice(&hashed[12..])
 }
 
@@ -33,28 +31,6 @@ fn get_eth_contract_address<D: DatabaseInterface>(db: &D) -> Result<EthAddress> 
         info!("✔ Calculating pBTC contract address...");
         calculate_contract_address(eth_address, INITIAL_NONCE)
     })
-}
-
-pub fn generate_and_store_btc_on_eth_contract_address<D: DatabaseInterface>(state: EthState<D>) -> Result<EthState<D>> {
-    info!("✔ Calculating `pBTC-on-ETH` contract address...");
-    get_eth_contract_address(&state.db)
-        .and_then(|ref smart_contract_address| {
-            info!("✔ Storing `pBTC-on-ETH` contract address in db...");
-            put_btc_on_eth_smart_contract_address_in_db(&state.db, smart_contract_address)
-        })
-        .and(Ok(state))
-}
-
-pub fn generate_and_store_erc20_on_eos_contract_address<D: DatabaseInterface>(
-    state: EthState<D>,
-) -> Result<EthState<D>> {
-    info!("✔ Calculating `pERC20-on-EOS` contract address...");
-    get_eth_contract_address(&state.db)
-        .and_then(|ref smart_contract_address| {
-            info!("✔ Storing `pERC20-on-EOS` contract address in db...");
-            put_erc20_on_eos_smart_contract_address_in_db(&state.db, smart_contract_address)
-        })
-        .and(Ok(state))
 }
 
 pub fn generate_and_store_eos_on_eth_contract_address<D: DatabaseInterface>(state: EthState<D>) -> Result<EthState<D>> {

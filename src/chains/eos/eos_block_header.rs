@@ -1,11 +1,12 @@
-use eos_primitives::{bitutil, AccountName, BlockTimestamp, Checksum256, NumBytes, Read, Write};
+use eos_chain::{utils::bitutil, AccountName, BlockTimestamp, Checksum256, NumBytes, Read, Write};
+use serde::{Deserialize, Serialize};
 
 use crate::chains::eos::{
     eos_extension::EosExtension,
     eos_producer_schedule::{EosProducerScheduleV1, EosProducerScheduleV2},
 };
-#[derive(Debug, Clone, Default, Read, Write, NumBytes, PartialEq, Deserialize, Serialize)]
-#[eosio_core_root_path = "eos_primitives"]
+#[derive(Debug, Clone, Read, Write, Default, NumBytes, PartialEq, Deserialize, Serialize)]
+#[eosio_core_root_path = "eos_chain"]
 pub struct EosBlockHeaderV1 {
     pub timestamp: BlockTimestamp,
     pub producer: AccountName,
@@ -48,8 +49,8 @@ impl EosBlockHeaderV1 {
     }
 }
 
-#[derive(Debug, Clone, Default, Read, Write, NumBytes, PartialEq, Deserialize, Serialize)]
-#[eosio_core_root_path = "eos_primitives"]
+#[derive(Debug, Clone, Read, Write, Default, NumBytes, PartialEq, Deserialize, Serialize)]
+#[eosio_core_root_path = "eos_chain"]
 pub struct EosBlockHeaderV2 {
     pub timestamp: BlockTimestamp,
     pub producer: AccountName,

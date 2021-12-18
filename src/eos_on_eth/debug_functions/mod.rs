@@ -16,10 +16,6 @@ use crate::{
                 remove_eos_eth_token_dictionary_entry,
                 update_incremerkle,
             },
-            eos_eth_token_dictionary::{
-                get_eos_eth_token_dictionary_from_db_and_add_to_eos_state,
-                get_eos_eth_token_dictionary_from_db_and_add_to_eth_state,
-            },
             eos_global_sequences::{
                 get_processed_global_sequences_and_add_to_state,
                 maybe_add_global_sequences_to_processed_list_and_return_state,
@@ -39,6 +35,7 @@ use crate::{
         },
         eth::{
             eth_constants::{get_eth_constants_db_keys, ETH_PRIVATE_KEY_DB_KEY},
+            eth_debug_functions::debug_set_eth_gas_price_in_db,
             eth_state::EthState,
             eth_submission_material::parse_eth_submission_material_and_put_in_state,
             validate_block_in_state::validate_block_in_state,
@@ -48,6 +45,13 @@ use crate::{
     check_debug_mode::check_debug_mode,
     constants::{DB_KEY_PREFIX, PRIVATE_KEY_DATA_SENSITIVITY_LEVEL},
     debug_database_utils::{get_key_from_db, set_key_in_db_to_value},
+    dictionaries::{
+        dictionary_constants::EOS_ETH_DICTIONARY_KEY,
+        eos_eth::{
+            get_eos_eth_token_dictionary_from_db_and_add_to_eos_state,
+            get_eos_eth_token_dictionary_from_db_and_add_to_eth_state,
+        },
+    },
     eos_on_eth::{
         check_core_is_initialized::{
             check_core_is_initialized,
@@ -89,7 +93,7 @@ use crate::{
 /// transaction replays. Use with extreme caution and only if you know exactly what you are doing
 /// and why.
 pub fn debug_update_incremerkle<D: DatabaseInterface>(db: &D, eos_init_json: &str) -> Result<String> {
-    check_core_is_initialized(db).and_then(|_| update_incremerkle(db, &EosInitJson::from_json_string(&eos_init_json)?))
+    check_core_is_initialized(db).and_then(|_| update_incremerkle(db, &EosInitJson::from_json_string(eos_init_json)?))
 }
 
 /// # Debug Add New Eos Schedule
@@ -139,6 +143,7 @@ pub fn debug_get_all_db_keys() -> Result<String> {
         "eth": get_eth_constants_db_keys(),
         "eos": get_eos_constants_db_keys(),
         "db-key-prefix": DB_KEY_PREFIX.to_string(),
+        "dictionary:": hex::encode(EOS_ETH_DICTIONARY_KEY.to_vec()),
     })
     .to_string()))
 }
@@ -264,4 +269,11 @@ pub fn debug_reprocess_eos_block<D: DatabaseInterface>(db: D, block_json: &str) 
         .and_then(end_eos_db_transaction_and_return_state)
         .and_then(get_eos_output)
         .map(prepend_debug_output_marker_to_string)
+}
+
+/// Debug Set ETH Gas Price
+///
+/// This function sets the ETH gas price to use when making ETH transactions. It's unit is `Wei`.
+pub fn debug_set_eth_gas_price<D: DatabaseInterface>(db: D, gas_price: u64) -> Result<String> {
+    debug_set_eth_gas_price_in_db(&db, gas_price)
 }

@@ -9,6 +9,7 @@ pub use bitcoin::{
     hashes::sha256d,
     util::address::Address as BtcAddress,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     chains::btc::{btc_constants::BTC_PUB_KEY_SLICE_LENGTH, deposit_address_info::DepositAddressInfoJson},
@@ -28,7 +29,7 @@ pub struct BtcUtxoAndValue {
     pub maybe_deposit_info_json: Option<DepositAddressInfoJson>,
 }
 
-pub type BtcRecipientsAndAmounts = Vec<BtcRecipientAndAmount>;
+pub type BtcRecipientsAndAmounts = Vec<BtcRecipientAndAmount>; // TODO Make this a proper type.
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BtcRecipientAndAmount {

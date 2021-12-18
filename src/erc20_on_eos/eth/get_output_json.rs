@@ -1,5 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     chains::{
         eos::{
@@ -83,7 +85,7 @@ where
                     .enumerate()
                     .map(|(i, eos_tx)| {
                         EosTxInfo::new(
-                            &eos_tx,
+                            eos_tx,
                             &state.erc20_on_eos_peg_in_infos[i],
                             start_nonce + i as u64,
                             get_latest_eos_block_number(&state.db)?,

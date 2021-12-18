@@ -15,7 +15,7 @@ use crate::{
                 put_difficulty_threshold_in_db,
             },
             check_btc_core_is_initialized::is_btc_core_initialized,
-            generate_and_store_btc_keys::generate_and_store_btc_keys,
+            generate_and_store_btc_keys::generate_and_store_btc_keys_and_return_state,
             get_btc_init_output_json::get_btc_init_output_json,
         },
         get_btc_block_in_db_format::create_btc_block_in_db_format_and_put_in_state,
@@ -46,7 +46,7 @@ pub fn maybe_initialize_btc_core<D: DatabaseInterface>(
             info!("✔ Initializing enclave for BTC...");
             start_btc_db_transaction(state)
                 .and_then(|state| put_difficulty_threshold_in_db(difficulty, state))
-                .and_then(|state| put_btc_network_in_db_and_return_state(&network, state))
+                .and_then(|state| put_btc_network_in_db_and_return_state(network, state))
                 .and_then(|state| put_btc_fee_in_db_and_return_state(fee, state))
                 .and_then(|state| parse_submission_material_and_put_in_state(block_json_string, state))
                 .and_then(validate_btc_block_header_in_state)
@@ -61,7 +61,7 @@ pub fn maybe_initialize_btc_core<D: DatabaseInterface>(
                 .and_then(create_btc_block_in_db_format_and_put_in_state)
                 .and_then(maybe_add_btc_block_to_db)
                 .and_then(put_btc_account_nonce_in_db_and_return_state)
-                .and_then(|state| generate_and_store_btc_keys(&network, state))
+                .and_then(|state| generate_and_store_btc_keys_and_return_state(network, state))
                 .and_then(end_btc_db_transaction)
                 .and_then(get_btc_init_output_json)
         },

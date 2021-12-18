@@ -1,5 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     chains::{
         eos::{eos_database_utils::get_latest_eos_block_number, eos_state::EosState},

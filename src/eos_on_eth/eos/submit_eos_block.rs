@@ -7,7 +7,6 @@ use crate::{
             end_eos_db_transaction_and_return_state,
             start_eos_db_transaction_and_return_state,
         },
-        eos_eth_token_dictionary::get_eos_eth_token_dictionary_from_db_and_add_to_eos_state,
         eos_global_sequences::{
             get_processed_global_sequences_and_add_to_state,
             maybe_add_global_sequences_to_processed_list_and_return_state,
@@ -32,6 +31,7 @@ use crate::{
         validate_producer_slot::validate_producer_slot_of_block_in_state,
         validate_signature::validate_block_header_signature,
     },
+    dictionaries::eos_eth::get_eos_eth_token_dictionary_from_db_and_add_to_eos_state,
     eos_on_eth::{
         check_core_is_initialized::check_core_is_initialized_and_return_eos_state,
         eos::{

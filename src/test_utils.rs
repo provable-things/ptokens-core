@@ -49,7 +49,7 @@ pub fn get_test_database() -> TestDB {
 }
 
 pub fn get_random_num_between(min: usize, max: usize) -> usize {
-    rand::thread_rng().gen_range(min, max)
+    rand::thread_rng().gen_range(min..max)
 }
 
 pub fn get_sample_message_to_sign_bytes() -> &'static [u8] {

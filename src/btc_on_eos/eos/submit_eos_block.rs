@@ -2,6 +2,7 @@ use crate::{
     btc_on_eos::{
         check_core_is_initialized::check_core_is_initialized_and_return_eos_state,
         eos::{
+            account_for_fees::maybe_account_for_fees,
             extract_utxos_from_btc_txs::maybe_extract_btc_utxo_from_btc_tx_in_state,
             get_eos_output::get_eos_output,
             redeem_info::{
@@ -79,6 +80,7 @@ where
         .and_then(maybe_filter_value_too_low_redeem_infos_in_state)
         .and_then(maybe_filter_out_already_processed_tx_ids_from_state)
         .and_then(maybe_add_global_sequences_to_processed_list_and_return_state)
+        .and_then(maybe_account_for_fees)
         .and_then(maybe_sign_txs_and_add_to_state)
         .and_then(maybe_increment_btc_signature_nonce_and_return_eos_state)
         .and_then(maybe_extract_btc_utxo_from_btc_tx_in_state)

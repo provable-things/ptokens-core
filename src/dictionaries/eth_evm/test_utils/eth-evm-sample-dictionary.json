@@ -1,0 +1,48 @@
+[
+  {
+    "eth_symbol": "PNT",
+    "evm_symbol": "PNT",
+    "evm_address": "0xdaacb0ab6fb34d24e8a67bfa14bf4d95d4c7af92",
+    "eth_address": "0x89ab32156e46f46d02ade3fecbe5fc4243b9aaed",
+    "eth_fee_basis_points": 10,
+    "evm_fee_basis_points": 20
+  },
+  {
+    "eth_symbol": "OPIUM",
+    "evm_symbol": "pOPIUM",
+    "evm_address": "0x566cedd201f67e542a6851a2959c1a449a041945",
+    "eth_address": "0x888888888889c00c67689029d7856aac1065ec11"
+  },
+  {
+    "eth_symbol": "PTERIA",
+    "evm_symbol": "PTERIA",
+    "evm_address": "0x9f5377fa03dcd4016a33669b385be4d0e02f27bc",
+    "eth_address": "0x02eca910cb3a7d43ebc7e8028652ed5c6b70259b"
+  },
+  {
+    "eth_symbol": "BCP",
+    "evm_symbol": "pBCP",
+    "evm_address": "0xa114f89b49d6a58416bb07dbe09502c4f3a19e2f",
+    "eth_address": "0xe4f726adc8e89c6a6017f01eada77865db22da14"
+  },
+  {
+    "eth_symbol": "DEFI++",
+    "evm_symbol": "pDEFI++",
+    "evm_address": "0xae22e27d1f727b585549c10e26192b2bc01082ca",
+    "eth_address": "0x8d1ce361eb68e9e05573443c407d4a3bed23b033"
+  },
+  {
+    "eth_symbol": "CGG",
+    "evm_symbol": "CGG",
+    "evm_address": "0x1613957159e9b0ac6c80e824f7eea748a32a0ae2",
+    "eth_address": "0x1fe24f25b1cf609b9c4e7e12d802e3640dfa5e43"
+  },
+  {
+    "eth_symbol": "GALA",
+    "evm_symbol": "GALA",
+    "evm_address": "0xbe807dddb074639cd9fa61b47676c064fc50d62c",
+    "eth_address": "0x15D4c048F83bd7e37d49eA4C83a07267Ec4203dA",
+    "eth_token_decimals": 8,
+    "evm_token_decimals": 18
+  }
+]

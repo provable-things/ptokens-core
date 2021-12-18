@@ -1,5 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     btc_on_eos::btc::minting_params::BtcOnEosMintingParamStruct,
     chains::{

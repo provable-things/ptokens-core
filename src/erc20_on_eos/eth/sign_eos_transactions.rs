@@ -1,11 +1,13 @@
 use crate::{
     chains::{
         eos::{
+            eos_chain_id::EosChainId,
             eos_crypto::{
                 eos_private_key::EosPrivateKey,
                 eos_transaction::{get_signed_eos_ptoken_issue_tx, EosSignedTransaction, EosSignedTransactions},
             },
             eos_database_utils::get_eos_chain_id_from_db,
+            eos_utils::get_eos_tx_expiration_timestamp_with_offset,
         },
         eth::eth_state::EthState,
     },
@@ -17,7 +19,7 @@ use crate::{
 pub fn get_signed_eos_ptoken_issue_txs_from_erc20_on_eos_peg_in_infos(
     ref_block_num: u16,
     ref_block_prefix: u32,
-    chain_id: &str,
+    chain_id: &EosChainId,
     private_key: &EosPrivateKey,
     peg_in_infos: &Erc20OnEosPegInInfos,
 ) -> Result<EosSignedTransactions> {
@@ -28,7 +30,8 @@ pub fn get_signed_eos_ptoken_issue_txs_from_erc20_on_eos_peg_in_infos(
     Ok(EosSignedTransactions::new(
         peg_in_infos
             .iter()
-            .map(|peg_in_info| {
+            .enumerate()
+            .map(|(i, peg_in_info)| {
                 info!("✔ Signing EOS tx from `erc20-on-eos` peg in info: {:?}", peg_in_info);
                 get_signed_eos_ptoken_issue_tx(
                     ref_block_num,
@@ -38,6 +41,7 @@ pub fn get_signed_eos_ptoken_issue_txs_from_erc20_on_eos_peg_in_infos(
                     chain_id,
                     private_key,
                     &peg_in_info.eos_token_address,
+                    get_eos_tx_expiration_timestamp_with_offset(i as u32)?,
                 )
             })
             .collect::<Result<Vec<EosSignedTransaction>>>()?,

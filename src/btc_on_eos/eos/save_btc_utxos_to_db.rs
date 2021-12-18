@@ -14,6 +14,6 @@ where
             info!("✔ No BTC UTXOs in state to save!");
             Ok(state)
         },
-        Some(utxos) => save_utxos_to_db(&state.db, &utxos).map(|_| state),
+        Some(utxos) => save_utxos_to_db(&state.db, utxos).map(|_| state),
     }
 }
