@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     chains::{eos::eos_enclave_state::EosEnclaveState, eth::eth_enclave_state::EthEnclaveState},
     enclave_info::EnclaveInfo,
@@ -27,6 +29,10 @@ impl EnclaveState {
     }
 }
 
+/// # Get Enclave State
+///
+/// This function returns a JSON containing the enclave state, including state relevant to each
+/// blockchain controlled by this instance.
 pub fn get_enclave_state<D: DatabaseInterface>(db: D) -> Result<String> {
     info!("✔ Getting core state...");
     check_core_is_initialized(&db).and_then(|_| EnclaveState::new(&db)?.to_string())

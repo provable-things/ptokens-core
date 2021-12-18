@@ -1,9 +1,10 @@
-use eos_primitives::{AccountName as EosAccountName, NumBytes, PublicKey as EosPublicKey, Read, Write};
+use eos_chain::{AccountName as EosAccountName, NumBytes, PublicKey as EosPublicKey, Read, Write};
+use serde::{Deserialize, Serialize};
 
 pub type Authority = (u8, EosKeysAndThreshold);
 
 #[derive(Deserialize, Serialize, Read, Write, NumBytes, Clone, Default, Debug, PartialEq)]
-#[eosio_core_root_path = "eos_primitives"]
+#[eosio_core_root_path = "eos_chain"]
 pub struct EosProducerKeyV1 {
     pub producer_name: EosAccountName,
     pub block_signing_key: EosPublicKey,
@@ -19,21 +20,21 @@ impl EosProducerKeyV1 {
 }
 
 #[derive(Deserialize, Serialize, Read, Write, NumBytes, Clone, Default, Debug, PartialEq)]
-#[eosio_core_root_path = "eos_primitives"]
+#[eosio_core_root_path = "eos_chain"]
 pub struct EosProducerKeyV2 {
     pub producer_name: EosAccountName,
     pub authority: Authority,
 }
 
 #[derive(Read, Write, NumBytes, Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-#[eosio_core_root_path = "eos_primitives"]
+#[eosio_core_root_path = "eos_chain"]
 pub struct EosKeysAndThreshold {
     pub threshold: u32,
     pub keys: Vec<EosKey>,
 }
 
 #[derive(Read, Write, NumBytes, Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-#[eosio_core_root_path = "eos_primitives"]
+#[eosio_core_root_path = "eos_chain"]
 pub struct EosKey {
     pub key: EosPublicKey,
     pub weight: u16,

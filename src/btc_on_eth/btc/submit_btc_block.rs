@@ -1,7 +1,7 @@
 use crate::{
     btc_on_eth::{
         btc::{
-            filter_p2pkh_deposit_txs::filter_for_p2pkh_deposit_txs_excluding_change_outputs_and_add_to_state,
+            account_for_fees::maybe_account_for_fees,
             get_btc_output_json::{create_btc_output_json_and_put_in_state, get_btc_output_as_string},
             minting_params::{
                 parse_minting_params_from_p2pkh_deposits_and_add_to_state,
@@ -23,6 +23,7 @@ use crate::{
         extract_utxos_from_p2pkh_txs::maybe_extract_utxos_from_p2pkh_txs_and_put_in_state,
         extract_utxos_from_p2sh_txs::maybe_extract_utxos_from_p2sh_txs_and_put_in_state,
         filter_minting_params::maybe_filter_out_value_too_low_btc_on_eth_minting_params_in_state,
+        filter_p2pkh_deposit_txs::filter_for_p2pkh_deposit_txs_excluding_change_outputs_and_add_to_state,
         filter_p2sh_deposit_txs::filter_p2sh_deposit_txs_and_add_to_state,
         filter_utxos::filter_out_value_too_low_utxos_from_state,
         get_btc_block_in_db_format::create_btc_block_in_db_format_and_put_in_state,
@@ -76,6 +77,7 @@ pub fn submit_btc_block_to_enclave<D: DatabaseInterface>(db: D, block_json_strin
         .and_then(filter_out_value_too_low_utxos_from_state)
         .and_then(maybe_save_utxos_to_db)
         .and_then(maybe_filter_out_value_too_low_btc_on_eth_minting_params_in_state)
+        .and_then(maybe_account_for_fees)
         .and_then(create_btc_block_in_db_format_and_put_in_state)
         .and_then(maybe_add_btc_block_to_db)
         .and_then(maybe_update_btc_latest_block_hash)

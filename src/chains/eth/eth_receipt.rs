@@ -2,17 +2,20 @@ use std::cmp::Ordering;
 
 use derive_more::{Constructor, Deref, From, Into};
 use ethereum_types::{Address as EthAddress, Bloom, H160, H256 as EthHash, U256};
-use rlp::{Encodable, RlpStream};
+use keccak_hasher::KeccakHasher;
+use rlp::RlpStream;
+use serde::Deserialize;
 use serde_json::{json, Value as JsonValue};
+use triehash::trie_root;
 
 use crate::{
     chains::eth::{
         eth_log::{EthLog, EthLogJson, EthLogs},
+        eth_receipt_type::EthReceiptType,
         eth_utils::{convert_hex_to_address, convert_hex_to_h256, convert_json_value_to_string},
-        nibble_utils::{get_nibbles_from_bytes, Nibbles},
-        trie::{put_in_trie_recursively, Trie},
     },
-    types::{Bytes, Result},
+    types::{Bytes, NoneError, Result},
+    utils::{add_key_and_value_to_json, strip_hex_prefix},
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Constructor, Deref, From, Into)]
@@ -31,8 +34,7 @@ impl EthReceipts {
 
     fn get_receipts_containing_log_from_address(&self, address: &EthAddress) -> Self {
         Self::new(
-            self.0
-                .iter()
+            self.iter()
                 .filter(|receipt| receipt.contains_log_from_address(address))
                 .cloned()
                 .collect(),
@@ -41,8 +43,7 @@ impl EthReceipts {
 
     fn get_receipts_containing_log_with_topic(&self, topic: &EthHash) -> Self {
         Self::new(
-            self.0
-                .iter()
+            self.iter()
                 .filter(|receipt| receipt.contains_log_with_topic(topic))
                 .cloned()
                 .collect(),
@@ -107,35 +108,42 @@ impl EthReceipts {
             .filter_for_those_from_address_containing_topic(address, topic)
     }
 
-    pub fn get_rlp_encoded_receipts_and_nibble_tuples(&self) -> Result<Vec<(Nibbles, Bytes)>> {
+    pub fn get_rlp_encoded_indicies_and_rlp_encoded_receipt_tuples(&self) -> Result<Vec<(Bytes, Bytes)>> {
         self.0
             .iter()
-            .map(|receipt| receipt.get_rlp_encoded_receipt_and_encoded_key_tuple())
+            .map(|receipt| receipt.get_rlp_encoded_index_and_rlp_encoded_receipt_tuple())
             .collect()
     }
 
     pub fn get_merkle_root(&self) -> Result<EthHash> {
-        self.get_rlp_encoded_receipts_and_nibble_tuples()
-            .and_then(|key_value_tuples| put_in_trie_recursively(Trie::get_new_trie()?, key_value_tuples, 0))
-            .map(|trie| trie.root)
+        self.get_rlp_encoded_indicies_and_rlp_encoded_receipt_tuples()
+            .map(|key_value_tuples| EthHash::from_slice(&trie_root::<KeccakHasher, _, _, _>(key_value_tuples)))
     }
 }
 
-#[allow(non_snake_case)]
 #[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EthReceiptJson {
     pub from: String,
     pub status: bool,
-    pub gasUsed: usize,
-    pub blockHash: String,
-    pub logsBloom: String,
+    pub gas_used: usize,
+    pub block_hash: String,
+    pub logs_bloom: String,
     pub logs: Vec<EthLogJson>,
-    pub blockNumber: usize,
+    pub block_number: usize,
     pub to: serde_json::Value,
-    pub transactionHash: String,
-    pub transactionIndex: usize,
-    pub cumulativeGasUsed: usize,
-    pub contractAddress: serde_json::Value,
+    pub transaction_hash: String,
+    pub transaction_index: usize,
+    pub cumulative_gas_used: usize,
+    pub contract_address: serde_json::Value,
+    #[serde(rename = "type")]
+    pub receipt_type: Option<String>,
+}
+
+impl EthReceiptJson {
+    pub fn from_str(s: &str) -> Result<Self> {
+        Ok(serde_json::from_str(s)?)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -152,16 +160,49 @@ pub struct EthReceipt {
     pub contract_address: EthAddress,
     pub logs: EthLogs,
     pub logs_bloom: Bloom,
+    pub receipt_type: Option<EthReceiptType>,
 }
 
 impl EthReceipt {
+    pub fn to_string(&self) -> Result<String> {
+        Ok(self.to_json()?.to_string())
+    }
+
+    pub fn from_str(s: &str) -> Result<Self> {
+        Self::from_json(&EthReceiptJson::from_str(s)?)
+    }
+
+    fn get_receipt_type(&self) -> Result<EthReceiptType> {
+        self.receipt_type
+            .clone()
+            .ok_or(NoneError("Could not get receipt type from receipt!"))
+    }
+
     pub fn to_json(&self) -> Result<JsonValue> {
         let encoded_logs = self
             .logs
-            .0
             .iter()
             .map(|eth_log| eth_log.to_json())
             .collect::<Result<Vec<JsonValue>>>()?;
+        if self.receipt_type.is_none() {
+            self.to_json_legacy(encoded_logs)
+        } else {
+            self.to_eip_2718_json(encoded_logs)
+        }
+    }
+
+    fn to_eip_2718_json(&self, encoded_logs: Vec<JsonValue>) -> Result<JsonValue> {
+        add_key_and_value_to_json(
+            "type",
+            json!(self
+                .receipt_type
+                .as_ref()
+                .map(|eth_receipt_type| eth_receipt_type.to_string())),
+            self.to_json_legacy(encoded_logs)?,
+        )
+    }
+
+    fn to_json_legacy(&self, encoded_logs: Vec<JsonValue>) -> Result<JsonValue> {
         Ok(json!({
             "logs": encoded_logs,
             "status": self.status,
@@ -174,29 +215,33 @@ impl EthReceipt {
             "contractAddress": format!("0x{:x}", self.contract_address),
             "blockHash": format!("0x{}", hex::encode(self.block_hash.as_bytes())),
             "logsBloom": format!("0x{}", hex::encode(self.logs_bloom.as_bytes())),
-            "transactionHash": format!("0x{}", hex::encode( self.transaction_hash.as_bytes())),
+            "transactionHash": format!("0x{}", hex::encode(self.transaction_hash.as_bytes())),
         }))
     }
 
-    pub fn from_json(eth_receipt_json: &EthReceiptJson) -> Result<Self> {
-        let logs = EthLogs::from_receipt_json(&eth_receipt_json)?;
-        Ok(EthReceipt {
-            status: eth_receipt_json.status,
+    pub fn from_json(json: &EthReceiptJson) -> Result<Self> {
+        let logs = EthLogs::from_receipt_json(json)?;
+        Ok(Self {
+            status: json.status,
             logs_bloom: logs.get_bloom(),
-            gas_used: U256::from(eth_receipt_json.gasUsed),
-            from: convert_hex_to_address(&eth_receipt_json.from)?,
-            block_number: U256::from(eth_receipt_json.blockNumber),
-            block_hash: convert_hex_to_h256(&eth_receipt_json.blockHash)?,
-            transaction_index: U256::from(eth_receipt_json.transactionIndex),
-            cumulative_gas_used: U256::from(eth_receipt_json.cumulativeGasUsed),
-            transaction_hash: convert_hex_to_h256(&eth_receipt_json.transactionHash)?,
-            to: match eth_receipt_json.to {
+            gas_used: U256::from(json.gas_used),
+            from: convert_hex_to_address(&json.from)?,
+            block_number: U256::from(json.block_number),
+            block_hash: convert_hex_to_h256(&json.block_hash)?,
+            transaction_index: U256::from(json.transaction_index),
+            cumulative_gas_used: U256::from(json.cumulative_gas_used),
+            transaction_hash: convert_hex_to_h256(&json.transaction_hash)?,
+            to: match json.to {
                 serde_json::Value::Null => H160::zero(),
-                _ => convert_hex_to_address(&convert_json_value_to_string(&eth_receipt_json.to)?)?,
+                _ => convert_hex_to_address(&convert_json_value_to_string(&json.to)?)?,
             },
-            contract_address: match eth_receipt_json.contractAddress {
+            contract_address: match json.contract_address {
                 serde_json::Value::Null => EthAddress::zero(),
-                _ => convert_hex_to_address(&convert_json_value_to_string(&eth_receipt_json.contractAddress)?)?,
+                _ => convert_hex_to_address(&convert_json_value_to_string(&json.contract_address)?)?,
+            },
+            receipt_type: match json.receipt_type {
+                Some(ref hex) => Some(EthReceiptType::from_byte(&hex::decode(&strip_hex_prefix(hex))?[0])),
+                None => None,
             },
             logs,
         })
@@ -211,20 +256,50 @@ impl EthReceipt {
     }
 
     pub fn rlp_encode(&self) -> Result<Bytes> {
+        match self.get_receipt_type() {
+            Ok(EthReceiptType::EIP2718) => {
+                debug!("RLP encoding EIP2718 receipt...");
+                self.encode_eip_2718_receipt()
+            },
+            Ok(EthReceiptType::Legacy) | Err(_) => {
+                debug!("RLP encoding LEGACY receipt...");
+                self.rlp_encode_legacy()
+            },
+        }
+    }
+
+    fn encode_eip_2718_receipt(&self) -> Result<Bytes> {
+        // NOTE: Per EIP-2718: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2718.md
+        // the encoding for these transactions are `TransactionType concatenated w/ ReceiptPayload`
+        // The `ReceiptPayload` for this transaction type is rlp([
+        //   status, cumulative_transaction_gas_used, logs_bloom, logs
+        // ]), which is the same as the RLP encoding for legacy receipts.
+        Ok([EthReceiptType::EIP2718.to_bytes(), self.rlp_encode_legacy()?].concat())
+    }
+
+    fn rlp_encode_legacy(&self) -> Result<Bytes> {
         let mut rlp_stream = RlpStream::new();
-        rlp_stream.append(self);
-        Ok(rlp_stream.out())
+        rlp_stream.begin_list(4);
+        match &self.status {
+            true => rlp_stream.append(&self.status),
+            false => rlp_stream.append_empty_data(),
+        };
+        rlp_stream
+            .append(&self.cumulative_gas_used)
+            .append(&self.logs_bloom)
+            .append_list(&self.logs);
+        Ok(rlp_stream.out().to_vec())
     }
 
     fn rlp_encode_transaction_index(&self) -> Bytes {
         let mut rlp_stream = RlpStream::new();
         rlp_stream.append(&self.transaction_index.as_usize());
-        rlp_stream.out()
+        rlp_stream.out().to_vec()
     }
 
-    pub fn get_rlp_encoded_receipt_and_encoded_key_tuple(&self) -> Result<(Nibbles, Bytes)> {
+    pub fn get_rlp_encoded_index_and_rlp_encoded_receipt_tuple(&self) -> Result<(Bytes, Bytes)> {
         self.rlp_encode()
-            .map(|bytes| (get_nibbles_from_bytes(self.rlp_encode_transaction_index()), bytes))
+            .map(|bytes| (self.rlp_encode_transaction_index(), bytes))
     }
 
     pub fn get_logs_from_address_with_topic(&self, address: &EthAddress, topic: &EthHash) -> EthLogs {
@@ -246,6 +321,18 @@ impl EthReceipt {
                 .concat(),
         )
     }
+
+    pub fn get_logs_from_addresses_with_topics(&self, addresses: &[EthAddress], topics: &[EthHash]) -> EthLogs {
+        debug!("Getting logs from addresses: {:?}", addresses);
+        debug!("Getting logs with topics: {:?}", topics);
+        EthLogs::new(
+            topics
+                .iter()
+                .map(|topic| self.get_logs_from_addresses_with_topic(addresses, topic).0)
+                .collect::<Vec<Vec<EthLog>>>()
+                .concat(),
+        )
+    }
 }
 
 impl Ord for EthReceipt {
@@ -260,19 +347,6 @@ impl PartialOrd for EthReceipt {
     }
 }
 
-impl Encodable for EthReceipt {
-    fn rlp_append(&self, rlp_stream: &mut RlpStream) {
-        let rlp = rlp_stream.begin_list(4);
-        match &self.status {
-            true => rlp.append(&self.status),
-            false => rlp.append_empty_data(),
-        };
-        rlp.append(&self.cumulative_gas_used)
-            .append(&self.logs_bloom)
-            .append_list(&self.logs.0);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,12 +354,21 @@ mod tests {
         get_expected_receipt,
         get_sample_contract_address,
         get_sample_contract_topic,
+        get_sample_eip1559_mainnet_submission_material,
         get_sample_eth_submission_material,
         get_sample_eth_submission_material_json,
         get_sample_receipt_with_desired_topic,
         get_valid_state_with_invalid_block_and_receipts,
         SAMPLE_RECEIPT_INDEX,
     };
+
+    fn get_eip1559_non_legacy_receipt() -> EthReceipt {
+        get_sample_eip1559_mainnet_submission_material().receipts[0].clone()
+    }
+
+    fn get_eip1559_legacy_receipt() -> EthReceipt {
+        get_sample_eip1559_mainnet_submission_material().receipts[1].clone()
+    }
 
     #[test]
     fn should_encode_eth_receipt_as_json() {
@@ -363,7 +446,6 @@ mod tests {
         assert_eq!(num_receipts_after, expected_num_receipts_after);
         assert!(num_receipts_before > num_receipts_after);
         result
-            .0
             .iter()
             .for_each(|receipt| assert!(receipt.logs.contain_topic(&topic)));
     }
@@ -376,35 +458,6 @@ mod tests {
     fn should_rlp_encode_receipt() {
         let result = get_expected_receipt().rlp_encode().unwrap();
         assert_eq!(hex::encode(result), get_encoded_receipt())
-    }
-
-    #[test]
-    fn should_get_encoded_receipt_and_hash_tuple() {
-        let result = get_expected_receipt()
-            .get_rlp_encoded_receipt_and_encoded_key_tuple()
-            .unwrap();
-        let expected_encoded_nibbles = get_nibbles_from_bytes(vec![0x02]); // NOTE: The tx index of sample receipt
-        assert_eq!(result.0, expected_encoded_nibbles);
-        assert_eq!(hex::encode(result.1), get_encoded_receipt());
-    }
-
-    #[test]
-    fn should_get_encoded_receipts_and_hash_tuples() {
-        let expected_encoded_nibbles = get_nibbles_from_bytes(vec![0x02]);
-        let receipts = EthReceipts::new(vec![get_expected_receipt(), get_expected_receipt()]);
-        let results = receipts.get_rlp_encoded_receipts_and_nibble_tuples().unwrap();
-        results.iter().for_each(|result| {
-            assert_eq!(result.0, expected_encoded_nibbles);
-            assert_eq!(hex::encode(&result.1), get_encoded_receipt());
-        });
-    }
-
-    #[test]
-    fn should_get_receipts_merkle_root_from_receipts() {
-        let block_and_receipts = get_sample_eth_submission_material();
-        let result = block_and_receipts.receipts.get_merkle_root().unwrap();
-        let expected_result = block_and_receipts.get_receipts_root().unwrap();
-        assert_eq!(result, expected_result);
     }
 
     #[test]
@@ -434,6 +487,84 @@ mod tests {
         logs_after.iter().for_each(|log| {
             assert!(log.is_from_address(&address));
             assert!(log.contains_topic(&topic));
-        })
+        });
+    }
+
+    #[test]
+    fn should_get_logs_from_addresses_and_with_topic_from_receipt() {
+        let topic = get_sample_contract_topic();
+        let addresses = vec![get_sample_contract_address()];
+        let receipt = get_sample_eth_submission_material()
+            .receipts
+            .get_receipts_containing_log_from_addresses_and_with_topics(&addresses, &vec![topic])[0]
+            .clone();
+        let result = receipt.get_logs_from_addresses_with_topic(&addresses, &topic);
+        assert_eq!(result.len(), 1);
+        result.iter().for_each(|log| {
+            assert!(log.is_from_address(&addresses[0]));
+            assert!(log.contains_topic(&topic));
+        });
+    }
+
+    #[test]
+    fn should_get_logs_from_addresses_and_with_topics_from_receipt() {
+        let topics = vec![get_sample_contract_topic()];
+        let addresses = vec![get_sample_contract_address()];
+        let receipt = get_sample_eth_submission_material()
+            .receipts
+            .get_receipts_containing_log_from_addresses_and_with_topics(&addresses, &topics)[0]
+            .clone();
+        let result = receipt.get_logs_from_addresses_with_topics(&addresses, &topics);
+        assert_eq!(result.len(), 1);
+        result.iter().for_each(|log| {
+            assert!(log.is_from_address(&addresses[0]));
+            assert!(log.contains_topic(&topics[0]));
+        });
+    }
+
+    #[test]
+    fn non_legacy_mainnet_eip1559_receipt_should_have_receipt_type_field() {
+        let receipt = get_eip1559_non_legacy_receipt();
+        assert!(receipt.receipt_type.is_some())
+    }
+
+    #[test]
+    fn non_legacy_eip1559_receipt_should_make_json_str_roundtrip() {
+        let receipt = get_eip1559_non_legacy_receipt();
+        let s = receipt.to_string().unwrap();
+        let result = EthReceipt::from_str(&s).unwrap();
+        assert_eq!(result, receipt);
+    }
+
+    #[test]
+    fn legacy_eip1559_receipt_should_make_json_str_roundtrip() {
+        let receipt = get_eip1559_legacy_receipt();
+        let s = receipt.to_string().unwrap();
+        let result = EthReceipt::from_str(&s).unwrap();
+        assert_eq!(result, receipt);
+    }
+
+    #[test]
+    fn should_get_receipt_type_from_non_legacy_receipt() {
+        let receipt = get_eip1559_non_legacy_receipt();
+        let expected_result = EthReceiptType::EIP2718;
+        let result = receipt.get_receipt_type().unwrap();
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn should_encode_legacy_receipt_correctly() {
+        let receipt = get_eip1559_legacy_receipt();
+        let result = receipt.rlp_encode().unwrap();
+        let expected_result = "f905bd0183062c30b9010000000002010000000000000000000000000000000000000000000000040000000000000000000000000008000000000002000000080020008000000000000000000000000000000808000008000000000000000000000000000000000000000000000000000000000000100002000000000000000000000200000014000800002000000000002000000000000400001000000000010000000000000000000000000100000800200000000008800000000000000000000000002000000008000000000002000000000000000000000000000000000000000000000000000000000000200000000000000010000000000100000000000000000000000000000000f904b2f89b94c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2f863a0ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3efa000000000000000000000000088e6a0c2ddd26feeb64f039a2c41296fcb3f5640a0000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564a00000000000000000000000000000000000000000000000026064e85c5caf57dff89b94a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48f863a0ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3efa00000000000000000000000007238a14518d70b6d8fe63878dd19cb89210c5c66a000000000000000000000000088e6a0c2ddd26feeb64f039a2c41296fcb3f5640a0000000000000000000000000000000000000000000000000000000203b169961f9011c9488e6a0c2ddd26feeb64f039a2c41296fcb3f5640f863a0c42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67a0000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564a0000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564b8a0000000000000000000000000000000000000000000000000000000203b169961fffffffffffffffffffffffffffffffffffffffffffffffd9f9b17a3a350a8210000000000000000000000000000000000004585c7a608dbfc4835aa9f44a8740000000000000000000000000000000000000000000000007c5de12db7429eb8000000000000000000000000000000000000000000000000000000000002fca2f89b948762db106b2c2a0bccb3a80d1ed41273552616e8f863a0ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3efa0000000000000000000000000ba8eb224b656681b2b8cce9c3fc920d98594675ba00000000000000000000000007238a14518d70b6d8fe63878dd19cb89210c5c66a000000000000000000000000000000000000000000002cb527e45ebb1f39485bdf89b94c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2f863a0ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3efa0000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564a0000000000000000000000000ba8eb224b656681b2b8cce9c3fc920d98594675ba00000000000000000000000000000000000000000000000026064e85c5caf57dff9011c94ba8eb224b656681b2b8cce9c3fc920d98594675bf863a0c42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67a0000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564a00000000000000000000000007238a14518d70b6d8fe63878dd19cb89210c5c66b8a0fffffffffffffffffffffffffffffffffffffffffffd34ad81ba144e0c6b7a430000000000000000000000000000000000000000000000026064e85c5caf57df000000000000000000000000000000000000000000ee653c0e75c3b7a964179d0000000000000000000000000000000000000000000068c0e87a58032f4082ddfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe4931";
+        assert_eq!(hex::encode(result), expected_result);
+    }
+
+    #[test]
+    fn should_encode_non_legacy_receipt_correctly() {
+        let receipt = get_eip1559_non_legacy_receipt();
+        let result = receipt.rlp_encode().unwrap();
+        let expected_result = "02f903640183019b2bb9010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000100080020000000000000000000000000000000000800000008000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000014000800002000000000002000000000000400001000000000000000000000000000000000000100000800000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000200000000000000100000000000100000000000000000000000000000000f90259f89b948762db106b2c2a0bccb3a80d1ed41273552616e8f863a0ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3efa0000000000000000000000000ba8eb224b656681b2b8cce9c3fc920d98594675ba000000000000000000000000000000000003b3cc22af3ae1eac0440bcee416b40a000000000000000000000000000000000000000000000541eb0a0ce7492aaf122f89b94c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2f863a0ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3efa000000000000000000000000000000000003b3cc22af3ae1eac0440bcee416b40a0000000000000000000000000ba8eb224b656681b2b8cce9c3fc920d98594675ba000000000000000000000000000000000000000000000000045cf942999229eb4f9011c94ba8eb224b656681b2b8cce9c3fc920d98594675bf863a0c42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67a000000000000000000000000000000000003b3cc22af3ae1eac0440bcee416b40a000000000000000000000000000000000003b3cc22af3ae1eac0440bcee416b40b8a0ffffffffffffffffffffffffffffffffffffffffffffabe14f5f318b6d550ede00000000000000000000000000000000000000000000000045cf942999229eb4000000000000000000000000000000000000000000e9290d4fa549b17685b3750000000000000000000000000000000000000000000074f082db6efc6c9d3457fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe4775";
+        assert_eq!(hex::encode(result), expected_result);
     }
 }

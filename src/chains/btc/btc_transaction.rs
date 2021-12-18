@@ -1,6 +1,6 @@
 use bitcoin::{
     blockdata::transaction::{Transaction as BtcTransaction, TxIn as BtcUtxo, TxOut as BtcTxOut},
-    hashes::sha256d,
+    SigHash,
 };
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 };
 
 // NOTE: Current tx constants. Could make generic in future if needed.
-pub const VERSION: u32 = 1;
+pub const VERSION: i32 = 1;
 pub const LOCK_TIME: u32 = 0;
 pub const SIGN_ALL_HASH_TYPE: u8 = 1;
 
@@ -97,7 +97,7 @@ pub fn create_signed_raw_btc_tx_for_n_input_n_outputs(
             };
             Ok(tx.signature_hash(i, &script, SIGN_ALL_HASH_TYPE as u32))
         })
-        .map(|hash: Result<sha256d::Hash>| Ok(hash?.to_vec()))
+        .map(|hash: Result<SigHash>| Ok(hash?.to_vec()))
         .map(|tx_hash_to_sign: Result<Bytes>| {
             btc_private_key.sign_hash_and_append_btc_hash_type(tx_hash_to_sign?.to_vec(), SIGN_ALL_HASH_TYPE as u8)
         })

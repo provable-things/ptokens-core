@@ -1,21 +1,22 @@
 #![allow(non_snake_case)]
 use std::str::FromStr;
 
-use eos_primitives::{AccountName as EosAccountName, Asset as EosAsset, NumBytes, Read, SerializeData, Write};
+use derive_more::Constructor;
+use eos_chain::{AccountName as EosAccountName, Asset as EosAsset, NumBytes, Read, SerializeData, Write};
 
 use crate::types::Bytes;
 
-#[derive(Clone, Debug, Default, Read, Write, NumBytes)]
-#[eosio_core_root_path = "eos_primitives"]
-pub struct PTokenMintAction {
+#[derive(Clone, Debug, Read, Write, NumBytes, PartialEq, Default, SerializeData)]
+#[eosio_core_root_path = "eos_chain"]
+pub struct PTokenMintActionWithoutMetadata {
     pub to: EosAccountName,
     pub quantity: EosAsset,
     pub memo: String,
 }
 
-impl PTokenMintAction {
+impl PTokenMintActionWithoutMetadata {
     pub fn new(to: EosAccountName, quantity: EosAsset, memo: &str) -> Self {
-        PTokenMintAction {
+        PTokenMintActionWithoutMetadata {
             to,
             quantity,
             memo: memo.into(),
@@ -31,8 +32,17 @@ impl PTokenMintAction {
     }
 }
 
-#[derive(Clone, Debug, Read, Write, NumBytes, Default)]
-#[eosio_core_root_path = "eos_primitives"]
+#[derive(Clone, Debug, Read, Write, NumBytes, PartialEq, Default, SerializeData, Constructor)]
+#[eosio_core_root_path = "eos_chain"]
+pub struct PTokenMintActionWithMetadata {
+    pub to: EosAccountName,
+    pub quantity: EosAsset,
+    pub memo: String,
+    pub metadata: Bytes,
+}
+
+#[derive(Clone, Debug, Read, Write, NumBytes, Default, SerializeData)]
+#[eosio_core_root_path = "eos_chain"]
 pub struct PTokenPegOutAction {
     pub tokenContract: EosAccountName,
     pub quantity: EosAsset,
@@ -51,16 +61,13 @@ impl PTokenPegOutAction {
     }
 }
 
-impl SerializeData for PTokenMintAction {}
-impl SerializeData for PTokenPegOutAction {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn should_create_ptoken_mint_action_from_str() {
-        let result = PTokenMintAction::from_str("whateverxxx", "1.000 EOS", "a memo");
+        let result = PTokenMintActionWithoutMetadata::from_str("whateverxxx", "1.000 EOS", "a memo");
         assert!(result.is_ok());
     }
 

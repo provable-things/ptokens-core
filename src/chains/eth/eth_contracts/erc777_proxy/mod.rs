@@ -13,6 +13,7 @@ use crate::{
             get_eth_private_key_from_db,
             increment_eth_account_nonce_in_db,
         },
+        eth_traits::EthSigningCapabilities,
     },
     traits::DatabaseInterface,
     types::{Bytes, Result},
@@ -68,11 +69,11 @@ where
         nonce_before_incrementing,
         ZERO_ETH_VALUE,
         get_erc777_proxy_contract_address_from_db(db)?,
-        get_eth_chain_id_from_db(db)?,
+        &get_eth_chain_id_from_db(db)?,
         ERC777_CHANGE_PNETWORK_GAS_LIMIT,
         get_eth_gas_price_from_db(db)?,
     )
-    .sign(get_eth_private_key_from_db(db)?)?
+    .sign(&get_eth_private_key_from_db(db)?)?
     .serialize_hex()))
 }
 
@@ -86,11 +87,11 @@ where
         nonce_before_incrementing,
         ZERO_ETH_VALUE,
         get_erc777_proxy_contract_address_from_db(db)?,
-        get_eth_chain_id_from_db(db)?,
+        &get_eth_chain_id_from_db(db)?,
         ERC777_CHANGE_PNETWORK_BY_PROXY_GAS_LIMIT,
         get_eth_gas_price_from_db(db)?,
     )
-    .sign(get_eth_private_key_from_db(db)?)?
+    .sign(&get_eth_private_key_from_db(db)?)?
     .serialize_hex()))
 }
 

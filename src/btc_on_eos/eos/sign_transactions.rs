@@ -12,58 +12,13 @@ use crate::{
             },
             btc_transaction::create_signed_raw_btc_tx_for_n_input_n_outputs,
             btc_types::{BtcRecipientAndAmount, BtcRecipientsAndAmounts},
-            btc_utils::calculate_btc_tx_fee,
-            utxo_manager::{utxo_database_utils::get_first_utxo_and_value, utxo_types::BtcUtxosAndValues},
+            utxo_manager::utxo_utils::get_enough_utxos_to_cover_total,
         },
         eos::eos_state::EosState,
     },
     traits::DatabaseInterface,
     types::Result,
 };
-
-fn get_enough_utxos_to_cover_total<D>(
-    db: &D,
-    required_btc_amount: u64,
-    num_outputs: usize,
-    sats_per_byte: u64,
-    inputs: BtcUtxosAndValues,
-) -> Result<BtcUtxosAndValues>
-where
-    D: DatabaseInterface,
-{
-    info!("✔ Getting UTXO from db...");
-    get_first_utxo_and_value(db).and_then(|utxo_and_value| {
-        debug!("✔ Retrieved UTXO of value: {}", utxo_and_value.value);
-        let fee = calculate_btc_tx_fee(inputs.len() + 1, num_outputs, sats_per_byte);
-        let total_cost = fee + required_btc_amount;
-        let updated_inputs = {
-            let mut v = inputs.clone();
-            v.push(utxo_and_value); // FIXME - can we make more efficient?
-            v
-        };
-        let total_utxo_value = updated_inputs
-            .iter()
-            .fold(0, |acc, utxo_and_value| acc + utxo_and_value.value);
-        debug!(
-            "✔ Calculated fee for {} input(s) & {} output(s): {} Sats",
-            updated_inputs.len(),
-            num_outputs,
-            fee
-        );
-        debug!("✔ Fee + required value of tx: {} Satoshis", total_cost);
-        debug!("✔ Current total UTXO value: {} Satoshis", total_utxo_value);
-        match total_cost > total_utxo_value {
-            true => {
-                trace!("✔ UTXOs do not cover fee + amount, need another!");
-                get_enough_utxos_to_cover_total(db, required_btc_amount, num_outputs, sats_per_byte, updated_inputs)
-            },
-            false => {
-                trace!("✔ UTXO(s) covers fee and required amount!");
-                Ok(updated_inputs)
-            },
-        }
-    })
-}
 
 fn get_address_and_amounts_from_redeem_infos(redeem_infos: &BtcOnEosRedeemInfos) -> Result<BtcRecipientsAndAmounts> {
     info!("✔ Getting addresses & amounts from redeem params...");
@@ -81,15 +36,12 @@ fn get_address_and_amounts_from_redeem_infos(redeem_infos: &BtcOnEosRedeemInfos)
         .collect()
 }
 
-fn sign_txs_from_redeem_infos<D>(
+fn sign_txs_from_redeem_infos<D: DatabaseInterface>(
     db: &D,
     sats_per_byte: u64,
     btc_network: BtcNetwork,
     redeem_infos: &BtcOnEosRedeemInfos,
-) -> Result<BtcTransaction>
-where
-    D: DatabaseInterface,
-{
+) -> Result<BtcTransaction> {
     info!("✔ Getting correct amount of UTXOs...");
     debug!("✔ Network: {}", btc_network);
     debug!("✔ Satoshis per byte: {}", sats_per_byte);
@@ -99,7 +51,7 @@ where
     info!("✔ Signing transaction...");
     create_signed_raw_btc_tx_for_n_input_n_outputs(
         sats_per_byte,
-        get_address_and_amounts_from_redeem_infos(&redeem_infos)?,
+        get_address_and_amounts_from_redeem_infos(redeem_infos)?,
         &get_btc_address_from_db(db)?[..],
         get_btc_private_key_from_db(db)?,
         utxos_and_values,
@@ -145,7 +97,7 @@ mod tests {
                 btc_database_utils::{put_btc_address_in_db, put_btc_network_in_db},
                 btc_test_utils::{get_sample_p2sh_utxo_and_value_2, get_sample_p2sh_utxo_and_value_3},
                 btc_utils::get_hex_tx_from_signed_btc_tx,
-                utxo_manager::utxo_database_utils::save_utxos_to_db,
+                utxo_manager::{utxo_database_utils::save_utxos_to_db, utxo_types::BtcUtxosAndValues},
             },
             eos::{eos_action_proofs::EosActionProof, eos_test_utils::get_sample_eos_submission_material_json_n},
         },

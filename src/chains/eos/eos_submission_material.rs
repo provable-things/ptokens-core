@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
 use chrono::prelude::*;
-use eos_primitives::{AccountName, BlockTimestamp, TimePoint};
+use eos_chain::{AccountName, BlockTimestamp, TimePoint};
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -13,13 +14,6 @@ use crate::{
         eos_state::EosState,
         eos_types::{Checksum256s, EosBlockHeaderJson},
         eos_utils::convert_hex_to_checksum256,
-        parse_eos_schedule::{
-            convert_v1_schedule_json_to_v1_schedule,
-            convert_v1_schedule_to_v2,
-            convert_v2_schedule_json_to_v2_schedule,
-            parse_v1_schedule_string_to_v1_schedule_json,
-            parse_v2_schedule_string_to_v2_schedule_json,
-        },
     },
     traits::DatabaseInterface,
     types::{NoneError, Result},
@@ -36,12 +30,7 @@ pub struct EosSubmissionMaterial {
 
 impl EosSubmissionMaterial {
     fn convert_schedule_json_value_to_v2_schedule_json(json_value: &JsonValue) -> Result<EosProducerScheduleV2> {
-        match parse_v2_schedule_string_to_v2_schedule_json(&json_value.to_string()) {
-            Ok(v2_json) => convert_v2_schedule_json_to_v2_schedule(&v2_json),
-            Err(_) => parse_v1_schedule_string_to_v1_schedule_json(&json_value.to_string())
-                .and_then(|v1_json| convert_v1_schedule_json_to_v1_schedule(&v1_json))
-                .map(|v1_schedule| convert_v1_schedule_to_v2(&v1_schedule)),
-        }
+        EosProducerScheduleV2::from_json(&json_value.to_string())
     }
 
     fn convert_timestamp_string_to_block_timestamp(timestamp: &str) -> Result<BlockTimestamp> {

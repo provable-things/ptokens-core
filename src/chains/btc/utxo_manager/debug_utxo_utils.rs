@@ -135,7 +135,7 @@ pub fn add_multiple_utxos<D: DatabaseInterface>(db: &D, json_str: &str) -> Resul
         .and_then(|utxos| {
             utxos
                 .iter()
-                .map(|utxo| utxo_exists_in_db(db, &utxo))
+                .map(|utxo| utxo_exists_in_db(db, utxo))
                 .collect::<Result<Vec<bool>>>()?
                 .iter()
                 .zip(utxos.iter())
@@ -147,7 +147,7 @@ pub fn add_multiple_utxos<D: DatabaseInterface>(db: &D, json_str: &str) -> Resul
                         Some(utxo)
                     }
                 })
-                .map(|utxo| save_new_utxo_and_value(db, &utxo))
+                .map(|utxo| save_new_utxo_and_value(db, utxo))
                 .collect::<Result<Vec<()>>>()
         })
         .map(|_| SUCCESS_JSON.to_string())

@@ -1,6 +1,8 @@
 pub mod initialize_eth_core;
 pub mod submit_eth_block;
 
+pub(crate) mod account_for_fees;
+pub(crate) mod add_erc777_contract_address;
 pub(crate) mod create_btc_transactions;
 pub(crate) mod extract_utxos_from_btc_txs;
 pub(crate) mod filter_receipts_in_state;

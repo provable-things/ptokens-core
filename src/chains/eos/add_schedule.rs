@@ -18,7 +18,7 @@ where
                 "✔ New producers schedule version {} found in EOS block, adding to db...",
                 new_schedule.version
             );
-            put_eos_schedule_in_db(&state.db, &new_schedule).and(Ok(state))
+            put_eos_schedule_in_db(&state.db, new_schedule).and(Ok(state))
         },
     }
 }

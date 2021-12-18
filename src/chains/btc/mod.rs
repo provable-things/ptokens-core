@@ -6,8 +6,10 @@ pub mod utxo_manager;
 
 pub(crate) mod add_btc_block_to_db;
 pub(crate) mod btc_block;
+pub(crate) mod btc_chain_id;
 pub(crate) mod btc_crypto;
 pub(crate) mod btc_database_utils;
+pub(crate) mod btc_debug_functions;
 pub(crate) mod btc_enclave_state;
 pub(crate) mod btc_state;
 pub(crate) mod btc_submission_material;
@@ -19,6 +21,7 @@ pub(crate) mod core_initialization;
 pub(crate) mod extract_utxos_from_p2pkh_txs;
 pub(crate) mod extract_utxos_from_p2sh_txs;
 pub(crate) mod filter_minting_params;
+pub(crate) mod filter_p2pkh_deposit_txs;
 pub(crate) mod filter_p2sh_deposit_txs;
 pub(crate) mod get_btc_block_in_db_format;
 pub(crate) mod get_deposit_info_hash_map;

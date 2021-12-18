@@ -1,4 +1,7 @@
-use bitcoin_hashes::{sha256d, Hash};
+use bitcoin::{
+    hashes::{sha256d, Hash},
+    Txid,
+};
 
 use crate::{
     chains::btc::utxo_manager::{
@@ -47,12 +50,12 @@ fn remove_utxo_pointer(utxo: &BtcUtxoAndValue) -> BtcUtxoAndValue {
 pub fn get_utxo_with_tx_id_and_v_out<D: DatabaseInterface>(
     db: &D,
     v_out: u32,
-    tx_id: &sha256d::Hash,
+    tx_id: &Txid,
 ) -> Result<BtcUtxoAndValue> {
     fn find_utxo_recursively<D: DatabaseInterface>(
         db: &D,
         v_out: u32,
-        tx_id: &sha256d::Hash,
+        tx_id: &Txid,
         mut utxos: Vec<BtcUtxoAndValue>,
     ) -> Result<(Option<BtcUtxoAndValue>, BtcUtxosAndValues)> {
         match get_first_utxo_and_value(db) {
@@ -79,10 +82,7 @@ pub fn get_utxo_with_tx_id_and_v_out<D: DatabaseInterface>(
     })
 }
 
-pub fn save_utxos_to_db<D>(db: &D, utxos_and_values: &BtcUtxosAndValues) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn save_utxos_to_db<D: DatabaseInterface>(db: &D, utxos_and_values: &BtcUtxosAndValues) -> Result<()> {
     debug!("✔ Saving {} `utxo_and_value`s...", utxos_and_values.len());
     utxos_and_values
         .0
@@ -90,14 +90,8 @@ where
         .try_for_each(|utxo_and_value| save_new_utxo_and_value(db, utxo_and_value))
 }
 
-pub fn get_all_utxo_db_keys<D>(db: &D) -> Vec<Bytes>
-where
-    D: DatabaseInterface,
-{
-    fn get_utxo_pointers_recursively<D>(db: &D, mut pointers: Vec<Bytes>) -> Vec<Bytes>
-    where
-        D: DatabaseInterface,
-    {
+pub fn get_all_utxo_db_keys<D: DatabaseInterface>(db: &D) -> Vec<Bytes> {
+    fn get_utxo_pointers_recursively<D: DatabaseInterface>(db: &D, mut pointers: Vec<Bytes>) -> Vec<Bytes> {
         match maybe_get_next_utxo_pointer_from_utxo_pointer(db, &pointers[pointers.len() - 1]) {
             None => pointers,
             Some(next_pointer) => {
@@ -112,20 +106,14 @@ where
     }
 }
 
-fn maybe_get_next_utxo_pointer_from_utxo_pointer<D>(db: &D, utxo_pointer: &[Byte]) -> Option<Bytes>
-where
-    D: DatabaseInterface,
-{
-    match maybe_get_utxo_from_db(db, &utxo_pointer) {
+fn maybe_get_next_utxo_pointer_from_utxo_pointer<D: DatabaseInterface>(db: &D, utxo_pointer: &[Byte]) -> Option<Bytes> {
+    match maybe_get_utxo_from_db(db, utxo_pointer) {
         None => None,
         Some(utxo) => utxo.maybe_pointer.map(|pointer| pointer.to_vec()),
     }
 }
 
-pub fn get_first_utxo_and_value<D>(db: &D) -> Result<BtcUtxoAndValue>
-where
-    D: DatabaseInterface,
-{
+pub fn get_first_utxo_and_value<D: DatabaseInterface>(db: &D) -> Result<BtcUtxoAndValue> {
     get_first_utxo_pointer(db)
         .and_then(|pointer| get_utxo_from_db(db, &pointer))
         .and_then(|utxo| match utxo.maybe_pointer {
@@ -147,10 +135,7 @@ where
         })
 }
 
-pub fn save_new_utxo_and_value<D>(db: &D, utxo_and_value: &BtcUtxoAndValue) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn save_new_utxo_and_value<D: DatabaseInterface>(db: &D, utxo_and_value: &BtcUtxoAndValue) -> Result<()> {
     let value = utxo_and_value.value;
     let hash_vec = get_utxo_and_value_db_key(get_utxo_nonce_from_db(db)? + 1);
     let hash = sha256d::Hash::from_slice(&hash_vec)?;
@@ -175,54 +160,36 @@ where
     }
 }
 
-pub fn delete_last_utxo_key<D>(db: &D) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn delete_last_utxo_key<D: DatabaseInterface>(db: &D) -> Result<()> {
     debug!("✔ Deleting `UTXO_LAST` key from db...");
     db.delete(UTXO_LAST.to_vec())
 }
 
-pub fn delete_first_utxo_key<D>(db: &D) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn delete_first_utxo_key<D: DatabaseInterface>(db: &D) -> Result<()> {
     debug!("✔ Deleting `UTXO_FIRST` key from db...");
     db.delete(UTXO_FIRST.to_vec())
 }
 
-pub fn delete_first_utxo<D>(db: &D) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn delete_first_utxo<D: DatabaseInterface>(db: &D) -> Result<()> {
     get_first_utxo_pointer(db).and_then(|pointer| {
         debug!("✔ Deleting UTXO under key: {}", hex::encode(&pointer));
         db.delete(pointer.to_vec())
     })
 }
 
-pub fn delete_utxo_balance_key<D>(db: &D) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn delete_utxo_balance_key<D: DatabaseInterface>(db: &D) -> Result<()> {
     debug!("✔ Deleting `UTXO_BALANCE` key from db...");
     db.delete(UTXO_BALANCE.to_vec())
 }
 
-pub fn increment_total_utxo_balance_in_db<D>(db: &D, amount_to_increment_by: u64) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn increment_total_utxo_balance_in_db<D: DatabaseInterface>(db: &D, amount_to_increment_by: u64) -> Result<()> {
     get_total_utxo_balance_from_db(db).and_then(|balance| {
         debug!("✔ Incrementing UTXO total by: {}", amount_to_increment_by);
         put_total_utxo_balance_in_db(db, balance + amount_to_increment_by)
     })
 }
 
-pub fn decrement_total_utxo_balance_in_db<D>(db: &D, amount_to_decrement_by: u64) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn decrement_total_utxo_balance_in_db<D: DatabaseInterface>(db: &D, amount_to_decrement_by: u64) -> Result<()> {
     get_total_utxo_balance_from_db(db).and_then(|balance| match balance >= amount_to_decrement_by {
         true => {
             debug!("✔ Decrementing UTXO balance by {}", amount_to_decrement_by);
@@ -232,18 +199,12 @@ where
     })
 }
 
-pub fn put_total_utxo_balance_in_db<D>(db: &D, balance: u64) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn put_total_utxo_balance_in_db<D: DatabaseInterface>(db: &D, balance: u64) -> Result<()> {
     debug!("✔ Setting total UTXO balance to: {}", balance);
     db.put(UTXO_BALANCE.to_vec(), convert_u64_to_bytes(balance), None)
 }
 
-pub fn get_total_utxo_balance_from_db<D>(db: &D) -> Result<u64>
-where
-    D: DatabaseInterface,
-{
+pub fn get_total_utxo_balance_from_db<D: DatabaseInterface>(db: &D) -> Result<u64> {
     debug!("✔ Getting total UTXO balance from db...");
     match db.get(UTXO_BALANCE.to_vec(), None) {
         Err(_) => Ok(0),
@@ -251,19 +212,17 @@ where
     }
 }
 
-pub fn update_pointer_in_last_utxo_in_db<D>(db: &D, new_pointer: sha256d::Hash) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn update_pointer_in_last_utxo_in_db<D: DatabaseInterface>(db: &D, new_pointer: sha256d::Hash) -> Result<()> {
     debug!("✔ Updating `UTXO_LAST` pointer in db to {}", new_pointer);
     get_last_utxo_pointer(db)
         .and_then(|pointer_to_utxo| update_pointer_in_utxo_in_db(db, &pointer_to_utxo, new_pointer))
 }
 
-pub fn update_pointer_in_utxo_in_db<D>(db: &D, db_key: &[Byte], new_pointer: sha256d::Hash) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn update_pointer_in_utxo_in_db<D: DatabaseInterface>(
+    db: &D,
+    db_key: &[Byte],
+    new_pointer: sha256d::Hash,
+) -> Result<()> {
     debug!(
         "✔ Updating UTXO pointer in db under key: {} to: {}",
         hex::encode(db_key),
@@ -274,10 +233,7 @@ where
         .and_then(|utxo| put_utxo_in_db(db, db_key, &utxo))
 }
 
-pub fn maybe_get_utxo_from_db<D>(db: &D, db_key: &[Byte]) -> Option<BtcUtxoAndValue>
-where
-    D: DatabaseInterface,
-{
+pub fn maybe_get_utxo_from_db<D: DatabaseInterface>(db: &D, db_key: &[Byte]) -> Option<BtcUtxoAndValue> {
     debug!("✔ Maybe getting UTXO in db under key: {}", hex::encode(db_key));
     match db.get(db_key.to_vec(), None) {
         Err(_) => {
@@ -294,59 +250,39 @@ where
     }
 }
 
-pub fn get_utxo_from_db<D>(db: &D, db_key: &[Byte]) -> Result<BtcUtxoAndValue>
-where
-    D: DatabaseInterface,
-{
+pub fn get_utxo_from_db<D: DatabaseInterface>(db: &D, db_key: &[Byte]) -> Result<BtcUtxoAndValue> {
     debug!("✔ Getting UTXO in db under key: {}", hex::encode(db_key));
     db.get(db_key.to_vec(), None)
         .and_then(|bytes| deserialize_utxo_and_value(&bytes))
 }
 
-pub fn put_utxo_in_db<D>(db: &D, key: &[Byte], utxo: &BtcUtxoAndValue) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn put_utxo_in_db<D: DatabaseInterface>(db: &D, key: &[Byte], utxo: &BtcUtxoAndValue) -> Result<()> {
     debug!("✔ Putting UTXO in db under key: {}", sha256d::Hash::from_slice(key)?);
     db.put(key.to_vec(), serialize_btc_utxo_and_value(utxo)?, None)
 }
 
-pub fn set_last_utxo_pointer<D>(db: &D, hash: &sha256d::Hash) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn set_last_utxo_pointer<D: DatabaseInterface>(db: &D, hash: &sha256d::Hash) -> Result<()> {
     debug!("✔ Setting `UTXO_LAST` pointer to: {}", hash);
     db.put(UTXO_LAST.to_vec(), hash.to_vec(), None)
 }
 
-pub fn get_last_utxo_pointer<D>(db: &D) -> Result<Bytes>
-where
-    D: DatabaseInterface,
-{
+pub fn get_last_utxo_pointer<D: DatabaseInterface>(db: &D) -> Result<Bytes> {
     debug!("✔ Getting `UTXO_LAST` pointer...");
     db.get(UTXO_LAST.to_vec(), None)
 }
 
-pub fn set_first_utxo_pointer<D>(db: &D, hash: &sha256d::Hash) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn set_first_utxo_pointer<D: DatabaseInterface>(db: &D, hash: &sha256d::Hash) -> Result<()> {
     debug!("✔ Setting `UTXO_FIRST` pointer to: {}", hex::encode(&hash));
     db.put(UTXO_FIRST.to_vec(), hash.to_vec(), None)
 }
 
-pub fn get_first_utxo_pointer<D>(db: &D) -> Result<Bytes>
-where
-    D: DatabaseInterface,
-{
+pub fn get_first_utxo_pointer<D: DatabaseInterface>(db: &D) -> Result<Bytes> {
     debug!("✔ Getting `UTXO_FIRST` pointer...");
     db.get(UTXO_FIRST.to_vec(), None)
+        .map_err(|_| "✘ No UTXOs in the database! Have you bricked this core?".into())
 }
 
-pub fn get_utxo_nonce_from_db<D>(db: &D) -> Result<u64>
-where
-    D: DatabaseInterface,
-{
+pub fn get_utxo_nonce_from_db<D: DatabaseInterface>(db: &D) -> Result<u64> {
     debug!("✔ Getting UTXO nonce from db...");
     match db.get(UTXO_NONCE.to_vec(), None) {
         Err(_) => {
@@ -365,18 +301,12 @@ pub fn get_total_number_of_utxos_from_db<D: DatabaseInterface>(db: &D) -> usize 
     get_all_utxo_db_keys(db).len()
 }
 
-pub fn put_utxo_nonce_in_db<D>(db: &D, utxo_nonce: u64) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn put_utxo_nonce_in_db<D: DatabaseInterface>(db: &D, utxo_nonce: u64) -> Result<()> {
     debug!("✔ Setting UTXO nonce to: {}", utxo_nonce);
     db.put(UTXO_NONCE.to_vec(), convert_u64_to_bytes(utxo_nonce), None)
 }
 
-pub fn increment_utxo_nonce_in_db<D>(db: &D) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn increment_utxo_nonce_in_db<D: DatabaseInterface>(db: &D) -> Result<()> {
     debug!("✔ Incrementing UTXO nonce in db by 1...");
     get_utxo_nonce_from_db(db).and_then(|num| put_utxo_nonce_in_db(db, num + 1))
 }
@@ -773,6 +703,17 @@ mod tests {
             Err(AppError::Custom(err)) => assert_eq!(err, expected_err),
             Err(_) => panic!("Wrong error receieved!"),
             Ok(_) => panic!("Should not have succeeded!"),
+        };
+    }
+
+    #[test]
+    fn should_have_helpful_error_message_if_no_utxos_in_db() {
+        let db = get_test_database();
+        let expected_err_msg = "✘ No UTXOs in the database! Have you bricked this core?";
+        match get_first_utxo_and_value(&db) {
+            Ok(_) => panic!("Should not have succeeded!"),
+            Err(AppError::Custom(err_msg)) => assert_eq!(err_msg, expected_err_msg),
+            Err(_) => panic!("Wrong error received!"),
         };
     }
 }

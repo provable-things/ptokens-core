@@ -7,6 +7,7 @@ use bitcoin::{
         transaction::{OutPoint as BtcOutPoint, Transaction as BtcTransaction, TxIn as BtcUtxo, TxOut as BtcTxOut},
     },
     hashes::{sha256d, Hash},
+    Txid,
 };
 
 use crate::{
@@ -16,7 +17,7 @@ use crate::{
     },
     btc_on_eth::{
         btc::minting_params::{BtcOnEthMintingParamStruct, BtcOnEthMintingParams},
-        utils::convert_satoshis_to_ptoken,
+        utils::convert_satoshis_to_wei,
     },
     chains::{
         btc::{
@@ -137,12 +138,12 @@ pub fn get_sample_minting_params() -> BtcOnEthMintingParams {
     let eth_address_1 = EthAddress::from_str(&originating_tx_address_1).unwrap();
     let eth_address_2 = EthAddress::from_str(&originating_tx_address_2).unwrap();
     let eth_address_3 = EthAddress::from_str(&originating_tx_address_3).unwrap();
-    let amount_1 = convert_satoshis_to_ptoken(MINIMUM_REQUIRED_SATOSHIS);
-    let amount_2 = convert_satoshis_to_ptoken(MINIMUM_REQUIRED_SATOSHIS + 1);
-    let amount_3 = convert_satoshis_to_ptoken(MINIMUM_REQUIRED_SATOSHIS - 1);
-    let originating_tx_hash_1 = sha256d::Hash::hash(b"something_1");
-    let originating_tx_hash_2 = sha256d::Hash::hash(b"something_2");
-    let originating_tx_hash_3 = sha256d::Hash::hash(b"something_3");
+    let amount_1 = convert_satoshis_to_wei(MINIMUM_REQUIRED_SATOSHIS);
+    let amount_2 = convert_satoshis_to_wei(MINIMUM_REQUIRED_SATOSHIS + 1);
+    let amount_3 = convert_satoshis_to_wei(MINIMUM_REQUIRED_SATOSHIS - 1);
+    let originating_tx_hash_1 = Txid::hash(b"something_1");
+    let originating_tx_hash_2 = Txid::hash(b"something_2");
+    let originating_tx_hash_3 = Txid::hash(b"something_3");
     let minting_params_1 = BtcOnEthMintingParamStruct {
         amount: amount_1,
         eth_address: eth_address_1,

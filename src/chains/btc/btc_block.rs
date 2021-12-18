@@ -6,10 +6,12 @@ pub use bitcoin::{
         transaction::Transaction as BtcTransaction,
     },
     consensus::encode::{deserialize as btc_deserialize, serialize as btc_serialize},
+    hash_types::{BlockHash, TxMerkleNode},
     hashes::{sha256d, Hash},
     util::address::Address as BtcAddress,
 };
 use derive_more::Constructor;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     btc_on_eos::btc::minting_params::BtcOnEosMintingParams,
@@ -28,7 +30,7 @@ use crate::{
 pub struct BtcBlockAndId {
     pub height: u64,
     pub block: BtcBlock,
-    pub id: sha256d::Hash,
+    pub id: BlockHash,
     pub deposit_address_list: DepositInfoList,
 }
 
@@ -38,7 +40,7 @@ impl BtcBlockAndId {
         Ok(Self {
             height: json.block.height,
             block: json.to_btc_block()?,
-            id: sha256d::Hash::from_str(&json.block.id)?,
+            id: BlockHash::from_str(&json.block.id)?,
             deposit_address_list: DepositInfoList::from_json(&json.deposit_address_list)?,
         })
     }
@@ -49,7 +51,7 @@ pub struct BtcBlockJson {
     pub bits: u32,
     pub id: String,
     pub nonce: u32,
-    pub version: u32,
+    pub version: i32,
     pub height: u64,
     pub timestamp: u32,
     pub merkle_root: String,
@@ -59,25 +61,25 @@ pub struct BtcBlockJson {
 impl BtcBlockJson {
     pub fn to_block_header(&self) -> Result<BtcBlockHeader> {
         info!("✔ Parsing `BtcBlockJson` to `BtcBlockHeader`...");
-        Ok(BtcBlockHeader::new(
-            self.timestamp,
-            self.bits,
-            self.nonce,
-            self.version,
-            sha256d::Hash::from_str(&self.merkle_root)?,
-            sha256d::Hash::from_str(&self.previousblockhash)?,
-        ))
+        Ok(BtcBlockHeader {
+            time: self.timestamp,
+            bits: self.bits,
+            nonce: self.nonce,
+            version: self.version,
+            merkle_root: TxMerkleNode::from_str(&self.merkle_root)?,
+            prev_blockhash: BlockHash::from_str(&self.previousblockhash)?,
+        })
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Constructor)]
 pub struct BtcBlockInDbFormat {
     pub height: u64,
-    pub id: sha256d::Hash,
+    pub id: BlockHash,
     pub extra_data: Bytes,
     pub eos_minting_params: Option<BtcOnEosMintingParams>,
     pub eth_minting_params: Option<BtcOnEthMintingParams>,
-    pub prev_blockhash: sha256d::Hash,
+    pub prev_blockhash: BlockHash,
 }
 
 impl BtcBlockInDbFormat {
@@ -153,7 +155,7 @@ impl BtcBlockInDbFormat {
         SerializedBlockInDbFormat::from_bytes(bytes).and_then(|serialized_block_in_db_format| {
             Ok(Self::new(
                 convert_bytes_to_u64(&serialized_block_in_db_format.height)?,
-                sha256d::Hash::from_slice(&serialized_block_in_db_format.id)?,
+                BlockHash::from_slice(&serialized_block_in_db_format.id)?,
                 serialized_block_in_db_format.extra_data.clone(),
                 serialized_block_in_db_format.get_btc_on_eos_minting_params()?,
                 serialized_block_in_db_format.get_btc_on_eth_minting_params()?,
@@ -225,12 +227,12 @@ impl SerializedBlockInDbFormat {
         }
     }
 
-    pub fn get_prev_blockhash(&self) -> Result<sha256d::Hash> {
+    pub fn get_prev_blockhash(&self) -> Result<BlockHash> {
         if self.prev_blockhash.is_some() {
             self.prev_blockhash
                 .clone()
                 .ok_or(NoneError("No `prev_blockhash` in `SerializedBlockInDbFormat`!"))
-                .and_then(|bytes| Ok(sha256d::Hash::from_slice(&bytes)?))
+                .and_then(|bytes| Ok(BlockHash::from_slice(&bytes)?))
         } else {
             // NOTE: Blocks saved into the DB pre core v2.0.0 contain the block itself.
             self.get_block().map(|block| block.header.prev_blockhash)
@@ -245,9 +247,9 @@ impl SerializedBlockInDbFormat {
     }
 
     pub fn from_bytes(bytes: &[Byte]) -> Result<Self> {
-        match serde_json::from_slice(&bytes) {
+        match serde_json::from_slice(bytes) {
             Ok(serialized_block) => Ok(serialized_block),
-            Err(_) => Ok(Self::from_legacy(&SerializedBlockInDbFormatLegacy::from_bytes(&bytes)?)),
+            Err(_) => Ok(Self::from_legacy(&SerializedBlockInDbFormatLegacy::from_bytes(bytes)?)),
         }
     }
 }
@@ -289,7 +291,7 @@ impl SerializedBlockInDbFormatLegacy {
     }
 
     pub fn from_bytes(bytes: &[Byte]) -> Result<Self> {
-        Ok(serde_json::from_slice::<Self>(&bytes)?)
+        Ok(serde_json::from_slice::<Self>(bytes)?)
     }
 }
 

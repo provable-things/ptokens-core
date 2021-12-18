@@ -1,6 +1,7 @@
 use crate::{
     btc_on_eos::{
         btc::{
+            account_for_fees::maybe_account_for_fees,
             get_btc_output_json::{create_btc_output_json_and_put_in_state, get_btc_output_as_string},
             minting_params::parse_minting_params_from_p2sh_deposits_and_add_to_state,
             sign_transactions::maybe_sign_canon_block_txs_and_add_to_state,
@@ -36,6 +37,13 @@ use crate::{
     types::Result,
 };
 
+/// # Submit BTC Block to Core
+///
+/// The main submission pipeline. Submitting a BTC block to the core will - if that block is
+/// valid & subsequent to the core's current latest block - advanced the piece of the BTC
+/// blockchain held by the core in it's encrypted database. Should the submitted block
+/// contain a deposit to an address derived from the core's BTC public key, an EOS
+/// transaction will be signed & returned to the caller.
 pub fn submit_btc_block_to_core<D: DatabaseInterface>(db: D, block_json_string: &str) -> Result<String> {
     info!("✔ Submitting BTC block to core...");
     parse_submission_material_and_put_in_state(block_json_string, BtcState::init(db))
@@ -53,6 +61,7 @@ pub fn submit_btc_block_to_core<D: DatabaseInterface>(db: D, block_json_string: 
         .and_then(maybe_extract_utxos_from_p2sh_txs_and_put_in_state)
         .and_then(filter_out_value_too_low_utxos_from_state)
         .and_then(maybe_save_utxos_to_db)
+        .and_then(maybe_account_for_fees)
         .and_then(create_btc_block_in_db_format_and_put_in_state)
         .and_then(maybe_add_btc_block_to_db)
         .and_then(maybe_update_btc_latest_block_hash)

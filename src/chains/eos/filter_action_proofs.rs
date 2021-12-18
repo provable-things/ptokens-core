@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use eos_primitives::{AccountName as EosAccountName, ActionName as EosActionName, Checksum256};
+use eos_chain::{AccountName as EosAccountName, ActionName as EosActionName, Checksum256};
 
 use crate::{
     chains::eos::{
@@ -85,7 +85,7 @@ pub fn filter_out_proofs_with_invalid_merkle_proofs(action_proofs: &[EosActionPr
 pub fn filter_out_invalid_action_receipt_digests(action_proofs: &[EosActionProof]) -> Result<EosActionProofs> {
     let filtered = action_proofs
         .iter()
-        .map(|proof| proof.action_receipt.to_digest())
+        .filter_map(|proof| proof.action_receipt.to_digest().ok())
         .map(hex::encode)
         .zip(action_proofs.iter())
         .filter_map(|(digest, proof)| {
@@ -108,7 +108,7 @@ pub fn filter_out_proofs_with_action_digests_not_in_action_receipts(
     let filtered = action_proofs
         .iter()
         .map(|proof| get_digest_from_eos_action(&proof.action))
-        .map(|digest_bytes| convert_bytes_to_checksum256(&digest_bytes))
+        .map(|digest_bytes| convert_bytes_to_checksum256(&digest_bytes?))
         .collect::<Result<Vec<Checksum256>>>()?
         .into_iter()
         .zip(action_proofs.iter())
@@ -129,7 +129,7 @@ pub fn filter_out_proofs_with_action_digests_not_in_action_receipts(
 pub fn filter_duplicate_proofs(action_proofs: &[EosActionProof]) -> Result<EosActionProofs> {
     let mut filtered: EosActionProofs = Vec::new();
     action_proofs.iter().for_each(|proof| {
-        if !filtered.contains(&proof) {
+        if !filtered.contains(proof) {
             filtered.push(proof.clone());
         }
     });
@@ -170,8 +170,8 @@ pub fn maybe_filter_proofs_for_action_name<D: DatabaseInterface>(
     state: EosState<D>,
     action_name: &str,
 ) -> Result<EosState<D>> {
-    info!("✔ Filtering for proofs with action name: {}", &action_name);
-    filter_for_proofs_with_action_name(&state.action_proofs, &action_name)
+    info!("✔ Filtering for proofs with action name: {}", action_name);
+    filter_for_proofs_with_action_name(&state.action_proofs, action_name)
         .and_then(|proofs| state.replace_action_proofs(proofs))
 }
 

@@ -1,5 +1,9 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
+
 use crate::{
     chains::eos::{
+        eos_chain_id::EosChainId,
         eos_constants::EOS_CORE_IS_INITIALIZED_JSON,
         eos_crypto::eos_private_key::EosPrivateKey,
         eos_database_utils::{
@@ -17,18 +21,18 @@ use crate::{
             put_eos_token_symbol_in_db,
             put_incremerkle_in_db,
         },
-        eos_eth_token_dictionary::{EosEthTokenDictionary, EosEthTokenDictionaryJson},
         eos_global_sequences::ProcessedGlobalSequences,
         eos_merkle_utils::Incremerkle,
+        eos_producer_schedule::EosProducerScheduleV2,
         eos_state::EosState,
         eos_submission_material::EosSubmissionMaterial,
         eos_types::{Checksum256s, EosBlockHeaderJson, EosKnownSchedules},
         eos_utils::convert_hex_to_checksum256,
-        parse_eos_schedule::{convert_v2_schedule_json_to_v2_schedule, EosProducerScheduleJsonV2},
         protocol_features::{EnabledFeatures, WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH},
         validate_signature::check_block_signature_is_valid,
     },
     constants::CORE_IS_VALIDATING,
+    dictionaries::eos_eth::{EosEthTokenDictionary, EosEthTokenDictionaryJson},
     traits::DatabaseInterface,
     types::{Bytes, NoneError, Result},
 };
@@ -37,7 +41,7 @@ use crate::{
 pub struct EosInitJson {
     pub block: EosBlockHeaderJson,
     pub blockroot_merkle: Vec<String>,
-    pub active_schedule: EosProducerScheduleJsonV2,
+    pub active_schedule: EosProducerScheduleV2,
     pub maybe_protocol_features_to_enable: Option<Vec<String>>,
     pub eos_eth_token_dictionary: Option<EosEthTokenDictionaryJson>,
     pub erc20_on_eos_token_dictionary: Option<EosEthTokenDictionaryJson>,
@@ -45,20 +49,36 @@ pub struct EosInitJson {
 
 impl EosInitJson {
     pub fn from_json_string(json_string: &str) -> Result<Self> {
-        match serde_json::from_str(&json_string) {
-            Ok(result) => Ok(result),
-            Err(err) => Err(err.into()),
+        // NOTE: This inefficient way allows us ot deail with init block with EITHER v1 || v2 schedules.
+        // The inefficiency is moot however since this function only gets called once in a core's lifetime
+        #[derive(Deserialize)]
+        pub struct InterimInitJson {
+            pub block: EosBlockHeaderJson,
+            pub active_schedule: JsonValue,
+            pub blockroot_merkle: Vec<String>,
+            pub maybe_protocol_features_to_enable: Option<Vec<String>>,
+            pub eos_eth_token_dictionary: Option<EosEthTokenDictionaryJson>,
+            pub erc20_on_eos_token_dictionary: Option<EosEthTokenDictionaryJson>,
         }
+        let interim_init_json = serde_json::from_str::<InterimInitJson>(json_string)?;
+        let producer_schedule = EosProducerScheduleV2::from_json(&interim_init_json.active_schedule.to_string())?;
+        Ok(EosInitJson {
+            block: interim_init_json.block.clone(),
+            blockroot_merkle: interim_init_json.blockroot_merkle.clone(),
+            active_schedule: producer_schedule,
+            maybe_protocol_features_to_enable: interim_init_json.maybe_protocol_features_to_enable,
+            eos_eth_token_dictionary: interim_init_json.eos_eth_token_dictionary.clone(),
+            erc20_on_eos_token_dictionary: interim_init_json.erc20_on_eos_token_dictionary,
+        })
     }
 
     #[cfg(test)]
     pub fn validate(&self) {
-        use eos_primitives::Checksum256;
+        use eos_chain::Checksum256;
         let msig_enabled = match &self.maybe_protocol_features_to_enable {
             None => false,
             Some(features) => features.contains(&hex::encode(WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH)),
         };
-        let schedule = convert_v2_schedule_json_to_v2_schedule(&self.active_schedule).unwrap();
         let block_header = EosSubmissionMaterial::parse_eos_block_header_from_json(&self.block).unwrap();
         let blockroot_merkle = self
             .blockroot_merkle
@@ -75,7 +95,7 @@ impl EosInitJson {
             &block_mroot,
             &producer_signature,
             &block_header,
-            &schedule,
+            &self.active_schedule,
         )
         .is_err()
         {
@@ -84,13 +104,10 @@ impl EosInitJson {
     }
 }
 
-pub fn maybe_enable_protocol_features_and_return_state<D>(
+pub fn maybe_enable_protocol_features_and_return_state<D: DatabaseInterface>(
     maybe_protocol_features_to_enable: &Option<Vec<String>>,
     state: EosState<D>,
-) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+) -> Result<EosState<D>> {
     match maybe_protocol_features_to_enable {
         None => {
             info!("✘ No protocol features to enable: Skipping!");
@@ -109,13 +126,10 @@ where
     }
 }
 
-pub fn test_block_validation_and_return_state<D>(
+pub fn test_block_validation_and_return_state<D: DatabaseInterface>(
     block_json: &EosBlockHeaderJson,
     state: EosState<D>,
-) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+) -> Result<EosState<D>> {
     if CORE_IS_VALIDATING {
         info!("✔ Checking block validation passes...");
         check_block_signature_is_valid(
@@ -124,7 +138,7 @@ where
                 .is_enabled(&WTMSIG_BLOCK_SIGNATURE_FEATURE_HASH.to_vec()),
             &get_incremerkle_from_db(&state.db)?.get_root().to_bytes().to_vec(),
             &block_json.producer_signature,
-            &EosSubmissionMaterial::parse_eos_block_header_from_json(&block_json)?,
+            &EosSubmissionMaterial::parse_eos_block_header_from_json(block_json)?,
             &get_eos_schedule_from_db(&state.db, block_json.schedule_version)?,
         )
         .and(Ok(state))
@@ -134,10 +148,7 @@ where
     }
 }
 
-pub fn generate_and_put_incremerkle_in_db<D>(db: &D, blockroot_merkle: &[String]) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn generate_and_put_incremerkle_in_db<D: DatabaseInterface>(db: &D, blockroot_merkle: &[String]) -> Result<()> {
     info!("✔ Generating and putting incremerkle in db...");
     put_incremerkle_in_db(
         db,
@@ -158,13 +169,10 @@ pub fn generate_and_put_incremerkle_in_db_and_return_state<D>(
 where
     D: DatabaseInterface,
 {
-    generate_and_put_incremerkle_in_db(&state.db, &blockroot_merkle).and(Ok(state))
+    generate_and_put_incremerkle_in_db(&state.db, blockroot_merkle).and(Ok(state))
 }
 
-pub fn put_eos_latest_block_info_in_db<D>(db: &D, block_json: &EosBlockHeaderJson) -> Result<()>
-where
-    D: DatabaseInterface,
-{
+pub fn put_eos_latest_block_info_in_db<D: DatabaseInterface>(db: &D, block_json: &EosBlockHeaderJson) -> Result<()> {
     info!(
         "✔ Putting latest block number '{}' & ID '{}' into db...",
         &block_json.block_num, &block_json.block_id
@@ -173,47 +181,30 @@ where
         .and_then(|_| put_eos_last_seen_block_id_in_db(db, &convert_hex_to_checksum256(block_json.block_id.clone())?))
 }
 
-pub fn put_eos_latest_block_info_in_db_and_return_state<D>(
+pub fn put_eos_latest_block_info_in_db_and_return_state<D: DatabaseInterface>(
     block_json: &EosBlockHeaderJson,
     state: EosState<D>,
-) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+) -> Result<EosState<D>> {
     put_eos_latest_block_info_in_db(&state.db, block_json).and(Ok(state))
 }
 
-pub fn put_eos_known_schedule_in_db_and_return_state<D>(
-    schedule_json: &EosProducerScheduleJsonV2,
+pub fn put_eos_known_schedule_in_db_and_return_state<D: DatabaseInterface>(
+    schedule: &EosProducerScheduleV2,
     state: EosState<D>,
-) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+) -> Result<EosState<D>> {
     info!("✔ Putting EOS known schedule into db...");
-    convert_v2_schedule_json_to_v2_schedule(schedule_json)
-        .map(|sched| EosKnownSchedules::new(sched.version))
-        .and_then(|sched| put_eos_known_schedules_in_db(&state.db, &sched))
-        .and(Ok(state))
+    put_eos_known_schedules_in_db(&state.db, &EosKnownSchedules::new(schedule.version)).and(Ok(state))
 }
 
-pub fn put_eos_schedule_in_db_and_return_state<D>(
-    schedule_json: &EosProducerScheduleJsonV2,
+pub fn put_eos_schedule_in_db_and_return_state<D: DatabaseInterface>(
+    schedule: &EosProducerScheduleV2,
     state: EosState<D>,
-) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+) -> Result<EosState<D>> {
     info!("✔ Putting EOS schedule into db...");
-    convert_v2_schedule_json_to_v2_schedule(schedule_json)
-        .and_then(|schedule| put_eos_schedule_in_db(&state.db, &schedule))
-        .and(Ok(state))
+    put_eos_schedule_in_db(&state.db, schedule).and(Ok(state))
 }
 
-pub fn generate_and_save_eos_keys_and_return_state<D>(state: EosState<D>) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+pub fn generate_and_save_eos_keys_and_return_state<D: DatabaseInterface>(state: EosState<D>) -> Result<EosState<D>> {
     info!("✔ Generating EOS keys & putting into db...");
     let private_key = EosPrivateKey::generate_random()?;
     put_eos_public_key_in_db(&state.db, &private_key.to_public_key())
@@ -225,28 +216,25 @@ pub fn get_eos_init_output<D: DatabaseInterface>(_state: EosState<D>) -> Result<
     Ok(EOS_CORE_IS_INITIALIZED_JSON.to_string())
 }
 
-pub fn put_eos_account_name_in_db_and_return_state<D>(account_name: &str, state: EosState<D>) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+pub fn put_eos_account_name_in_db_and_return_state<D: DatabaseInterface>(
+    account_name: &str,
+    state: EosState<D>,
+) -> Result<EosState<D>> {
     info!("✔ Putting EOS account name '{}' into db...", account_name);
-    put_eos_account_name_in_db(&state.db, &account_name).and(Ok(state))
+    put_eos_account_name_in_db(&state.db, account_name).and(Ok(state))
 }
 
-pub fn put_eos_account_nonce_in_db_and_return_state<D>(state: EosState<D>) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+pub fn put_eos_account_nonce_in_db_and_return_state<D: DatabaseInterface>(state: EosState<D>) -> Result<EosState<D>> {
     info!("✔ Putting EOS account nonce in db...");
     put_eos_account_nonce_in_db(&state.db, 0).and(Ok(state))
 }
 
-pub fn put_eos_token_symbol_in_db_and_return_state<D>(token_symbol: &str, state: EosState<D>) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+pub fn put_eos_token_symbol_in_db_and_return_state<D: DatabaseInterface>(
+    token_symbol: &str,
+    state: EosState<D>,
+) -> Result<EosState<D>> {
     info!("✔ Putting EOS token symbol '{}' into db...", token_symbol);
-    put_eos_token_symbol_in_db(&state.db, &token_symbol).and(Ok(state))
+    put_eos_token_symbol_in_db(&state.db, token_symbol).and(Ok(state))
 }
 
 pub fn put_empty_processed_tx_ids_in_db_and_return_state<D: DatabaseInterface>(
@@ -258,13 +246,14 @@ pub fn put_empty_processed_tx_ids_in_db_and_return_state<D: DatabaseInterface>(
         .and(Ok(state))
 }
 
-pub fn put_eos_chain_id_in_db_and_return_state<D>(chain_id: &str, state: EosState<D>) -> Result<EosState<D>>
-where
-    D: DatabaseInterface,
-{
+pub fn put_eos_chain_id_in_db_and_return_state<D: DatabaseInterface>(
+    chain_id: &str,
+    state: EosState<D>,
+) -> Result<EosState<D>> {
     info!("✔ Putting EOS chain ID '{}' into db...", chain_id);
-    put_eos_chain_id_in_db(&state.db, chain_id).and(Ok(state))
+    put_eos_chain_id_in_db(&state.db, &EosChainId::from_str(chain_id)?).and(Ok(state))
 }
+
 pub fn maybe_put_eos_eth_token_dictionary_in_db_and_return_state<D: DatabaseInterface>(
     init_json: &EosInitJson,
     state: EosState<D>,
@@ -291,9 +280,11 @@ pub fn maybe_put_eos_eth_token_dictionary_in_db_and_return_state<D: DatabaseInte
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::chains::eos::eos_test_utils::{
         get_j3_init_json_n,
         get_mainnet_init_json_n,
+        get_sample_init_block_with_v1_schedule,
         get_sample_mainnet_init_json_with_eos_eth_token_dictionary,
         NUM_J3_INIT_SAMPLES,
         NUM_MAINNET_INIT_SAMPLES,
@@ -319,5 +310,12 @@ mod tests {
     fn should_parse_init_json_with_eos_eth_token_dictionary() {
         let init_json_with_eos_eth_token_dictionary = get_sample_mainnet_init_json_with_eos_eth_token_dictionary();
         assert!(init_json_with_eos_eth_token_dictionary.is_ok());
+    }
+
+    #[test]
+    fn should_get_init_json_from_init_block_with_v1_schedule() {
+        let fio_init_json_string = get_sample_init_block_with_v1_schedule().unwrap();
+        let result = EosInitJson::from_json_string(&fio_init_json_string);
+        assert!(result.is_ok());
     }
 }

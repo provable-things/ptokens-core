@@ -1,6 +1,7 @@
 use std::fmt;
 
-use eos_primitives::{Checksum256, PermissionLevel as EosPermissionLevel};
+use eos_chain::{Checksum256, PermissionLevel as EosPermissionLevel};
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 pub type PermissionLevels = Vec<EosPermissionLevel>;
@@ -124,12 +125,6 @@ pub struct EosBlockHeaderJson {
 pub struct ProducerSchedule {
     pub version: u32,
     pub producers: ProducerKeys,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ProducerKeyJsonV2 {
-    pub producer_name: String,
-    pub block_signing_key: String,
 }
 
 #[derive(Debug)]

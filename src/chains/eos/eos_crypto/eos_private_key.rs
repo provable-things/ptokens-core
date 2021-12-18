@@ -1,6 +1,9 @@
 use std::{fmt, str::FromStr};
 
-use bitcoin_hashes::{sha256, Hash as HashTrait};
+use bitcoin::{
+    hashes::{sha256, Hash as HashTrait},
+    util::base58,
+};
 use secp256k1::{
     key::{PublicKey, SecretKey, ONE_KEY},
     Message,
@@ -8,7 +11,6 @@ use secp256k1::{
 };
 
 use crate::{
-    base58,
     chains::eos::{
         eos_constants::EOS_PRIVATE_KEY_DB_KEY,
         eos_crypto::{eos_public_key::EosPublicKey, eos_signature::EosSignature},
@@ -48,7 +50,7 @@ impl EosPrivateKey {
         Ok(Self {
             compressed: false,
             network: EosNetwork::Mainnet, // NOTE: Since they're all same.
-            private_key: SecretKey::from_slice(&slice)?,
+            private_key: SecretKey::from_slice(slice)?,
         })
     }
 
@@ -72,7 +74,7 @@ impl EosPrivateKey {
     }
 
     pub fn sign_hash(&self, hash: &[u8]) -> Result<EosSignature> {
-        let msg = match Message::from_slice(&hash) {
+        let msg = match Message::from_slice(hash) {
             Ok(msg) => msg,
             Err(err) => return Err(err.into()),
         };
@@ -84,7 +86,7 @@ impl EosPrivateKey {
     }
 
     pub fn sign_message_bytes(&self, message_slice: &[u8]) -> Result<EosSignature> {
-        let msg_hash = sha256::Hash::hash(&message_slice);
+        let msg_hash = sha256::Hash::hash(message_slice);
         self.sign_hash(&msg_hash)
     }
 
@@ -138,7 +140,7 @@ impl Drop for EosPrivateKey {
 
 #[cfg(test)]
 mod test {
-    use bitcoin_hashes::{sha256, Hash as HashTrait};
+    use bitcoin::hashes::{sha256, Hash as HashTrait};
 
     use super::*;
     use crate::{

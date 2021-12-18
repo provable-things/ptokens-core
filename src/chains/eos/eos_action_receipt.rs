@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
-use bitcoin_hashes::{sha256, Hash};
-use eos_primitives::{AccountName as EosAccountName, Checksum256, NumBytes, Read, SerializeData, Write};
+use bitcoin::hashes::{sha256, Hash};
+use eos_chain::{names::AccountName as EosAccountName, Checksum256, NumBytes, Read, SerializeData, Write};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     chains::eos::{
@@ -13,8 +14,8 @@ use crate::{
 
 pub type AuthSequences = Vec<AuthSequence>;
 
-#[derive(Clone, Debug, Deserialize, Serialize, Read, Write, NumBytes, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[eosio_core_root_path = "eos_primitives"]
+#[derive(Clone, Debug, Read, Write, Deserialize, Serialize, NumBytes, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[eosio_core_root_path = "eos_chain"]
 pub struct AuthSequence(EosAccountName, u64);
 
 impl SerializeData for AuthSequence {}
@@ -25,8 +26,8 @@ impl AuthSequence {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Read, Write, NumBytes, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[eosio_core_root_path = "eos_primitives"]
+#[derive(Clone, Debug, Read, Write, Serialize, Deserialize, NumBytes, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[eosio_core_root_path = "eos_chain"]
 pub struct EosActionReceipt {
     pub recipient: EosAccountName,
     pub act_digest: Checksum256,
@@ -61,12 +62,12 @@ impl EosActionReceipt {
         })
     }
 
-    pub fn serialize(&self) -> Bytes {
-        self.to_serialize_data()
+    pub fn serialize(&self) -> crate::Result<Bytes> {
+        Ok(self.to_serialize_data()?)
     }
 
-    pub fn to_digest(&self) -> Bytes {
-        sha256::Hash::hash(&self.serialize()).to_vec()
+    pub fn to_digest(&self) -> crate::Result<Bytes> {
+        Ok(sha256::Hash::hash(&self.serialize()?).to_vec())
     }
 
     fn parse_auth_sequence_jsons(auth_sequence_jsons: &[AuthSequenceJson]) -> crate::Result<AuthSequences> {

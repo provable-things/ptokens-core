@@ -10,7 +10,7 @@ where
 {
     info!("✔ Maybe saving BTC UTXOs...");
     match &state.btc_utxos_and_values {
-        Some(utxos) => save_utxos_to_db(&state.db, &utxos).and(Ok(state)),
+        Some(utxos) => save_utxos_to_db(&state.db, utxos).and(Ok(state)),
         None => {
             info!("✔ No BTC UTXOs in state to save!");
             Ok(state)

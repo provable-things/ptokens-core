@@ -1,4 +1,4 @@
-use bitcoin_hashes::sha256d;
+use bitcoin::BlockHash;
 
 use crate::{
     chains::btc::{
@@ -10,7 +10,7 @@ use crate::{
     types::Result,
 };
 
-fn is_anchor_block<D: DatabaseInterface>(db: &D, btc_block_hash: &sha256d::Hash) -> Result<bool> {
+fn is_anchor_block<D: DatabaseInterface>(db: &D, btc_block_hash: &BlockHash) -> Result<bool> {
     match get_btc_anchor_block_hash_from_db(db) {
         Ok(ref hash) => Ok(hash == btc_block_hash),
         _ => Err("✘ No anchor hash found in db!".into()),

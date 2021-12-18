@@ -7,6 +7,7 @@ pub use bitcoin::{
     hashes::sha256d,
     util::address::Address as BtcAddress,
 };
+use serde::Deserialize;
 
 use crate::{
     chains::btc::{
@@ -23,7 +24,7 @@ pub fn parse_btc_submission_json_and_put_in_state<D: DatabaseInterface>(
     state: BtcState<D>,
 ) -> Result<BtcState<D>> {
     info!("✔ Parsing BTC submission json and adding to state...");
-    BtcSubmissionMaterialJson::from_str(&json_str).and_then(|result| state.add_btc_submission_json(result))
+    BtcSubmissionMaterialJson::from_str(json_str).and_then(|result| state.add_btc_submission_json(result))
 }
 
 pub fn parse_submission_material_and_put_in_state<D: DatabaseInterface>(
@@ -31,7 +32,7 @@ pub fn parse_submission_material_and_put_in_state<D: DatabaseInterface>(
     state: BtcState<D>,
 ) -> Result<BtcState<D>> {
     info!("✔ Parsing BTC submisson material and adding to state...");
-    BtcSubmissionMaterial::from_str(&json_str).and_then(|result| state.add_btc_submission_material(result))
+    BtcSubmissionMaterial::from_str(json_str).and_then(|result| state.add_btc_submission_material(result))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
@@ -58,10 +59,10 @@ impl BtcSubmissionMaterialJson {
 
     pub fn to_btc_block(&self) -> Result<BtcBlock> {
         info!("✔ Parsing `BtcSubmissionMaterialJson` to `BtcBlock`...");
-        Ok(BtcBlock::new(
-            self.block.to_block_header()?,
-            Self::convert_hex_txs_to_btc_transactions(self.transactions.clone())?,
-        ))
+        Ok(BtcBlock {
+            header: self.block.to_block_header()?,
+            txdata: Self::convert_hex_txs_to_btc_transactions(self.transactions.clone())?,
+        })
     }
 
     pub fn from_str(string: &str) -> Result<Self> {

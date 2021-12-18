@@ -1,4 +1,5 @@
 use derive_more::{Constructor, Deref, DerefMut};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
 
 use crate::{
@@ -15,7 +16,7 @@ pub struct GlobalSequences(Vec<GlobalSequence>);
 
 impl GlobalSequences {
     pub fn from_str(s: &str) -> Result<Self> {
-        Ok(Self::new(serde_json::from_str::<Vec<u64>>(&s)?))
+        Ok(Self::new(serde_json::from_str::<Vec<u64>>(s)?))
     }
 }
 

@@ -30,13 +30,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        chains::eth::eth_test_utils::{
-            get_valid_state_with_block_and_receipts,
-            get_valid_state_with_invalid_block_and_receipts,
-        },
-        errors::AppError,
-    };
+    use crate::chains::eth::eth_test_utils::get_valid_state_with_block_and_receipts;
+    #[cfg(not(feature = "non-validating"))]
+    use crate::{chains::eth::eth_test_utils::get_valid_state_with_invalid_block_and_receipts, errors::AppError};
 
     #[test]
     fn should_validate_receipts_in_state() {

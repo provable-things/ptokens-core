@@ -1,19 +1,20 @@
 use ethereum_types::Address as EthAddress;
+use secp256k1::key::PublicKey;
 
-use crate::{chains::eth::eth_crypto_utils::keccak_hash_bytes, types::Bytes};
+use crate::{crypto_utils::keccak_hash_bytes, types::Bytes};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct EthPublicKey {
     pub compressed: bool,
-    pub public_key: secp256k1::key::PublicKey,
+    pub public_key: PublicKey,
 }
 
 impl EthPublicKey {
-    pub fn to_bytes(&self) -> Bytes {
+    pub fn to_bytes(self) -> Bytes {
         self.public_key.serialize_uncompressed().to_vec()
     }
 
-    pub fn to_address(&self) -> EthAddress {
+    pub fn to_address(self) -> EthAddress {
         let mut eth_address = EthAddress::zero();
         eth_address.assign_from_slice(&keccak_hash_bytes(&self.to_bytes()[1..65].to_vec())[12..]);
         eth_address

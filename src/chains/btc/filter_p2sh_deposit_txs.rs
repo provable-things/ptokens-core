@@ -23,7 +23,7 @@ fn is_address_locked_to_pub_key(
     deposit_info: &DepositInfoHashMap,
 ) -> bool {
     trace!("✔ Checking if address is locked to enclave's public key...");
-    match deposit_info.get(&address_from_utxo) {
+    match deposit_info.get(address_from_utxo) {
         None => {
             trace!("✘ Address {} is NOT in hash map!", address_from_utxo);
             false

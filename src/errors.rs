@@ -19,7 +19,11 @@ quick_error! {
             from()
             display("✘ Crypto Error!\n✘ {}", err)
         }
-        Base58Error(err: crate::base58::Error) {
+        BitcoinCryptoError(err: bitcoin::secp256k1::Error) {
+            from()
+            display("✘ Bitcoin Crypto Error!\n✘ {}", err)
+        }
+        Base58Error(err: bitcoin::util::base58::Error) {
             from()
             display("✘ Base58 Error!\n✘ {}", err)
         }
@@ -43,11 +47,11 @@ quick_error! {
             from()
             display("✘ Chrono Error!\n✘ {}", err)
         }
-        EosPrimitivesError(err: eos_primitives::Error) {
+        EosPrimitivesError(err: eos_chain::Error) {
             from()
-            display("✘ Eos Primitives Error!\n✘ {:?}", err)
+            display("✘ EOS Chain Error!\n✘ {:?}", err)
         }
-        BitcoinHexError(err: bitcoin_hashes::hex::Error) {
+        BitcoinHexError(err: bitcoin::hashes::hex::Error) {
             from()
             display("✘ Bitcoin Hex Error!\n✘ {}", err)
         }
@@ -59,7 +63,7 @@ quick_error! {
             from(std::array::TryFromSliceError)
             display("✘ From slice Error!\n✘ {}", err)
         }
-        BitcoinHashError(err: bitcoin_hashes::Error) {
+        BitcoinHashError(err: bitcoin::hashes::Error) {
             from()
             display("✘ Bitcoin Hash Error!\n✘ {}", err)
         }
@@ -71,13 +75,20 @@ quick_error! {
             from()
             display("✘ Bitcoin Address Error!\n✘ {}", err)
         }
-        EosPrimitivesNamesError(err: eos_primitives::ParseNameError) {
+        BitcoinScriptError(err: bitcoin::blockdata::script::Error) {
             from()
-            display("✘ Eos Primitives Names Error!\n✘ {}", err)
+            display("✘ Bitcoin Script Error!\n✘ {}", err)
+        }
+        BitcoinKeyError(err: bitcoin::util::key::Error) {
+            from()
+            display("✘ Bitcoin Key Error!\n✘ {}", err)
+        }        EosPrimitivesNamesError(err: eos_chain::ParseNameError) {
+            from()
+            display("✘ EOS Chain Names Error!\n✘ {}", err)
         }
         EthAbiError(err: ethabi::Error) {
             from()
-            display("✘ Eth ABI  Error!\n✘ {}", err)
+            display("✘ ETH ABI Error!\n✘ {}", err)
         }
         RlpDecoderError(err: rlp::DecoderError) {
             from()
@@ -87,13 +98,21 @@ quick_error! {
             from()
             display("✘ Ethereum types `from_dec_str` err: {}", err)
         }
-        EosParseAssetErr(err: eos_primitives::ParseAssetError) {
+        EosParseAssetErr(err: eos_chain::ParseAssetError) {
             from()
             display("✘ EOS parse asset error: {:?}", err)
         }
-        EosWriteError(err: eos_primitives::WriteError) {
+        EosWriteError(err: eos_chain::WriteError) {
             from()
             display("✘ EOS write error: {:?}", err)
+        }
+        TryFromError(err: std::num::TryFromIntError) {
+            from()
+            display("✘ `TryFrom` error: {:?}", err)
+        }
+        TryFromSliceError(err: std::array::TryFromSliceError) {
+            from()
+            display("✘ `TryFromSlice` error: {:?}", err)
         }
         NoneError(err: &'static str) {
             display("✘ None Error!\n✘ {}", err)

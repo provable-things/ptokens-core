@@ -38,7 +38,7 @@ pub fn initialize_eos_core<D: DatabaseInterface>(
     maybe_token_symbol: Option<&str>,
     eos_init_json: &str,
 ) -> Result<String> {
-    let init_json = EosInitJson::from_json_string(&eos_init_json)?;
+    let init_json = EosInitJson::from_json_string(eos_init_json)?;
     info!("✔ Initializing core for EOS...");
     start_eos_db_transaction_and_return_state(EosState::init(db))
         .and_then(put_empty_processed_tx_ids_in_db_and_return_state)

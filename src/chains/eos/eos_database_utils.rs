@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
-use eos_primitives::{AccountName as EosAccountName, Checksum256};
+use eos_chain::{AccountName as EosAccountName, Checksum256};
 
 use crate::{
     chains::eos::{
+        eos_chain_id::EosChainId,
         eos_constants::{
             EOS_ACCOUNT_NAME_KEY,
             EOS_ACCOUNT_NONCE_KEY,
@@ -21,7 +22,6 @@ use crate::{
         eos_producer_schedule::EosProducerScheduleV2,
         eos_types::EosKnownSchedules,
         eos_utils::{convert_hex_to_checksum256, get_eos_schedule_db_key},
-        parse_eos_schedule::parse_v2_schedule_string_to_v2_schedule,
         protocol_features::EnabledFeatures,
     },
     constants::MIN_DATA_SENSITIVITY_LEVEL,
@@ -143,7 +143,7 @@ pub fn put_eos_schedule_in_db<D: DatabaseInterface>(db: &D, schedule: &EosProduc
 pub fn get_eos_schedule_from_db<D: DatabaseInterface>(db: &D, version: u32) -> Result<EosProducerScheduleV2> {
     debug!("✔ Getting EOS schedule from db...");
     match get_string_from_db(db, &get_eos_schedule_db_key(version)) {
-        Ok(json) => parse_v2_schedule_string_to_v2_schedule(&json),
+        Ok(json) => EosProducerScheduleV2::from_json(&json),
         Err(_) => Err(format!("✘ Core does not have EOS schedule version: {}", version).into()),
     }
 }
@@ -180,17 +180,20 @@ pub fn get_eos_account_name_string_from_db<D: DatabaseInterface>(db: &D) -> Resu
 
 pub fn get_eos_account_name_from_db<D: DatabaseInterface>(db: &D) -> Result<EosAccountName> {
     debug!("✔ Getting EOS account name from db...");
-    Ok(EosAccountName::from_str(&get_eos_account_name_string_from_db(db)?)?)
+    match get_eos_account_name_string_from_db(db) {
+        Err(_) => Err("No EOS account name in DB! Did you forget to set it?".into()),
+        Ok(ref s) => Ok(EosAccountName::from_str(s)?),
+    }
 }
 
-pub fn put_eos_chain_id_in_db<D: DatabaseInterface>(db: &D, chain_id: &str) -> Result<()> {
+pub fn put_eos_chain_id_in_db<D: DatabaseInterface>(db: &D, chain_id: &EosChainId) -> Result<()> {
     debug!("✔ Putting EOS chain ID in db...");
-    put_string_in_db(db, &EOS_CHAIN_ID_DB_KEY.to_vec(), chain_id)
+    put_string_in_db(db, &EOS_CHAIN_ID_DB_KEY.to_vec(), &chain_id.to_hex())
 }
 
-pub fn get_eos_chain_id_from_db<D: DatabaseInterface>(db: &D) -> Result<String> {
-    debug!("✔ Getting EOS chain ID from db...");
-    get_string_from_db(db, &EOS_CHAIN_ID_DB_KEY.to_vec())
+pub fn get_eos_chain_id_from_db<D: DatabaseInterface>(db: &D) -> Result<EosChainId> {
+    info!("✔ Getting EOS chain ID from db...");
+    EosChainId::from_str(&get_string_from_db(db, &EOS_CHAIN_ID_DB_KEY.to_vec())?)
 }
 
 #[cfg(test)]

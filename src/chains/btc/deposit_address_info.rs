@@ -6,6 +6,7 @@ use bitcoin::{
     util::address::Address as BtcAddress,
 };
 use derive_more::{Constructor, Deref};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     chains::btc::{
@@ -52,7 +53,7 @@ impl DepositAddressInfoVersion {
     pub fn from_maybe_string(maybe_string: &Option<String>) -> Result<Self> {
         match maybe_string {
             None => Ok(DepositAddressInfoVersion::V0),
-            Some(version_string) => DepositAddressInfoVersion::from_string(&version_string),
+            Some(version_string) => DepositAddressInfoVersion::from_string(version_string),
         }
     }
 
@@ -101,6 +102,7 @@ impl DepositAddressInfoJson {
 
 #[cfg(test)]
 use crate::types::Byte;
+
 #[cfg(test)]
 impl DepositAddressInfoJson {
     pub fn new(

@@ -2,19 +2,19 @@ use std::fmt;
 
 use bitcoin::{
     network::constants::Network,
+    secp256k1::{
+        key::{PublicKey, SecretKey},
+        rand::thread_rng,
+        Message,
+        Secp256k1,
+        Signature,
+    },
     util::{address::Address as BtcAddress, key::PrivateKey},
-};
-use secp256k1::{
-    key::{PublicKey, SecretKey},
-    Message,
-    Secp256k1,
-    Signature,
 };
 
 use crate::{
     chains::btc::{btc_types::BtcPubKeySlice, btc_utils::get_btc_one_key},
     constants::PRIVATE_KEY_DATA_SENSITIVITY_LEVEL,
-    crypto_utils::generate_random_private_key,
     traits::DatabaseInterface,
     types::{Byte, Bytes, Result},
 };
@@ -31,7 +31,7 @@ impl BtcPrivateKey {
         Ok(Self(PrivateKey {
             network,
             compressed: true,
-            key: SecretKey::from_slice(&slice)?,
+            key: SecretKey::from_slice(slice)?,
         }))
     }
 
@@ -39,7 +39,7 @@ impl BtcPrivateKey {
         Ok(Self(PrivateKey {
             network,
             compressed: false,
-            key: generate_random_private_key()?,
+            key: SecretKey::new(&mut thread_rng()),
         }))
     }
 
@@ -93,7 +93,7 @@ impl Drop for BtcPrivateKey {
 
 #[cfg(test)]
 mod tests {
-    use bitcoin_hashes::{sha256d, Hash};
+    use bitcoin::hashes::{sha256d, Hash};
 
     use super::*;
     use crate::chains::btc::btc_test_utils::{

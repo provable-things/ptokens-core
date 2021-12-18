@@ -17,11 +17,6 @@ use crate::{
                 remove_eos_eth_token_dictionary_entry,
                 update_incremerkle,
             },
-            eos_eth_token_dictionary::{
-                get_eos_eth_token_dictionary_from_db_and_add_to_eos_state,
-                get_eos_eth_token_dictionary_from_db_and_add_to_eth_state,
-                EosEthTokenDictionary,
-            },
             eos_global_sequences::{
                 get_processed_global_sequences_and_add_to_state,
                 maybe_add_global_sequences_to_processed_list_and_return_state,
@@ -41,12 +36,12 @@ use crate::{
         },
         eth::{
             eth_constants::{get_eth_constants_db_keys, ETH_PRIVATE_KEY_DB_KEY},
-            eth_contracts::perc20::{
-                encode_perc20_add_supported_token_fx_data,
-                encode_perc20_migrate_fxn_data,
-                encode_perc20_remove_supported_token_fx_data,
-                PERC20_CHANGE_SUPPORTED_TOKEN_GAS_LIMIT,
-                PERC20_MIGRATE_GAS_LIMIT,
+            eth_contracts::erc20_vault::{
+                encode_erc20_vault_add_supported_token_fx_data,
+                encode_erc20_vault_migrate_fxn_data,
+                encode_erc20_vault_remove_supported_token_fx_data,
+                ERC20_VAULT_CHANGE_SUPPORTED_TOKEN_GAS_LIMIT,
+                ERC20_VAULT_MIGRATE_GAS_LIMIT,
             },
             eth_crypto::eth_transaction::EthTransaction,
             eth_database_utils::{
@@ -58,6 +53,7 @@ use crate::{
                 increment_eth_account_nonce_in_db,
                 put_erc20_on_eos_smart_contract_address_in_db,
             },
+            eth_debug_functions::debug_set_eth_gas_price_in_db,
             eth_state::EthState,
             eth_submission_material::parse_eth_submission_material_and_put_in_state,
             eth_utils::get_eth_address_from_str,
@@ -68,6 +64,14 @@ use crate::{
     check_debug_mode::check_debug_mode,
     constants::{DB_KEY_PREFIX, PRIVATE_KEY_DATA_SENSITIVITY_LEVEL},
     debug_database_utils::{get_key_from_db, set_key_in_db_to_value},
+    dictionaries::{
+        dictionary_constants::EOS_ETH_DICTIONARY_KEY,
+        eos_eth::{
+            get_eos_eth_token_dictionary_from_db_and_add_to_eos_state,
+            get_eos_eth_token_dictionary_from_db_and_add_to_eth_state,
+            EosEthTokenDictionary,
+        },
+    },
     erc20_on_eos::{
         check_core_is_initialized::{
             check_core_is_initialized,
@@ -85,9 +89,9 @@ use crate::{
             peg_in_info::{
                 filter_out_zero_value_peg_ins_from_state,
                 filter_submission_material_for_peg_in_events_in_state,
+                maybe_sign_eos_txs_and_add_to_eth_state,
                 Erc20OnEosPegInInfos,
             },
-            sign_eos_transactions::maybe_sign_eos_txs_and_add_to_eth_state,
         },
     },
     traits::DatabaseInterface,
@@ -107,7 +111,7 @@ use crate::{
 /// and why.
 pub fn debug_update_incremerkle<D: DatabaseInterface>(db: &D, eos_init_json: &str) -> Result<String> {
     check_core_is_initialized(db)
-        .and_then(|_| update_incremerkle(db, &EosInitJson::from_json_string(&eos_init_json)?))
+        .and_then(|_| update_incremerkle(db, &EosInitJson::from_json_string(eos_init_json)?))
         .map(prepend_debug_output_marker_to_string)
 }
 
@@ -157,6 +161,7 @@ pub fn debug_get_all_db_keys() -> Result<String> {
         "eth": get_eth_constants_db_keys(),
         "eos": get_eos_constants_db_keys(),
         "db-key-prefix": DB_KEY_PREFIX.to_string(),
+        "dictionary": hex::encode(EOS_ETH_DICTIONARY_KEY.to_vec()),
     })
     .to_string()))
 }
@@ -195,7 +200,7 @@ pub fn debug_remove_eos_eth_token_dictionary_entry<D: DatabaseInterface>(
     check_core_is_initialized(&db).and_then(|_| remove_eos_eth_token_dictionary_entry(&db, eth_address_str))
 }
 
-/// # Debug Get PERC20 Migration Transaction
+/// # Debug Get ERC20_VAULT Migration Transaction
 ///
 /// This function will create and sign a transaction that calls the `migrate` function on the
 /// current `pERC20-on-EOS` smart-contract, migrationg it to the ETH address provided as an
@@ -209,7 +214,7 @@ pub fn debug_remove_eos_eth_token_dictionary_entry<D: DatabaseInterface>(
 /// ### BEWARE:
 /// This function outputs a signed transaction which if NOT broadcast will result in the enclave no
 /// longer working.  Use with extreme caution and only if you know exactly what you are doing!
-pub fn debug_get_perc20_migration_tx<D>(db: D, new_eos_erc20_smart_contract_address_string: &str) -> Result<String>
+pub fn debug_get_erc20_vault_migration_tx<D>(db: D, new_eos_erc20_smart_contract_address_string: &str) -> Result<String>
 where
     D: DatabaseInterface,
 {
@@ -222,19 +227,19 @@ where
         .and_then(|_| check_core_is_initialized(&db))
         .and_then(|_| increment_eth_account_nonce_in_db(&db, 1))
         .and_then(|_| put_erc20_on_eos_smart_contract_address_in_db(&db, &new_eos_erc20_smart_contract_address))
-        .and_then(|_| encode_perc20_migrate_fxn_data(new_eos_erc20_smart_contract_address))
+        .and_then(|_| encode_erc20_vault_migrate_fxn_data(new_eos_erc20_smart_contract_address))
         .and_then(|tx_data| {
             Ok(EthTransaction::new_unsigned(
                 tx_data,
                 current_eth_account_nonce,
                 0,
                 current_eos_erc20_smart_contract_address,
-                get_eth_chain_id_from_db(&db)?,
-                PERC20_MIGRATE_GAS_LIMIT,
+                &get_eth_chain_id_from_db(&db)?,
+                ERC20_VAULT_MIGRATE_GAS_LIMIT,
                 get_eth_gas_price_from_db(&db)?,
             ))
         })
-        .and_then(|unsigned_tx| unsigned_tx.sign(get_eth_private_key_from_db(&db)?))
+        .and_then(|unsigned_tx| unsigned_tx.sign(&get_eth_private_key_from_db(&db)?))
         .map(|signed_tx| signed_tx.serialize_hex())
         .and_then(|hex_tx| {
             db.end_transaction()?;
@@ -250,7 +255,7 @@ where
 /// # Debug Get Add Supported Token Transaction
 ///
 /// This function will sign a transaction to add the given address as a supported token to
-/// the `perc20-on-eos` smart-contract.
+/// the `erc20-vault-on-eos` smart-contract.
 ///
 /// ### NOTE:
 /// This function will increment the core's ETH nonce, meaning the outputted reports will have a
@@ -271,19 +276,19 @@ where
     check_debug_mode()
         .and_then(|_| check_core_is_initialized(&db))
         .and_then(|_| increment_eth_account_nonce_in_db(&db, 1))
-        .and_then(|_| encode_perc20_add_supported_token_fx_data(eth_address))
+        .and_then(|_| encode_erc20_vault_add_supported_token_fx_data(eth_address))
         .and_then(|tx_data| {
             Ok(EthTransaction::new_unsigned(
                 tx_data,
                 current_eth_account_nonce,
                 0,
                 get_erc20_on_eos_smart_contract_address_from_db(&db)?,
-                get_eth_chain_id_from_db(&db)?,
-                PERC20_CHANGE_SUPPORTED_TOKEN_GAS_LIMIT,
+                &get_eth_chain_id_from_db(&db)?,
+                ERC20_VAULT_CHANGE_SUPPORTED_TOKEN_GAS_LIMIT,
                 get_eth_gas_price_from_db(&db)?,
             ))
         })
-        .and_then(|unsigned_tx| unsigned_tx.sign(get_eth_private_key_from_db(&db)?))
+        .and_then(|unsigned_tx| unsigned_tx.sign(&get_eth_private_key_from_db(&db)?))
         .map(|signed_tx| signed_tx.serialize_hex())
         .and_then(|hex_tx| {
             db.end_transaction()?;
@@ -294,7 +299,7 @@ where
 /// # Debug Get Remove Supported Token Transaction
 ///
 /// This function will sign a transaction to remove the given address as a supported token to
-/// the `perc20-on-eos` smart-contract.
+/// the `erc20-vault-on-eos` smart-contract.
 ///
 /// ### NOTE:
 /// This function will increment the core's ETH nonce, meaning the outputted reports will have a
@@ -315,19 +320,19 @@ where
     check_debug_mode()
         .and_then(|_| check_core_is_initialized(&db))
         .and_then(|_| increment_eth_account_nonce_in_db(&db, 1))
-        .and_then(|_| encode_perc20_remove_supported_token_fx_data(eth_address))
+        .and_then(|_| encode_erc20_vault_remove_supported_token_fx_data(eth_address))
         .and_then(|tx_data| {
             Ok(EthTransaction::new_unsigned(
                 tx_data,
                 current_eth_account_nonce,
                 0,
                 get_erc20_on_eos_smart_contract_address_from_db(&db)?,
-                get_eth_chain_id_from_db(&db)?,
-                PERC20_CHANGE_SUPPORTED_TOKEN_GAS_LIMIT,
+                &get_eth_chain_id_from_db(&db)?,
+                ERC20_VAULT_CHANGE_SUPPORTED_TOKEN_GAS_LIMIT,
                 get_eth_gas_price_from_db(&db)?,
             ))
         })
-        .and_then(|unsigned_tx| unsigned_tx.sign(get_eth_private_key_from_db(&db)?))
+        .and_then(|unsigned_tx| unsigned_tx.sign(&get_eth_private_key_from_db(&db)?))
         .map(|signed_tx| signed_tx.serialize_hex())
         .and_then(|hex_tx| {
             db.end_transaction()?;
@@ -372,7 +377,11 @@ pub fn debug_reprocess_eth_block<D: DatabaseInterface>(db: D, block_json_string:
                     );
                     EosEthTokenDictionary::get_from_db(&state.db)
                         .and_then(|token_dictionary| {
-                            Erc20OnEosPegInInfos::from_submission_material(&submission_material, &token_dictionary)
+                            Erc20OnEosPegInInfos::from_submission_material(
+                                &submission_material,
+                                &token_dictionary,
+                                &get_eth_chain_id_from_db(&state.db)?,
+                            )
                         })
                         .and_then(|peg_in_infos| state.add_erc20_on_eos_peg_in_infos(peg_in_infos))
                 },
@@ -428,4 +437,11 @@ where
 /// This function returns the list of already-processed action global sequences in JSON format.
 pub fn debug_get_processed_actions_list<D: DatabaseInterface>(db: &D) -> Result<String> {
     check_core_is_initialized(db).and_then(|_| get_processed_actions_list(db))
+}
+
+/// Debug Set ETH Gas Price
+///
+/// This function sets the ETH gas price to use when making ETH transactions. It's unit is `Wei`.
+pub fn debug_set_eth_gas_price<D: DatabaseInterface>(db: D, gas_price: u64) -> Result<String> {
+    debug_set_eth_gas_price_in_db(&db, gas_price)
 }

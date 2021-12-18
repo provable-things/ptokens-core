@@ -1,4 +1,4 @@
-use tiny_keccak::keccak256;
+use tiny_keccak::{Hasher, Keccak};
 
 use crate::chains::eth::{eth_types::EthHash, eth_utils::convert_h256_to_bytes};
 
@@ -13,7 +13,11 @@ pub fn calculate_linker_hash(
         convert_h256_to_bytes(linker_hash),
     ]
     .concat();
-    EthHash::from(keccak256(&data))
+    let mut keccak = Keccak::v256();
+    let mut hashed = [0u8; 32];
+    keccak.update(&data);
+    keccak.finalize(&mut hashed);
+    EthHash::from(&hashed)
 }
 
 #[cfg(test)]
